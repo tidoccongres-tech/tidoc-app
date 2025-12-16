@@ -1,0 +1,12 @@
+{
+  "name": "tidoc",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "build": "echo 'static site'"
+  },
+  "dependencies": {
+    "@capacitor/core": "^6.0.0",
+    "@capacitor/cli": "^6.0.0"
+  }
+}

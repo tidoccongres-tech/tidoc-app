@@ -1,0 +1,724 @@
+:root{
+  --tidoc:#178CA8;
+  --bg:#ffffff;
+  --muted:#5aaec0;
+  --line:#eaeaea;
+}
+
+/* ===== RESET ===== */
+*{ box-sizing:border-box; }
+
+html, body{
+  margin:0;
+  min-height:100%;
+  overflow-x:hidden;                 /* évite le “gros zoom / débordement” */
+  -webkit-overflow-scrolling:touch;
+  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;
+  background:var(--bg);
+  color:#1f2a2e;
+}
+
+img, svg{
+  max-width:100%;
+  height:auto;
+}
+
+/* ===== PAGE ===== */
+.page{
+  padding:20px;
+  padding-bottom:160px; /* place tabbar */
+  max-width:520px;
+  margin:0 auto;
+}
+
+/* ===== CARTES ===== */
+.card{
+  border:1px solid var(--line);
+  border-radius:16px;
+  padding:16px;
+  background:#fff;
+  box-shadow:0 10px 24px rgba(0,0,0,.06);
+}
+
+.center{ display:flex; justify-content:center; }
+
+/* ===== BOUTONS ===== */
+.btn-outline{
+  background:#fff;
+  color:var(--tidoc);
+  border:2px solid var(--tidoc);
+  border-radius:12px;
+  height:44px;
+  padding:0 16px;
+  font-weight:700;
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  text-decoration:none;
+}
+
+.btn-primary{
+  background:var(--tidoc);
+  color:#fff;
+  border:none;
+  border-radius:12px;
+  height:44px;
+  padding:0 16px;
+  font-weight:700;
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  text-decoration:none;
+}
+
+/* ===== TABBAR ===== */
+.tabbar{
+  position:fixed;
+  left:0; right:0; bottom:0;
+  height:72px;
+  background:#fff;
+  border-top:1px solid var(--line);
+  display:flex;
+  justify-content:space-around;
+  align-items:center;
+  z-index:9999;
+}
+
+.tab{
+  text-decoration:none;
+  font-size:12px;
+  font-weight:800;
+  color:var(--muted);
+  padding:10px 12px;
+  border-radius:12px;
+}
+
+.tab.active{
+  color:var(--tidoc);
+  background:rgba(23,140,168,.12);
+}
+
+/* ===== TOPBAR (Blog/Galerie/Events + Home maintenant) ===== */
+.blog-topbar{
+  position:sticky;
+  top:0;
+  height:54px;
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  padding:0 14px;
+  background:var(--tidoc);
+  z-index:999;
+}
+
+.blog-topbar-left{
+  display:flex;
+  align-items:center;
+  gap:10px;
+}
+
+/* icônes SVG */
+.icon{
+  width:22px;
+  height:22px;
+  fill:currentColor;
+  display:block;
+}
+
+.blog-topbar .icon-btn{
+  color:#fff;
+  background:transparent;
+  border:none;
+  padding:8px;
+  border-radius:12px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+}
+
+/* ===== PROFIL TOPBAR ===== */
+.profile-btn{
+  position:relative;
+  border:none;
+  background:transparent;
+  padding:0;
+  cursor:pointer;
+}
+
+.profile-circle{
+  width:34px;
+  height:34px;
+  border-radius:50%;
+  background:#fff;
+  color:var(--tidoc);
+  font-weight:900;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  overflow:hidden;
+  box-shadow:0 6px 18px rgba(0,0,0,.15);
+}
+
+#profileImg{
+  width:100%;
+  height:100%;
+  object-fit:cover;
+  display:none;
+}
+
+#profileInitial{ display:block; }
+
+.status-dot{
+  position:absolute;
+  right:-2px;
+  bottom:-2px;
+  width:10px;
+  height:10px;
+  border-radius:50%;
+  background:#cfcfcf;
+  border:2px solid var(--tidoc);
+}
+
+.profile-menu{
+  position:absolute;
+  top:56px;
+  left:12px;
+  background:#fff;
+  border:1px solid rgba(0,0,0,.08);
+  border-radius:12px;
+  box-shadow:0 10px 30px rgba(0,0,0,.12);
+  z-index:9999;
+  overflow:hidden;
+}
+
+.menu-item{
+  padding:12px 14px;
+  width:100%;
+  border:none;
+  background:#fff;
+  text-align:left;
+  font-weight:600;
+}
+
+/* ===== BLOG / EVENTS / GALERIE (bouton créer) ===== */
+.blog-page{ padding-top:14px; }
+
+.create-post{
+  width:100%;
+  border:1px solid var(--line);
+  background:#fff;
+  border-radius:14px;
+  padding:14px 16px;
+  display:flex;
+  align-items:center;     /* centrage vertical */
+  gap:12px;
+  font-weight:800;
+  color:var(--tidoc);
+}
+
+.create-post-plus{
+  width:26px;
+  height:26px;
+  border-radius:8px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  background:rgba(23,140,168,.12);
+  font-size:18px;
+  line-height:1;
+}
+
+/* ===== POSTS ===== */
+.post-card{ margin-bottom:12px; }
+
+.post-head{
+  display:flex;
+  justify-content:space-between;
+  align-items:flex-start;
+  gap:10px;
+}
+
+.post-title{
+  font-weight:800;
+  font-size:16px;
+  line-height:1.15;
+  overflow-wrap:anywhere;
+}
+
+.post-sub{
+  font-size:12px;
+  opacity:.6;
+}
+
+.post-body{
+  margin-top:8px;
+  font-size:14px;
+  color:#44565c;
+  line-height:1.45;
+  white-space:pre-wrap;
+  overflow-wrap:anywhere;
+}
+
+.post-actions{
+  display:flex;
+  align-items:center;
+  gap:10px;
+  margin-top:10px;
+}
+
+.like-btn{
+  background:none;
+  border:none;
+  padding:0;
+  cursor:pointer;
+  color:#b0b0b0;
+  display:flex;
+  align-items:center;
+}
+.like-btn.liked{ color:var(--tidoc); }
+
+.like-btn .icon-heart{
+  width:20px;
+  height:20px;
+  display:block;
+}
+
+.like-meta{ font-size:13px; opacity:.7; }
+
+.delete-btn,
+.comment-del{
+  background:none;
+  border:none;
+  padding:0;
+  cursor:pointer;
+  color:var(--tidoc);
+  display:flex;
+  align-items:center;
+}
+
+/* comments */
+.comments{
+  margin-top:10px;
+  display:flex;
+  flex-direction:column;
+  gap:8px;
+}
+
+.comment{
+  padding:10px;
+  border:1px solid rgba(0,0,0,.06);
+  border-radius:12px;
+  background:#fff;
+}
+
+.comment-row{
+  display:flex;
+  justify-content:space-between;
+  gap:10px;
+}
+
+.comment-author{
+  font-size:12px;
+  font-weight:700;
+  opacity:.75;
+}
+
+.comment-text{
+  margin-top:3px;
+  overflow-wrap:anywhere;
+  word-break:break-word;
+}
+
+.comment-form{
+  display:flex;
+  gap:8px;
+  margin-top:10px;
+  align-items:center;
+}
+
+.comment-form input{
+  flex:1;
+  padding:10px 12px;
+  border:1px solid rgba(0,0,0,.12);
+  border-radius:12px;
+}
+
+/* form post */
+.post-form{
+  display:flex;
+  flex-direction:column;
+  gap:12px;
+  border:1px solid var(--line);
+  border-radius:16px;
+  padding:16px;
+  background:#fff;
+  box-shadow:0 10px 24px rgba(0,0,0,.06);
+}
+
+.post-form .field{
+  display:flex;
+  flex-direction:column;
+  gap:6px;
+}
+
+.post-form .field span{
+  font-size:12px;
+  color:var(--muted);
+}
+
+.post-form input,
+.post-form textarea{
+  width:100%;
+  border:1px solid var(--line);
+  border-radius:12px;
+  padding:12px;
+  font-size:14px;
+  outline:none;
+}
+
+.post-form textarea{
+  resize:vertical;
+  min-height:100px;
+}
+
+.form-actions{
+  display:flex;
+  justify-content:flex-end;
+  gap:10px;
+}
+
+/* ===== EVENTS ===== */
+.event-card{
+  display:flex;
+  gap:14px;
+  padding:14px;
+  border:1px solid var(--line);
+  border-radius:16px;
+  margin-top:12px;
+  background:#fff;
+  box-shadow:0 10px 24px rgba(0,0,0,.06);
+}
+
+.event-date{
+  min-width:60px;
+  text-align:center;
+  background:rgba(23,140,168,.12);
+  border-radius:12px;
+  padding:8px 6px;
+  color:var(--tidoc);
+  font-weight:900;
+}
+
+.event-date .day{ font-size:20px; display:block; }
+.event-date .month{ font-size:11px; }
+
+.event-content{ flex:1; }
+
+.event-head{
+  display:flex;
+  justify-content:space-between;
+  align-items:flex-start;
+  gap:10px;
+}
+
+.event-content h3{
+  margin:0 0 4px;
+  font-size:16px;
+  color:#111;
+  font-weight:800;
+}
+
+.event-desc{
+  margin:0 0 8px;
+  font-size:14px;
+  color:#44565c;
+  line-height:1.35;
+}
+
+.event-meta{
+  font-size:12px;
+  color:var(--muted);
+  display:flex;
+  flex-wrap:wrap;
+  gap:6px;
+}
+
+.event-place{
+  color: var(--tidoc);
+  font-weight: 700;
+  text-decoration: none;
+}
+.event-place:hover{
+  text-decoration: underline;
+}
+
+/* ===== GALERIE : switch années ===== */
+.gallery-grid{
+  margin-top:12px;
+  display:grid;
+  grid-template-columns:repeat(2, 1fr);
+  gap:10px;
+}
+
+.gallery-item{
+  display:block;
+  border-radius:16px;
+  overflow:hidden;
+  border:1px solid var(--line);
+  background:#fff;
+  box-shadow:0 10px 24px rgba(0,0,0,.06);
+}
+
+.gallery-item img{
+  width:100%;
+  height:160px;
+  object-fit:cover;
+  display:block;
+}
+
+/* ===== FIX bouton inviter (toujours en haut à droite de la carte Ti'Doc) ===== */
+.home-card{ position:relative; }
+
+.home-invite-icon{
+  position:absolute !important;
+  top:12px !important;
+  right:12px !important;
+  left:auto !important;
+
+  width:40px;
+  height:40px;
+  border:1px solid var(--line);
+  border-radius:14px;
+  background:rgba(23,140,168,.12);
+  color:var(--tidoc);
+
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  z-index:10;
+}
+
+.home-invite-icon .icon{
+  width:20px;
+  height:20px;
+}
+
+.home-hero{
+  display:flex;
+  flex-direction:column;
+  gap:14px;
+}
+
+.home-hero-left{
+  display:flex;
+  align-items:center;
+  gap:12px;
+}
+
+.home-logo{
+  width:54px;
+  height:54px;
+  border-radius:14px;
+  object-fit:cover;
+  border:1px solid var(--line);
+  background:#fff;
+}
+
+.home-title{
+  margin:0;
+  font-size:20px;
+  color:var(--tidoc);
+  font-weight:900;
+}
+
+.home-sub{
+  margin:4px 0 0;
+  font-size:13px;
+  color:var(--muted);
+}
+
+.home-contact-btn{
+  width:100%;
+}
+
+/* accès rapides */
+.home-quick{
+  margin-top:14px;
+  display:grid;
+  grid-template-columns:repeat(3, 1fr);
+  gap:10px;
+}
+
+.home-tile{
+  display:block;
+  border:1px solid var(--line);
+  border-radius:16px;
+  padding:12px;
+  text-decoration:none;
+  background:#fff;
+  box-shadow:0 10px 24px rgba(0,0,0,.06);
+}
+
+.home-tile-title{
+  font-weight:900;
+  color:var(--tidoc);
+}
+
+.home-tile-sub{
+  margin-top:4px;
+  font-size:12px;
+  color:var(--muted);
+  font-weight:700;
+}
+
+/* photos accueil */
+.home-photos{
+  margin-top:14px;
+}
+
+.home-section-title{
+  font-weight:900;
+  color:var(--tidoc);
+  margin:6px 0 10px;
+}
+
+.home-photo-grid{
+  display:grid;
+  grid-template-columns:repeat(2, 1fr);
+  gap:10px;
+}
+
+.home-photo-grid img{
+  width:100%;
+  height:140px;
+  object-fit:cover;
+  border-radius:16px;
+  border:1px solid var(--line);
+  display:block;
+  box-shadow:0 10px 24px rgba(0,0,0,.06);
+}
+
+/* réseaux */
+.social-section{
+  margin:14px 0 6px;
+  text-align:center;
+}
+
+.social-title{
+  font-size:13px;
+  color:var(--muted);
+  margin-bottom:12px;
+  font-weight:700;
+}
+
+.social-icons{
+  display:flex;
+  justify-content:center;
+  gap:14px;
+  margin-top:10px;
+}
+
+.social-icon{
+  width:44px;
+  height:44px;
+  border-radius:14px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  background:rgba(23,140,168,.12);
+  color:var(--tidoc);
+  transition:transform .15s ease, background .15s ease;
+  text-decoration:none;
+}
+
+.social-icon:hover{
+  background:rgba(23,140,168,.22);
+  transform:translateY(-2px);
+}
+
+/* ===== GALERIE : switch années ===== */
+.gallery-years{
+  display:flex;
+  gap:10px;
+  margin-bottom:12px;
+}
+
+.year-btn{
+  flex:1;
+  border:1px solid var(--line);
+  background:#fff;
+  border-radius:12px;
+  padding:10px 12px;
+  font-weight:800;
+  color:var(--muted);
+  cursor:pointer;
+}
+
+.year-btn.active{
+  color:var(--tidoc);
+  background:rgba(23,140,168,.12);
+  border-color:rgba(23,140,168,.25);
+}
+
+/* bouton supprimer photo (si tu l’utilises) */
+.gallery-del{
+  position:absolute;
+  top:8px;
+  right:8px;
+  border:none;
+  background:#fff;
+  border-radius:10px;
+  padding:6px 8px;
+  cursor:pointer;
+  box-shadow:0 10px 24px rgba(0,0,0,.10);
+}
+
+/* pour que le bouton delete puisse se placer */
+.gallery-item{
+  position:relative;
+}
+
+.event-select{
+  margin-top:10px;
+  display:flex;
+  justify-content:flex-start;
+}
+
+.event-add{
+  height:40px;
+  border-radius:12px;
+  font-weight:800;
+}
+
+.blog-topbar{ z-index: 10000; }
+.profile-menu{ z-index: 10001; }
+.profile-btn{ pointer-events: auto; }
+
+/* ===== TABBAR ICONES ===== */
+.tabbar .tab{
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  justify-content:center;
+  gap:4px;
+  min-width:56px;
+}
+
+.tab-ico{
+  width:22px;
+  height:22px;
+  display:block;
+  color: var(--muted);
+}
+
+.tab-label{
+  font-size:11px;
+  font-weight:800;
+  color: var(--muted);
+  line-height:1;
+}
+
+.tab.active .tab-ico,
+.tab.active .tab-label{
+  color: var(--tidoc);
+}
