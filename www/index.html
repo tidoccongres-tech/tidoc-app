@@ -10,6 +10,12 @@
   <meta name="theme-color" content="#178CA8" />
 </head>
 
+<script type="module">
+  import { requireAuthOrRedirect } from "./auth.js";
+  requireAuthOrRedirect("./login.html");
+</script>
+
+  
 <body>
 
   <!-- Topbar bleue (comme Blog/Galerie) -->
