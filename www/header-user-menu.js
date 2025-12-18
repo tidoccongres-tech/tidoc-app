@@ -105,7 +105,40 @@ window.addEventListener("DOMContentLoaded", () => {
       slot.innerHTML = ""; // ou un bouton "Se connecter"
       return;
     }
+    
+    // header-user-menu.js
+import { auth } from "./auth.js";
+import { onAuthStateChanged } from
+  "https://www.gstatic.com/firebasejs/10.12.4/firebase-auth.js";
 
+const root = document.getElementById("appHeader");
+
+if (root) {
+  root.innerHTML = `
+    <header class="blog-topbar">
+      <div class="blog-topbar-left">
+        <button class="profile-btn" id="profileBtn">
+          <span class="profile-circle">
+            <img id="profileAvatar" style="display:none"/>
+            <span id="profileFallback">T</span>
+          </span>
+        </button>
+      </div>
+
+      <div class="blog-topbar-right">
+        <button class="icon-btn" aria-label="Notifications">
+          🔔
+        </button>
+      </div>
+
+      <div class="profile-menu" id="profileMenu" hidden>
+        <button id="menuProfile">Paramètres</button>
+        <button id="menuLogout">Se déconnecter</button>
+      </div>
+    </header>
+  `;
+}
+    
     const avatarUrl = await ensureAvatarForUser(u);
     renderMenu(slot, { avatarUrl });
   });
