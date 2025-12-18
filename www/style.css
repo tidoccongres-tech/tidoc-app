@@ -266,24 +266,28 @@ img, svg{
   margin-top:10px;
 }
 
-.like-btn{
-  background:none;
-  border:none;
-  padding:0;
-  cursor:pointer;
-  color:#b0b0b0;
-  display:flex;
-  align-items:center;
-}
-.like-btn.liked{ color:var(--tidoc); }
-
-.like-btn .icon-heart{
-  width:20px;
-  height:20px;
-  display:block;
+.like-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0;
 }
 
-.like-meta{ font-size:13px; opacity:.7; }
+.like-btn .heart-icon {
+  width: 20px;
+  height: 20px;
+  fill: #b5b5b5; /* gris */
+  transition: fill 0.2s ease;
+}
+
+.like-btn.liked .heart-icon {
+  fill: #178CA8; /* couleur Ti’Doc */
+}
+
+.like-count {
+  font-size: 13px;
+  opacity: 0.7;
+}
 
 .delete-btn,
 .comment-del{
