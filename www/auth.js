@@ -1,9 +1,11 @@
-// auth.js (MODULE)
+// auth.js (MODULE) — session-only + menu topbar stable
 import { firebaseConfig } from "./firebase-config.js";
 import { initializeApp, getApps, getApp } from "https://www.gstatic.com/firebasejs/10.12.4/firebase-app.js";
 import {
   getAuth,
   onAuthStateChanged,
+  setPersistence,
+  browserSessionPersistence,
   createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
   sendPasswordResetEmail,
@@ -23,11 +25,10 @@ const app = getApps().length ? getApp() : initializeApp(firebaseConfig);
 export const auth = getAuth(app);
 export const db = getFirestore(app);
 
-// ✅ Admin(s)
+// ✅ Admin
 const ADMIN_EMAILS = ["tidoc.congres@gmail.com"];
 
-// ✅ Avatars “personnages Ti’Doc” (dossier = /avatars)
-// Mets ici tes vrais noms de fichiers
+// ✅ dossier avatars (TU M’AS DIT : pas "icons", mais "avatars")
 export const AVATARS = [
   "./avatars/avatar-1.png",
   "./avatars/avatar-2.png",
@@ -38,171 +39,193 @@ export const AVATARS = [
   "./avatars/avatar-7.png",
   "./avatars/avatar-8.png",
   "./avatars/avatar-9.png",
-  "./avatars/avatar-10.png",
+  "./avatars/avatar-10.png"
 ];
 
-export function pickRandomAvatar() {
-  return AVATARS[Math.floor(Math.random() * AVATARS.length)];
-}
+window.TIDOC_AUTH = window.TIDOC_AUTH || { user: null, isAdmin: false };
+
+// ✅ 1) Session only (fermeture = déconnexion)
+(async () => {
+  try {
+    await setPersistence(auth, browserSessionPersistence);
+  } catch (e) {
+    console.log("setPersistence error:", e);
+  }
+})();
 
 export function isAdminUser(user = auth.currentUser) {
   const email = (user?.email || "").toLowerCase();
   return ADMIN_EMAILS.includes(email);
 }
 
-/**
- * À appeler dans chaque page "protégée"
- * → si pas connecté : redirection vers login.html
- */
-export function requireAuthOrRedirect(redirectTo = "./login.html") {
-  onAuthStateChanged(auth, (u) => {
-    if (!u) window.location.href = redirectTo;
+function pickRandomAvatar() {
+  return AVATARS[Math.floor(Math.random() * AVATARS.length)];
+}
+
+// ===== UI TOPBAR (avatar + menu) =====
+function initials(user) {
+  const name = (user?.displayName || user?.email || "U").trim();
+  return name.slice(0, 1).toUpperCase();
+}
+
+async function ensureUserDoc(u) {
+  if (!u?.uid) return null;
+
+  const ref = doc(db, "users", u.uid);
+  const snap = await getDoc(ref);
+
+  if (!snap.exists()) {
+    const avatarUrl = u.photoURL || pickRandomAvatar();
+
+    // Met à jour le profil Firebase si pas d’avatar
+    if (!u.photoURL) {
+      try { await updateProfile(u, { photoURL: avatarUrl }); } catch {}
+    }
+
+    await setDoc(ref, {
+      email: (u.email || "").toLowerCase(),
+      displayName: u.displayName || "Utilisateur",
+      avatarUrl,
+      role: isAdminUser(u) ? "admin" : "user",
+      createdAt: serverTimestamp()
+    }, { merge: true });
+
+    return { avatarUrl };
+  }
+
+  return snap.data();
+}
+
+function updateTopbarUI(u, userDoc) {
+  const img = document.getElementById("profileImg");
+  const initial = document.getElementById("profileInitial");
+  const dot = document.getElementById("statusDot");
+
+  const avatarUrl = userDoc?.avatarUrl || u?.photoURL || "";
+
+  if (dot) dot.style.background = u ? "#2ecc71" : "#cfcfcf";
+
+  if (u && avatarUrl && img && initial) {
+    img.src = avatarUrl;
+    img.style.display = "block";
+    initial.style.display = "none";
+  } else {
+    if (img) img.style.display = "none";
+    if (initial) {
+      initial.textContent = initials(u);
+      initial.style.display = "block";
+    }
+  }
+
+  // admin-only
+  document.querySelectorAll("[data-admin-only='true']").forEach((el) => {
+    el.style.display = window.TIDOC_AUTH.isAdmin ? "" : "none";
   });
 }
 
-/**
- * Signup email + mdp
- * ✅ Maintenant: displayName + email + password seulement
- * ✅ Avatar aléatoire par défaut (modifiable dans settings plus tard)
- */
-export async function signupEmail({ email, password, displayName }) {
-  const cleanEmail = (email || "").trim().toLowerCase();
-  const name = (displayName || "").trim() || "Utilisateur";
+function initProfileMenu() {
+  const btn = document.getElementById("profileBtn");
+  const menu = document.getElementById("profileMenu");
+  if (!btn || !menu) return;
 
-  const cred = await createUserWithEmailAndPassword(auth, cleanEmail, password);
+  const loginBtn = document.getElementById("menuLogin");
+  const logoutBtn = document.getElementById("menuLogout");
+  const settingsBtn = document.getElementById("menuSettings"); // optionnel
+
+  function openMenu() {
+    const logged = !!auth.currentUser;
+    if (loginBtn) loginBtn.hidden = logged;
+    if (logoutBtn) logoutBtn.hidden = !logged;
+    if (settingsBtn) settingsBtn.hidden = !logged;
+    menu.hidden = false;
+  }
+
+  function closeMenu() { menu.hidden = true; }
+
+  btn.addEventListener("click", (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    menu.hidden ? openMenu() : closeMenu();
+  });
+
+  document.addEventListener("click", (e) => {
+    if (!menu.hidden && !menu.contains(e.target) && !btn.contains(e.target)) {
+      closeMenu();
+    }
+  });
+
+  loginBtn?.addEventListener("click", () => {
+    closeMenu();
+    // 👉 on envoie vers la page login
+    window.location.href = "./login.html";
+  });
+
+  logoutBtn?.addEventListener("click", async () => {
+    closeMenu();
+    await signOut(auth);
+    // option : revenir login
+    window.location.href = "./login.html";
+  });
+
+  settingsBtn?.addEventListener("click", () => {
+    closeMenu();
+    window.location.href = "./account.html"; // page paramètres (on la fera après)
+  });
+}
+
+// ===== API Auth email =====
+export async function signupEmail({ email, password, displayName }) {
+  const cred = await createUserWithEmailAndPassword(auth, email, password);
 
   const avatarUrl = pickRandomAvatar();
-
-  // Firebase Auth profile (affichage)
   await updateProfile(cred.user, {
-    displayName: name,
+    displayName: displayName || "Utilisateur",
     photoURL: avatarUrl
   });
 
-  // Firestore user profile
-  await setDoc(
-    doc(db, "users", cred.user.uid),
-    {
-      email: cleanEmail,
-      displayName: name,
-      avatarUrl,
-      createdAt: serverTimestamp(),
-      role: isAdminUser(cred.user) ? "admin" : "user"
-    },
-    { merge: true }
-  );
+  await setDoc(doc(db, "users", cred.user.uid), {
+    email: (email || "").toLowerCase(),
+    displayName: displayName || "Utilisateur",
+    avatarUrl,
+    role: isAdminUser(cred.user) ? "admin" : "user",
+    createdAt: serverTimestamp()
+  }, { merge: true });
 
   return cred.user;
 }
 
 export async function loginEmail({ email, password }) {
-  const cleanEmail = (email || "").trim().toLowerCase();
-  const cred = await signInWithEmailAndPassword(auth, cleanEmail, password);
-
-  // Optionnel: si ton ancien compte n'a pas avatarUrl, on en injecte un
-  await ensureUserProfile(cred.user);
-
+  const cred = await signInWithEmailAndPassword(auth, email, password);
+  await ensureUserDoc(cred.user);
   return cred.user;
 }
 
 export async function resetPassword(email) {
-  const cleanEmail = (email || "").trim().toLowerCase();
-  await sendPasswordResetEmail(auth, cleanEmail);
+  await sendPasswordResetEmail(auth, email);
 }
 
 export async function logout() {
   await signOut(auth);
 }
 
-export async function getUserProfile(uid) {
-  if (!uid) return null;
-  const snap = await getDoc(doc(db, "users", uid));
-  return snap.exists() ? snap.data() : null;
+// ===== Garde (pages protégées) =====
+export function requireAuthOrRedirect(redirectTo = "./login.html") {
+  onAuthStateChanged(auth, (u) => {
+    if (!u) window.location.href = redirectTo;
+  });
 }
 
-/**
- * Si l'utilisateur existe mais n'a pas de doc Firestore complet
- * (ou pas d'avatar), on complète proprement.
- */
-export async function ensureUserProfile(user = auth.currentUser) {
-  if (!user?.uid) return null;
+// ===== Boot global =====
+document.addEventListener("DOMContentLoaded", () => {
+  initProfileMenu();
 
-  const ref = doc(db, "users", user.uid);
-  const snap = await getDoc(ref);
+  onAuthStateChanged(auth, async (u) => {
+    window.TIDOC_AUTH.user = u || null;
+    window.TIDOC_AUTH.isAdmin = isAdminUser(u);
 
-  const currentEmail = (user.email || "").toLowerCase();
-  const currentName = user.displayName || "Utilisateur";
+    let userDoc = null;
+    if (u) userDoc = await ensureUserDoc(u);
 
-  // Si pas de doc du tout → on crée
-  if (!snap.exists()) {
-    const avatarUrl = user.photoURL || pickRandomAvatar();
-
-    await setDoc(ref, {
-      email: currentEmail,
-      displayName: currentName,
-      avatarUrl,
-      createdAt: serverTimestamp(),
-      role: isAdminUser(user) ? "admin" : "user"
-    }, { merge: true });
-
-    // On synchronise aussi Auth si manquant
-    if (!user.photoURL || !user.displayName) {
-      await updateProfile(user, {
-        displayName: user.displayName || currentName,
-        photoURL: user.photoURL || avatarUrl
-      });
-    }
-
-    return { email: currentEmail, displayName: currentName, avatarUrl };
-  }
-
-  // Si doc existe mais avatar manquant → on complète
-  const data = snap.data() || {};
-  if (!data.avatarUrl) {
-    const avatarUrl = user.photoURL || pickRandomAvatar();
-    await setDoc(ref, { avatarUrl }, { merge: true });
-
-    if (!user.photoURL) {
-      await updateProfile(user, { photoURL: avatarUrl });
-    }
-  }
-
-  // Si role pas cohérent, on le corrige au login
-  const wantedRole = isAdminUser(user) ? "admin" : "user";
-  if ((data.role || "user") !== wantedRole) {
-    await setDoc(ref, { role: wantedRole }, { merge: true });
-  }
-
-  return (await getDoc(ref)).data();
-}
-
-/**
- * Pour la page "Paramètres du compte" :
- * changer l’avatar ET le displayName si tu veux.
- */
-export async function updateAccountProfile({ displayName, avatarUrl }) {
-  const user = auth.currentUser;
-  if (!user) throw new Error("Not authenticated");
-
-  const updatesAuth = {};
-  if (typeof displayName === "string" && displayName.trim()) {
-    updatesAuth.displayName = displayName.trim();
-  }
-  if (typeof avatarUrl === "string" && avatarUrl.trim()) {
-    updatesAuth.photoURL = avatarUrl.trim();
-  }
-
-  if (Object.keys(updatesAuth).length) {
-    await updateProfile(user, updatesAuth);
-  }
-
-  const updatesDb = {};
-  if (updatesAuth.displayName) updatesDb.displayName = updatesAuth.displayName;
-  if (updatesAuth.photoURL) updatesDb.avatarUrl = updatesAuth.photoURL;
-
-  if (Object.keys(updatesDb).length) {
-    await setDoc(doc(db, "users", user.uid), updatesDb, { merge: true });
-  }
-
-  return true;
-}
+    updateTopbarUI(u, userDoc);
+  });
+});
