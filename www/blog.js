@@ -131,22 +131,27 @@ function clearForm() {
   if (textInput) textInput.value = "";
 }
 
-// ====== Likes ======
+// ===== LIKE SVG (tu pourras remplacer) =====
+const HEART_SVG = `
+<svg viewBox="0 0 24 24" class="icon" aria-hidden="true">
+  <path d="M1.24264 8.24264L8 15L14.7574 8.24264C15.553 7.44699 16 6.36786 16 5.24264V5.05234C16 2.8143 14.1857 1 11.9477 1C10.7166 1 9.55233 1.55959 8.78331 2.52086L8 3.5L7.21669 2.52086C6.44767 1.55959 5.28338 1 4.05234 1C1.8143 1 0 2.8143 0 5.05234V5.24264C0 6.36786 0.44699 7.44699 1.24264 8.24264Z"
+</svg>`;
+
+// ===== Likes =====
 async function getLikesCount(postId) {
-  const snap = await getDocs(collection(db, "posts", postId, "likes"));
-  return snap.size;
+  const likesSnap = await getDocs(collection(db, "posts", postId, "likes"));
+  return likesSnap.size;
 }
 
 async function isLikedByMe(postId) {
-  const uid = currentUserId();
+  const uid = currentUserId(); // ta fonction existante
   if (!uid) return false;
-  const ref = doc(db, "posts", postId, "likes", uid);
-  const snap = await getDoc(ref);
-  return snap.exists();
+  const likeDoc = await getDoc(doc(db, "posts", postId, "likes", uid));
+  return likeDoc.exists();
 }
 
 async function toggleLike(postId) {
-  if (!requireLogin("liker ce post")) return;
+  if (!requireLogin("liker ce post")) return; // ta fonction existante
 
   const uid = currentUserId();
   const likeRef = doc(db, "posts", postId, "likes", uid);
@@ -158,7 +163,7 @@ async function toggleLike(postId) {
     await setDoc(likeRef, { createdAt: serverTimestamp() });
   }
 
-  await loadPosts();
+  await loadPosts(); // ou refresh juste du post si tu as mieux
 }
 
 // ====== Comments ======
@@ -275,18 +280,6 @@ function renderPostCard(postId, p) {
   if (delOk) {
     card.querySelector(`[data-del="${postId}"]`)?.addEventListener("click", () => deletePost(postId));
   }
-
-  // like + count + liked state
-  (async () => {
-    const count = await getLikesCount(postId);
-    const liked = await isLikedByMe(postId);
-
-    const countEl = card.querySelector(`[data-likecount="${postId}"]`);
-    const likeBtn = card.querySelector(`[data-like="${postId}"]`);
-
-    if (countEl) countEl.textContent = `${count} like${count > 1 ? "s" : ""}`;
-    if (likeBtn) likeBtn.classList.toggle("liked", liked);
-  })();
 
   card.querySelector(`[data-like="${postId}"]`)?.addEventListener("click", () => toggleLike(postId));
 
