@@ -7,21 +7,50 @@
   <link rel="stylesheet" href="style.css" />
   <style>
     body{margin:0;min-height:100vh;display:flex;align-items:center;justify-content:center;background:#178CA8;}
-    .box{width:min(420px,92vw);background:#fff;border-radius:16px;padding:20px;box-shadow:0 10px 30px rgba(0,0,0,.2)}
+
+    .box{
+      width:min(420px,92vw);
+      background:#fff;
+      border-radius:16px;
+      padding:20px;
+      padding-top:44px; /* place pour le logo */
+      box-shadow:0 10px 30px rgba(0,0,0,.2);
+      position:relative;
+    }
+
+    .auth-logo{
+      position:absolute;
+      top:-28px;
+      left:50%;
+      transform:translateX(-50%);
+      width:56px;height:56px;
+      border-radius:50%;
+      background:#fff;
+      border:1px solid rgba(0,0,0,.08);
+      box-shadow:0 10px 24px rgba(0,0,0,.12);
+      object-fit:cover;
+    }
+
     .logo{font-weight:800;font-size:26px;margin-bottom:6px}
     .sub{opacity:.75;margin-bottom:14px}
+
     .tabs{display:flex;gap:8px;margin:12px 0}
     .tab{flex:1;border:1px solid #ddd;border-radius:12px;padding:10px;background:#f6f6f6}
     .tab.active{border-color:#178CA8;background:#e9f7fb}
+
     .row{display:flex;flex-direction:column;gap:8px;margin:10px 0}
-    input,select{padding:12px;border:1px solid #ddd;border-radius:12px;font-size:15px}
+    input{padding:12px;border:1px solid #ddd;border-radius:12px;font-size:15px}
+
     button{padding:12px;border:none;border-radius:12px;background:#178CA8;color:#fff;font-weight:700}
     .link{background:transparent;color:#178CA8;text-decoration:underline}
     .small{font-size:13px;opacity:.75}
   </style>
 </head>
+
 <body>
   <div class="box">
+    <img class="auth-logo" src="./icons/icon-512.png" alt="Ti'Doc">
+
     <div class="logo">Ti’Doc</div>
     <div class="sub">Crée ton compte ou connecte-toi pour accéder à l’application.</div>
 
@@ -36,7 +65,6 @@
         <input id="suName" placeholder="Nom (ex : Aurore)" />
         <input id="suEmail" placeholder="Email" inputmode="email" />
         <input id="suPass" placeholder="Mot de passe (6+)" type="password" />
-        <select id="suAvatar"></select>
         <button id="btnSignup" type="button">Créer mon compte</button>
         <div class="small">En créant un compte, tu acceptes les règles de Ti’Doc (anti-spam, respect, etc.).</div>
       </div>
@@ -56,7 +84,7 @@
   </div>
 
   <script type="module">
-    import { auth, AVATARS, signupEmail, loginEmail, resetPassword } from "./auth.js";
+    import { auth, signupEmail, loginEmail, resetPassword } from "./auth.js";
     import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.4/firebase-auth.js";
 
     const tabSignup = document.getElementById("tabSignup");
@@ -87,9 +115,8 @@
         const displayName = document.getElementById("suName").value.trim();
         const email = document.getElementById("suEmail").value.trim();
         const password = document.getElementById("suPass").value;
-        const avatarUrl = suAvatar.value;
 
-        await signupEmail({ email, password, displayName, avatarUrl });
+        await signupEmail({ email, password, displayName });
         msg.textContent = "Compte créé ✅ Redirection…";
         window.location.href = "./index.html";
       } catch(e){
@@ -121,19 +148,5 @@
       }
     };
   </script>
-
-<div class="login-wrapper">
-  <div class="login-card">
-
-    <!-- Logo Ti'Doc -->
-    <div class="login-logo">
-      <img src="./icons/icon-512.png" alt="Ti'Doc">
-    </div>
-
-    
-
-  </div>
-</div>
-
 </body>
 </html>
