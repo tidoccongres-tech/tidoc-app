@@ -1,6 +1,6 @@
 {
   "appId": "com.tidoc.app",
   "appName": "TiDoc",
-  "webDir": ".",
+  "webDir": "www",
   "bundledWebRuntime": false
 }
