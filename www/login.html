@@ -1,0 +1,134 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Ti’Doc – Connexion</title>
+  <link rel="stylesheet" href="style.css" />
+  <style>
+    body{margin:0;min-height:100vh;display:flex;align-items:center;justify-content:center;background:#178CA8;}
+    .box{width:min(420px,92vw);background:#fff;border-radius:16px;padding:20px;box-shadow:0 10px 30px rgba(0,0,0,.2)}
+    .logo{font-weight:800;font-size:26px;margin-bottom:6px}
+    .sub{opacity:.75;margin-bottom:14px}
+    .tabs{display:flex;gap:8px;margin:12px 0}
+    .tab{flex:1;border:1px solid #ddd;border-radius:12px;padding:10px;background:#f6f6f6}
+    .tab.active{border-color:#178CA8;background:#e9f7fb}
+    .row{display:flex;flex-direction:column;gap:8px;margin:10px 0}
+    input,select{padding:12px;border:1px solid #ddd;border-radius:12px;font-size:15px}
+    button{padding:12px;border:none;border-radius:12px;background:#178CA8;color:#fff;font-weight:700}
+    .link{background:transparent;color:#178CA8;text-decoration:underline}
+    .small{font-size:13px;opacity:.75}
+  </style>
+</head>
+<body>
+  <div class="box">
+    <div class="logo">Ti’Doc</div>
+    <div class="sub">Crée ton compte ou connecte-toi pour accéder à l’application.</div>
+
+    <div class="tabs">
+      <button class="tab active" id="tabSignup" type="button">Créer un compte</button>
+      <button class="tab" id="tabLogin" type="button">Se connecter</button>
+    </div>
+
+    <!-- SIGNUP -->
+    <div id="signupPane">
+      <div class="row">
+        <input id="suName" placeholder="Nom (ex : Aurore)" />
+        <input id="suEmail" placeholder="Email" inputmode="email" />
+        <input id="suPass" placeholder="Mot de passe (6+)" type="password" />
+        <select id="suAvatar"></select>
+        <button id="btnSignup" type="button">Créer mon compte</button>
+        <div class="small">En créant un compte, tu acceptes les règles de Ti’Doc (anti-spam, respect, etc.).</div>
+      </div>
+    </div>
+
+    <!-- LOGIN -->
+    <div id="loginPane" style="display:none;">
+      <div class="row">
+        <input id="liEmail" placeholder="Email" inputmode="email" />
+        <input id="liPass" placeholder="Mot de passe" type="password" />
+        <button id="btnLogin" type="button">Se connecter</button>
+        <button id="btnReset" class="link" type="button">Mot de passe oublié</button>
+      </div>
+    </div>
+
+    <div id="msg" class="small" style="margin-top:10px;"></div>
+  </div>
+
+  <script type="module">
+    import { auth, AVATARS, signupEmail, loginEmail, resetPassword } from "./auth.js";
+    import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.4/firebase-auth.js";
+
+    const tabSignup = document.getElementById("tabSignup");
+    const tabLogin  = document.getElementById("tabLogin");
+    const signupPane = document.getElementById("signupPane");
+    const loginPane  = document.getElementById("loginPane");
+    const msg = document.getElementById("msg");
+
+    // remplit la liste avatars
+    const suAvatar = document.getElementById("suAvatar");
+    AVATARS.forEach((url, i) => {
+      const opt = document.createElement("option");
+      opt.value = url;
+      opt.textContent = "Avatar " + (i+1);
+      suAvatar.appendChild(opt);
+    });
+
+    function setTab(which){
+      const s = which === "signup";
+      tabSignup.classList.toggle("active", s);
+      tabLogin.classList.toggle("active", !s);
+      signupPane.style.display = s ? "" : "none";
+      loginPane.style.display = s ? "none" : "";
+      msg.textContent = "";
+    }
+    tabSignup.onclick = () => setTab("signup");
+    tabLogin.onclick  = () => setTab("login");
+
+    // si déjà connecté → go home
+    onAuthStateChanged(auth, (u) => {
+      if (u) window.location.href = "./index.html";
+    });
+
+    document.getElementById("btnSignup").onclick = async () => {
+      try{
+        msg.textContent = "Création du compte…";
+        const displayName = document.getElementById("suName").value.trim();
+        const email = document.getElementById("suEmail").value.trim();
+        const password = document.getElementById("suPass").value;
+        const avatarUrl = suAvatar.value;
+
+        await signupEmail({ email, password, displayName, avatarUrl });
+        msg.textContent = "Compte créé ✅ Redirection…";
+        window.location.href = "./index.html";
+      } catch(e){
+        msg.textContent = "Erreur: " + (e?.message || e);
+      }
+    };
+
+    document.getElementById("btnLogin").onclick = async () => {
+      try{
+        msg.textContent = "Connexion…";
+        const email = document.getElementById("liEmail").value.trim();
+        const password = document.getElementById("liPass").value;
+        await loginEmail({ email, password });
+        msg.textContent = "Connecté ✅";
+        window.location.href = "./index.html";
+      } catch(e){
+        msg.textContent = "Erreur: " + (e?.message || e);
+      }
+    };
+
+    document.getElementById("btnReset").onclick = async () => {
+      const email = document.getElementById("liEmail").value.trim();
+      if(!email) { msg.textContent = "Mets ton email d’abord."; return; }
+      try{
+        await resetPassword(email);
+        msg.textContent = "Email de réinitialisation envoyé ✅";
+      } catch(e){
+        msg.textContent = "Erreur: " + (e?.message || e);
+      }
+    };
+  </script>
+</body>
+</html>
