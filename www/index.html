@@ -19,30 +19,30 @@
 
   <!-- Topbar bleue (comme Blog/Galerie) -->
   <header class="blog-topbar">
-    <div class="blog-topbar-left">
-      <button class="profile-btn" id="profileBtn" type="button" aria-label="Profil">
-        <span class="profile-circle" id="profileCircle">
-          <img id="profileImg" alt="" />
-          <span id="profileInitial">T</span>
-        </span>
-        <span class="status-dot" id="statusDot" aria-hidden="true"></span>
-      </button>
-    </div>
+  <div class="blog-topbar-left">
+    <button class="profile-btn" id="profileBtn" type="button" aria-label="Profil">
+      <span class="profile-circle" id="profileCircle">
+        <img id="profileImg" alt="" />
+        <span id="profileInitial">T</span>
+      </span>
+      <span class="status-dot" id="statusDot" aria-hidden="true"></span>
+    </button>
+  </div>
 
-    <div class="profile-menu" id="profileMenu" hidden>
-      <button class="menu-item" id="menuLogin" type="button">Se connecter</button>
-      <button class="menu-item" id="menuLogout" type="button">Se déconnecter</button>
-      <button class="menu-item" id="menuSwitch" type="button">Changer de compte</button>
-    </div>
+  <!-- MENU PROFIL (2 boutons seulement) -->
+  <div class="profile-menu" id="profileMenu" hidden>
+    <button class="menu-item" id="menuSettings" type="button">Paramètres</button>
+    <button class="menu-item" id="menuLogout" type="button">Se déconnecter</button>
+  </div>
 
-    <div class="blog-topbar-right">
-      <button class="icon-btn" id="notifBtn" type="button" aria-label="Notifications">
-        <svg viewBox="0 0 24 24" class="icon" aria-hidden="true">
-          <path d="M12 22a2.2 2.2 0 0 0 2.2-2.2h-4.4A2.2 2.2 0 0 0 12 22Zm7-6.4V11a7 7 0 1 0-14 0v4.6L3.5 17v1.2h17V17L19 15.6Z"/>
-        </svg>
-      </button>
-    </div>
-  </header>
+  <div class="blog-topbar-right">
+    <button class="icon-btn" id="notifBtn" type="button" aria-label="Notifications">
+      <svg viewBox="0 0 24 24" class="icon" aria-hidden="true">
+        <path d="M12 22a2.2 2.2 0 0 0 2.2-2.2h-4.4A2.2 2.2 0 0 0 12 22Zm7-6.4V11a7 7 0 1 0-14 0v4.6L3.5 17v1.2h17V17L19 15.6Z"/>
+      </svg>
+    </button>
+  </div>
+</header>
 
   <main class="page">
 
