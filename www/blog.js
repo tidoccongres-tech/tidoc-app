@@ -131,39 +131,41 @@ function clearForm() {
   if (textInput) textInput.value = "";
 }
 
-// ===== LIKE SVG (tu pourras remplacer) =====
+// ===== Like SVG =====
 const HEART_SVG = `
-<svg viewBox="0 0 24 24" class="icon" aria-hidden="true">
-  <path d="M1.24264 8.24264L8 15L14.7574 8.24264C15.553 7.44699 16 6.36786 16 5.24264V5.05234C16 2.8143 14.1857 1 11.9477 1C10.7166 1 9.55233 1.55959 8.78331 2.52086L8 3.5L7.21669 2.52086C6.44767 1.55959 5.28338 1 4.05234 1C1.8143 1 0 2.8143 0 5.05234V5.24264C0 6.36786 0.44699 7.44699 1.24264 8.24264Z"
-</svg>`;
+<svg viewBox="0 0 16 16" class="heart-icon" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+  <path d="M1.24264 8.24264L8 15L14.7574 8.24264C15.553 7.44699 16 6.36786 16 5.24264V5.05234C16 2.8143 14.1857 1 11.9477 1C10.7166 1 9.55233 1.55959 8.78331 2.52086L8 3.5L7.21669 2.52086C6.44767 1.55959 5.28338 1 4.05234 1C1.8143 1 0 2.8143 0 5.05234V5.24264C0 6.36786 0.44699 7.44699 1.24264 8.24264Z"/>
+</svg>
+`;
 
 // ===== Likes =====
 async function getLikesCount(postId) {
-  const likesSnap = await getDocs(collection(db, "posts", postId, "likes"));
-  return likesSnap.size;
+  const snap = await getDocs(collection(db, "posts", postId, "likes"));
+  return snap.size;
 }
 
 async function isLikedByMe(postId) {
-  const uid = currentUserId(); // ta fonction existante
+  const uid = currentUserId();
   if (!uid) return false;
-  const likeDoc = await getDoc(doc(db, "posts", postId, "likes", uid));
-  return likeDoc.exists();
+  const ref = doc(db, "posts", postId, "likes", uid);
+  const snap = await getDoc(ref);
+  return snap.exists();
 }
 
 async function toggleLike(postId) {
-  if (!requireLogin("liker ce post")) return; // ta fonction existante
+  if (!requireLogin("liker ce post")) return;
 
   const uid = currentUserId();
-  const likeRef = doc(db, "posts", postId, "likes", uid);
-  const snap = await getDoc(likeRef);
+  const ref = doc(db, "posts", postId, "likes", uid);
+  const snap = await getDoc(ref);
 
   if (snap.exists()) {
-    await deleteDoc(likeRef);
+    await deleteDoc(ref);
   } else {
-    await setDoc(likeRef, { createdAt: serverTimestamp() });
+    await setDoc(ref, { createdAt: serverTimestamp() });
   }
 
-  await loadPosts(); // ou refresh juste du post si tu as mieux
+  await loadPosts(); // simple et fiable
 }
 
 // ====== Comments ======
@@ -258,13 +260,31 @@ function renderPostCard(postId, p) {
     <div class="post-body">${escapeHTML(p.text || "")}</div>
 
     <div class="post-actions">
-      <button class="like-btn" type="button" data-like="${postId}">❤</button>
-      <span class="like-meta" data-likecount="${postId}">…</span>
+  <button class="like-btn" type="button" data-like="${postId}">
+    ${HEART_SVG}
+  </button>
+  <span class="like-count" data-likecount="${postId}">0</span>
 
-      <button class="btn-outline" type="button" data-togglecomments="${postId}" style="height:36px;">
-        Commentaires
-      </button>
-    </div>
+  <button class="btn-outline" type="button" data-togglecomments="${postId}">
+    Commentaires
+  </button>
+</div>
+
+// click like
+card.querySelector(`[data-like="${postId}"]`)
+  ?.addEventListener("click", () => toggleLike(postId));
+
+// état initial (liked + compteur)
+(async () => {
+  const count = await getLikesCount(postId);
+  const liked = await isLikedByMe(postId);
+
+  const countEl = card.querySelector(`[data-likecount="${postId}"]`);
+  const btn = card.querySelector(`[data-like="${postId}"]`);
+
+  if (countEl) countEl.textContent = count;
+  if (btn) btn.classList.toggle("liked", liked);
+})();
 
     <div class="comments" data-commentswrap="${postId}" style="display:none;">
       <div data-commentslist="${postId}" style="margin-top:8px;"></div>
