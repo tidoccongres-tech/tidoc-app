@@ -126,20 +126,12 @@ function updateTopbarUI(u, userDoc) {
 function initProfileMenu() {
   const btn = document.getElementById("profileBtn");
   const menu = document.getElementById("profileMenu");
+  const logoutBtn = document.getElementById("menuLogout");
+  const settingsBtn = document.getElementById("menuSettings");
+
   if (!btn || !menu) return;
 
-  const loginBtn = document.getElementById("menuLogin");
-  const logoutBtn = document.getElementById("menuLogout");
-  const settingsBtn = document.getElementById("menuSettings"); // optionnel
-
-  function openMenu() {
-    const logged = !!auth.currentUser;
-    if (loginBtn) loginBtn.hidden = logged;
-    if (logoutBtn) logoutBtn.hidden = !logged;
-    if (settingsBtn) settingsBtn.hidden = !logged;
-    menu.hidden = false;
-  }
-
+  function openMenu() { menu.hidden = false; }
   function closeMenu() { menu.hidden = true; }
 
   btn.addEventListener("click", (e) => {
@@ -149,27 +141,18 @@ function initProfileMenu() {
   });
 
   document.addEventListener("click", (e) => {
-    if (!menu.hidden && !menu.contains(e.target) && !btn.contains(e.target)) {
-      closeMenu();
-    }
-  });
-
-  loginBtn?.addEventListener("click", () => {
-    closeMenu();
-    // 👉 on envoie vers la page login
-    window.location.href = "./login.html";
+    if (!menu.hidden && !menu.contains(e.target) && !btn.contains(e.target)) closeMenu();
   });
 
   logoutBtn?.addEventListener("click", async () => {
     closeMenu();
     await signOut(auth);
-    // option : revenir login
     window.location.href = "./login.html";
   });
 
   settingsBtn?.addEventListener("click", () => {
     closeMenu();
-    window.location.href = "./account.html"; // page paramètres (on la fera après)
+    window.location.href = "./account.html";
   });
 }
 
