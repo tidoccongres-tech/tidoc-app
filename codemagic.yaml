@@ -3,12 +3,6 @@ workflows:
     name: Android Debug Build
     max_build_duration: 60
 
-    environment:
-      vars:
-        CM_KEYSTORE_PATH: ""
-      android_signing:
-        - keystore_reference: ""
-
     scripts:
       - name: Install dependencies
         script: |
