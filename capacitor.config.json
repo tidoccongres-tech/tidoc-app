@@ -2,7 +2,5 @@
   "appId": "com.tidoc.app",
   "appName": "TiDoc",
   "webDir": ".",
-  "server": {
-    "androidScheme": "https"
-  }
+  "bundledWebRuntime": false
 }
