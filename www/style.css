@@ -768,3 +768,57 @@ img, svg{
   object-fit: contain;
   border-radius: 50%;
 }
+
+/* ===== Animations ===== */
+@keyframes pageFade {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+@keyframes cardIn {
+  from { opacity: 0; transform: translateY(18px) scale(0.98); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@keyframes logoPop {
+  0%   { transform: translateX(-50%) scale(0.7); opacity: 0; }
+  60%  { transform: translateX(-50%) scale(1.08); opacity: 1; }
+  100% { transform: translateX(-50%) scale(1); }
+}
+
+@keyframes fieldIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* Page */
+.login-wrapper {
+  animation: pageFade 350ms ease-out both;
+}
+
+/* Card */
+.login-card {
+  animation: cardIn 420ms cubic-bezier(.2,.9,.2,1) both;
+}
+
+/* Logo */
+.login-logo {
+  animation: logoPop 520ms cubic-bezier(.2,1.2,.2,1) both;
+  animation-delay: 120ms;
+}
+
+/* Cascade sur les éléments du formulaire */
+.login-card h2 { animation: fieldIn 350ms ease-out both; animation-delay: 120ms; }
+.login-card form { animation: fieldIn 350ms ease-out both; animation-delay: 180ms; }
+
+.login-card input:nth-of-type(1) { animation: fieldIn 350ms ease-out both; animation-delay: 220ms; }
+.login-card input:nth-of-type(2) { animation: fieldIn 350ms ease-out both; animation-delay: 280ms; }
+.login-card button { animation: fieldIn 350ms ease-out both; animation-delay: 340ms; }
+
+/* Important: pour que ça marche, faut que les inputs/buttons soient visibles au départ */
+.login-card h2,
+.login-card form,
+.login-card input,
+.login-card button {
+  opacity: 0;
+}
