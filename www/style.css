@@ -726,13 +726,14 @@ img, svg{
 .tab.active .tab-label{
   color: var(--tidoc);
 }
-
+/* ===== LOGIN ===== */
 .login-wrapper {
   min-height: 100vh;
   display: flex;
   justify-content: center;
   align-items: center;
-  background: #f4f7fb; /* ou bleu Ti'Doc */
+  background: #178CA8; /* bleu Ti'Doc */
+  animation: pageFade 350ms ease-out both;
 }
 
 .login-card {
@@ -744,9 +745,9 @@ img, svg{
   border-radius: 16px;
   box-shadow: 0 10px 30px rgba(0,0,0,0.08);
   text-align: center;
+  animation: cardIn 420ms cubic-bezier(.2,.9,.2,1) both;
 }
 
-/* LOGO */
 .login-logo {
   position: absolute;
   top: -40px;
@@ -760,6 +761,8 @@ img, svg{
   display: flex;
   justify-content: center;
   align-items: center;
+  animation: logoPop 520ms cubic-bezier(.2,1.2,.2,1) both;
+  animation-delay: 120ms;
 }
 
 .login-logo img {
@@ -784,27 +787,6 @@ img, svg{
   0%   { transform: translateX(-50%) scale(0.7); opacity: 0; }
   60%  { transform: translateX(-50%) scale(1.08); opacity: 1; }
   100% { transform: translateX(-50%) scale(1); }
-}
-
-@keyframes fieldIn {
-  from { opacity: 0; transform: translateY(10px); }
-  to   { opacity: 1; transform: translateY(0); }
-}
-
-/* Page */
-.login-wrapper {
-  animation: pageFade 350ms ease-out both;
-}
-
-/* Card */
-.login-card {
-  animation: cardIn 420ms cubic-bezier(.2,.9,.2,1) both;
-}
-
-/* Logo */
-.login-logo {
-  animation: logoPop 520ms cubic-bezier(.2,1.2,.2,1) both;
-  animation-delay: 120ms;
 }
 
 
