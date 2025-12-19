@@ -1,15 +1,15 @@
 <!DOCTYPE html>
 <html lang="fr">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Ti'Doc — Forum</title>
-  <link rel="stylesheet" href="style.css?v=10">
 
-  <link rel="manifest" href="/manifest.webmanifest">
-  <meta name="theme-color" content="#178CA8">
+  <link rel="stylesheet" href="style.css?v=10" />
+  <link rel="manifest" href="/manifest.webmanifest" />
+  <meta name="theme-color" content="#178CA8" />
 
-  <!-- protège la page (redirige si pas connecté) -->
+  <!-- Protège la page (redirige si pas connecté) -->
   <script type="module">
     import { requireAuthOrRedirect } from "./auth.js";
     requireAuthOrRedirect("./login.html");
@@ -17,7 +17,6 @@
 </head>
 
 <body>
-
   <!-- ✅ Topbar + menu profil (avatar + cloche + menu) -->
   <script type="module" src="./header-user-menu.js"></script>
 
@@ -31,11 +30,11 @@
 
     <!-- ✅ Formulaire (caché au départ) -->
     <section class="card post-form" id="postForm" style="display:none; margin-top:12px;">
-      <h2 style="margin:0 0 10px;">Nouveau post</h2>
+      <h2 style="margin:0 0 10px;color:var(--tidoc)">Nouveau post</h2>
 
       <label class="field">
         <span>Titre</span>
-        <input id="postTitle" type="text" placeholder="Ex : Workshop sutures — salle B" maxlength="80">
+        <input id="postTitle" type="text" placeholder="Ex : Workshop sutures — salle B" maxlength="80" />
       </label>
 
       <label class="field">
@@ -80,8 +79,7 @@
   </nav>
 
   <!-- ✅ Un seul JS forum -->
-  <script type="module" src="blog.js?v=10"></script>
+  <script type="module" src="./blog.js?v=10"></script>
   <script src="pwa.js"></script>
-
 </body>
 </html>
