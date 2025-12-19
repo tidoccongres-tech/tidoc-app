@@ -887,3 +887,27 @@ img, svg{
   color: var(--tidoc) !important;
   font-weight: 900;
 }
+
+/* Paramètres : items */
+.settings-item{
+  display:block;
+  border:1px solid var(--line);
+  border-radius:14px;
+  padding:14px;
+  text-decoration:none;
+  background:#fff;
+  box-shadow:0 10px 24px rgba(0,0,0,.06);
+  margin-top:10px;
+}
+
+.settings-title{
+  font-weight:900;
+  color:var(--tidoc);
+}
+
+.settings-sub{
+  margin-top:4px;
+  font-size:13px;
+  color:var(--muted);
+  font-weight:700;
+}
