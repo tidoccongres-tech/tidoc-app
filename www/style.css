@@ -874,7 +874,6 @@ img, svg{
   height:18px;
   color: var(--tidoc); /* grâce à fill="currentColor" */
 }
-}
 
 .username{
   color: var(--tidoc);
