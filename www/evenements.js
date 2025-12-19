@@ -1,4 +1,4 @@
-// evenements.js (MODULE) — clean & fiable
+// evenements.js (MODULE) — clean & fiable (admin via auth.js)
 import { firebaseConfig } from "./firebase-config.js";
 import { initializeApp, getApps, getApp } from "https://www.gstatic.com/firebasejs/10.12.4/firebase-app.js";
 import {
@@ -15,6 +15,9 @@ import {
 } from "https://www.gstatic.com/firebasejs/10.12.4/firebase-firestore.js";
 import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.4/firebase-auth.js";
 
+// ✅ IMPORTANT : on utilise auth.js pour admin + profil
+import { isAdminUser, ensureUserDoc } from "./auth.js";
+
 // ✅ init
 const app = getApps().length ? getApp() : initializeApp(firebaseConfig);
 const db = getFirestore(app);
@@ -29,8 +32,9 @@ const eventsList = document.getElementById("eventsList");
 const eventMsg = document.getElementById("eventMsg");
 
 // ===== helpers
+let IS_ADMIN = false;
 function isAdmin() {
-  return !!window.TIDOC_AUTH?.isAdmin;
+  return IS_ADMIN;
 }
 
 function showMsg(t = "") {
@@ -82,9 +86,9 @@ async function createEvent() {
   }
 
   try {
-    const d = document.getElementById("eventDate")?.value || "";        // "2026-03-27"
-    const start = document.getElementById("eventStart")?.value || "";  // "09:00"
-    const end = document.getElementById("eventEnd")?.value || "";      // "10:30"
+    const d = document.getElementById("eventDate")?.value || "";
+    const start = document.getElementById("eventStart")?.value || "";
+    const end = document.getElementById("eventEnd")?.value || "";
     const title = document.getElementById("eventTitle")?.value?.trim() || "";
     const place = document.getElementById("eventPlace")?.value?.trim() || "";
     const type = document.getElementById("eventType")?.value || "Autre";
@@ -120,6 +124,7 @@ async function createEvent() {
       endAt,
       createdAt: serverTimestamp(),
       createdBy: auth.currentUser?.uid || "",
+      createdByEmail: (auth.currentUser?.email || "").toLowerCase(),
     });
 
     clearForm();
@@ -154,11 +159,10 @@ function renderEventCard(id, e) {
   const endTxt = e.endAt?.toDate ? formatTime(e.endAt.toDate()) : "";
 
   const canDelete = isAdmin();
+  const place = (e.place || "").trim();
 
   const card = document.createElement("section");
   card.className = "event-card";
-
-  const place = (e.place || "").trim();
 
   card.innerHTML = `
     <div class="event-date">
@@ -232,7 +236,6 @@ async function loadEvents() {
 
 // ===== boot
 document.addEventListener("DOMContentLoaded", () => {
-  // form buttons
   openEventForm?.addEventListener("click", () => {
     if (!isAdmin()) {
       alert("Réservé à l’admin Ti’Doc.");
@@ -249,10 +252,18 @@ document.addEventListener("DOMContentLoaded", () => {
 
   publishEvent?.addEventListener("click", createEvent);
 
-  // auth -> affiche bouton admin + reload
-  onAuthStateChanged(auth, () => {
-    if (openEventForm) openEventForm.style.display = isAdmin() ? "" : "none";
-    if (!isAdmin()) showForm(false);
+  onAuthStateChanged(auth, async (user) => {
+    if (user) {
+      // ✅ s’assure que /users/<uid> existe (displayName etc)
+      await ensureUserDoc(user);
+      IS_ADMIN = isAdminUser(user);
+    } else {
+      IS_ADMIN = false;
+    }
+
+    if (openEventForm) openEventForm.style.display = IS_ADMIN ? "" : "none";
+    if (!IS_ADMIN) showForm(false);
+
     loadEvents();
   });
 
