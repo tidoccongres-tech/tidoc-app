@@ -1,5 +1,6 @@
 // galerie.js (MODULE)
 import { firebaseConfig } from "./firebase-config.js";
+
 import { initializeApp, getApps, getApp } from "https://www.gstatic.com/firebasejs/10.12.4/firebase-app.js";
 import {
   getFirestore,
@@ -13,6 +14,7 @@ import {
   deleteDoc,
   doc
 } from "https://www.gstatic.com/firebasejs/10.12.4/firebase-firestore.js";
+
 import {
   getAuth,
   onAuthStateChanged
@@ -27,8 +29,10 @@ const auth = getAuth(app);
 const CLOUD_NAME = "dctwkkvn1";
 const UPLOAD_PRESET = "tidoc_galerie";
 
-// ✅ TON EMAIL ADMIN (le même que dans le header)
-const ADMIN_EMAIL = "tidoc.congres@gmail.com";
+// ⚠️ Mets ici EXACTEMENT l’email admin (celui qui doit pouvoir upload/delete)
+const ADMIN_EMAILS = [
+  "tidoc.congres@gmail.com",
+];
 
 // UI
 const grid = document.getElementById("galleryGrid");
@@ -36,9 +40,18 @@ const addPhotosBtn = document.getElementById("addPhotosBtn");
 const yearBtns = Array.from(document.querySelectorAll(".year-btn"));
 
 let currentYear = "2025";
-let IS_ADMIN = false;
 
-// ---------- helpers ----------
+// ===== Helpers =====
+function isAdmin() {
+  const email = (auth.currentUser?.email || "").toLowerCase();
+  // Priorité : ta logique globale si elle existe
+  if (window.TIDOC_AUTH && typeof window.TIDOC_AUTH.isAdmin === "boolean") {
+    return !!window.TIDOC_AUTH.isAdmin;
+  }
+  // Fallback fiable : email list
+  return ADMIN_EMAILS.includes(email);
+}
+
 function requireLogin(actionText = "faire ça") {
   if (!auth.currentUser) {
     alert("Connexion requise 🔒\n\nPour " + actionText + ", connecte-toi.");
@@ -47,68 +60,129 @@ function requireLogin(actionText = "faire ça") {
   return true;
 }
 
-function isAdminNow() {
-  const email = (auth.currentUser?.email || "").toLowerCase();
-  return !!email && email === ADMIN_EMAIL.toLowerCase();
-}
-
 function escapeHTML(s = "") {
-  return String(s).replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;");
+  return String(s)
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;");
 }
 
-// ---------- gallery ----------
+function showError(msg) {
+  if (!grid) return;
+  grid.innerHTML = `<div class="card"><p>${escapeHTML(msg)}</p></div>`;
+}
+
+function tsToMs(ts) {
+  try {
+    if (!ts) return 0;
+    if (ts.toDate) return ts.toDate().getTime();
+    const d = new Date(ts);
+    return isNaN(d.getTime()) ? 0 : d.getTime();
+  } catch {
+    return 0;
+  }
+}
+
+// ===== Load gallery (avec fallback si index Firestore) =====
 async function loadGallery(year) {
   if (!grid) return;
 
   grid.innerHTML = `<div class="card"><p>Chargement…</p></div>`;
 
-  const qy = query(
-    collection(db, "gallery"),
-    where("year", "==", year),
-    orderBy("createdAt", "desc")
-  );
-
-  let snap;
   try {
-    snap = await getDocs(qy);
-  } catch (e) {
-    console.error(e);
-    // ⚠️ Si Firestore te demande un index (error failed-precondition), tu devras le créer
-    grid.innerHTML = `<div class="card"><p>Erreur chargement galerie (voir console).</p></div>`;
+    // 1) essai normal (plus propre)
+    const q1 = query(
+      collection(db, "gallery"),
+      where("year", "==", year),
+      orderBy("createdAt", "desc")
+    );
+
+    const snap = await getDocs(q1);
+    renderGalleryFromSnap(snap);
     return;
+  } catch (err) {
+    console.log("Firestore gallery error:", err);
+
+    // 2) si Firestore demande un index, on fallback sans orderBy et on trie côté client
+    const code = err?.code || "";
+    const msg = String(err?.message || "");
+
+    if (code === "failed-precondition" || msg.toLowerCase().includes("index")) {
+      try {
+        const q2 = query(
+          collection(db, "gallery"),
+          where("year", "==", year)
+        );
+
+        const snap2 = await getDocs(q2);
+
+        // tri client-side
+        const docs = snap2.docs
+          .map(d => ({ id: d.id, ...d.data() }))
+          .sort((a, b) => tsToMs(b.createdAt) - tsToMs(a.createdAt));
+
+        renderGalleryFromArray(docs);
+        return;
+      } catch (err2) {
+        console.log("Fallback query error:", err2);
+        showError("Erreur chargement galerie (fallback).");
+        return;
+      }
+    }
+
+    // 3) permissions
+    if (code === "permission-denied" || msg.toLowerCase().includes("insufficient permissions")) {
+      showError("Accès refusé (permissions Firestore). Vérifie tes Rules.");
+      return;
+    }
+
+    showError("Erreur chargement galerie (voir console).");
   }
+}
+
+function renderGalleryFromSnap(snap) {
+  if (!grid) return;
 
   if (snap.empty) {
     grid.innerHTML = `<div class="card"><p>Aucune photo pour l’instant.</p></div>`;
     return;
   }
 
+  const docs = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+  renderGalleryFromArray(docs);
+}
+
+function renderGalleryFromArray(items) {
+  if (!grid) return;
+
+  if (!items.length) {
+    grid.innerHTML = `<div class="card"><p>Aucune photo pour l’instant.</p></div>`;
+    return;
+  }
+
   grid.innerHTML = "";
 
-  for (const d of snap.docs) {
-    const item = d.data();
+  const admin = isAdmin();
 
+  for (const item of items) {
     const wrap = document.createElement("div");
     wrap.className = "gallery-item";
 
-    // ✅ tout le monde peut “télécharger” (ouvre l'image en grand)
-    // ✅ seuls admins voient 🗑️
     wrap.innerHTML = `
-      <img src="${escapeHTML(item.url)}" alt="" loading="lazy">
-
-      <div class="gallery-actions">
-        <a class="gallery-btn" href="${escapeHTML(item.url)}" target="_blank" rel="noopener" title="Télécharger / ouvrir">⬇️</a>
-        ${IS_ADMIN ? `<button class="gallery-btn" type="button" title="Supprimer" data-del="${d.id}">🗑️</button>` : ""}
-      </div>
+      <a href="${escapeHTML(item.url)}" download style="display:block;">
+        <img src="${escapeHTML(item.url)}" alt="" loading="lazy">
+      </a>
+      ${admin ? `<button class="gallery-del" type="button" title="Supprimer" data-del="${item.id}">🗑️</button>` : ""}
     `;
 
     grid.appendChild(wrap);
 
-    if (IS_ADMIN) {
-      wrap.querySelector(`[data-del="${d.id}"]`)?.addEventListener("click", async () => {
+    if (admin) {
+      wrap.querySelector(`[data-del="${item.id}"]`)?.addEventListener("click", async () => {
         if (!confirm("Supprimer cette photo de la galerie ?")) return;
-        await deleteDoc(doc(db, "gallery", d.id));
+        await deleteDoc(doc(db, "gallery", item.id));
         await loadGallery(currentYear);
+        alert("Photo supprimée ✅");
       });
     }
   }
@@ -120,19 +194,18 @@ function setActiveYear(year) {
   loadGallery(year);
 }
 
-// ---------- upload ----------
 function openCloudinaryWidget() {
-  // ✅ bouton doit être invisible si pas admin,
-  // mais on protège aussi ici au cas où
-  if (!IS_ADMIN) return;
   if (!requireLogin("ajouter des photos")) return;
 
-  if (!window.cloudinary?.createUploadWidget) {
-    alert("Cloudinary n’a pas chargé. Rafraîchis la page.");
+  if (!isAdmin()) {
+    alert("Réservé à l’admin Ti’Doc.");
     return;
   }
 
-  const uploads = []; // ✅ on collecte les addDoc à attendre
+  if (!window.cloudinary || !window.cloudinary.createUploadWidget) {
+    alert("Cloudinary n’a pas chargé. Rafraîchis la page.");
+    return;
+  }
 
   const widget = window.cloudinary.createUploadWidget(
     {
@@ -140,7 +213,7 @@ function openCloudinaryWidget() {
       uploadPreset: UPLOAD_PRESET,
       multiple: true,
       maxFiles: 30,
-      folder: `tidoc/galerie/${currentYear}`, // ✅ range aussi côté Cloudinary
+      folder: `tidoc/galerie/${currentYear}`, // ✅ range par année côté Cloudinary aussi
       sources: ["local", "camera"],
       clientAllowedFormats: ["png", "jpg", "jpeg", "webp", "heic"],
       showCompletedButton: true
@@ -148,41 +221,28 @@ function openCloudinaryWidget() {
     async (error, result) => {
       if (error) {
         console.log("Cloudinary error:", error);
-        alert("Erreur upload Cloudinary. Réessaie.");
+        alert("Erreur upload. Réessaie.");
         return;
       }
 
-      // ✅ 1 event "success" par fichier
+      // 1 event par fichier uploadé
       if (result?.event === "success") {
         const info = result.info;
 
-        uploads.push(
-          addDoc(collection(db, "gallery"), {
-            year: currentYear,                 // ✅ IMPORTANT : 2025 / 2026
-            url: info.secure_url,
-            publicId: info.public_id,
-            width: info.width || null,
-            height: info.height || null,
-            uploadedBy: auth.currentUser?.email || "",
-            createdAt: serverTimestamp()
-          })
-        );
+        await addDoc(collection(db, "gallery"), {
+          year: currentYear,                 // ✅ l’année active
+          url: info.secure_url,
+          publicId: info.public_id,
+          width: info.width || null,
+          height: info.height || null,
+          uploadedBy: auth.currentUser?.email || "",
+          createdAt: serverTimestamp()
+        });
       }
 
-      // ✅ à la fin de la queue → on attend les écritures et on reload
-      if (result?.event === "queues-end") {
-        try {
-          await Promise.allSettled(uploads);
-        } catch (_) {}
-        await loadGallery(currentYear);
-      }
-
-      // fallback : si l’event queues-end n’arrive pas selon le device
+      // quand tu fermes → reload
       if (result?.event === "close") {
-        try {
-          await Promise.allSettled(uploads);
-        } catch (_) {}
-        await loadGallery(currentYear);
+        loadGallery(currentYear);
       }
     }
   );
@@ -197,18 +257,12 @@ document.addEventListener("DOMContentLoaded", () => {
     btn.addEventListener("click", () => setActiveYear(btn.dataset.year));
   });
 
-  // upload
+  // bouton upload
   addPhotosBtn?.addEventListener("click", openCloudinaryWidget);
 
-  // ✅ calc admin dès que Auth est prêt + affiche/masque bouton
-  onAuthStateChanged(auth, async (user) => {
-    IS_ADMIN = !!user && isAdminNow();
-
-    // ✅ si pas admin : on cache totalement le bouton
-    if (addPhotosBtn) addPhotosBtn.style.display = IS_ADMIN ? "" : "none";
-
-    // reload galerie (pour afficher/masquer les 🗑️)
-    await loadGallery(currentYear);
+  // ✅ Affiche/masque le bouton admin au bon moment
+  onAuthStateChanged(auth, () => {
+    if (addPhotosBtn) addPhotosBtn.style.display = isAdmin() ? "" : "none";
   });
 
   // load initial
