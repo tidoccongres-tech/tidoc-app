@@ -4,34 +4,37 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Ti’Doc – Profil</title>
-  <link rel="stylesheet" href="style.css?v=1" />
+  <link rel="stylesheet" href="style.css?v=2" />
 </head>
 
 <body>
   <main class="page blog-page">
+
     <section class="card">
       <h2 style="margin:0;color:var(--tidoc)">Profil</h2>
-      <p style="margin:8px 0 0;color:var(--muted);font-size:13px">
-        Choisis ton avatar. Il s’affichera en haut à gauche dans l’application.
+      <p style="margin:6px 0 0;color:var(--muted);font-size:13px">
+        Gère ton compte Ti’Doc
       </p>
     </section>
 
-    <section class="card" style="margin-top:12px;">
-      <div id="profileStatus" style="color:var(--muted);font-size:13px;margin-bottom:10px;"></div>
+    <section class="card" style="margin-top:12px;display:flex;gap:14px;align-items:center;">
+      <div id="currentAvatar" class="profile-avatar"></div>
 
-      <div id="avatarGrid" class="avatar-grid"></div>
+      <div style="flex:1">
+        <div id="profileName" style="font-weight:800"></div>
+        <div id="profileEmail" style="font-size:13px;color:var(--muted)"></div>
 
-      <div style="height:12px"></div>
+        <div style="height:10px"></div>
 
-      <button class="btn-primary" id="saveAvatarBtn" type="button" style="width:100%">
-        Enregistrer mon avatar
-      </button>
+        <button class="btn-outline" id="changeAvatarBtn" type="button">
+          Changer d’avatar
+        </button>
+      </div>
     </section>
+
   </main>
 
-  <!-- Header commun -->
-  <script type="module" src="header-user-menu.js?v=2"></script>
-  <!-- Logique profil -->
-  <script type="module" src="profile.js?v=2"></script>
+  <script type="module" src="header-user-menu.js"></script>
+  <script type="module" src="profile.js"></script>
 </body>
 </html>
