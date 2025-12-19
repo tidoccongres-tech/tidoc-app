@@ -14,57 +14,41 @@ import {
   setDoc,
   getDoc
 } from "https://www.gstatic.com/firebasejs/10.12.4/firebase-firestore.js";
-import {
-  getAuth,
-  onAuthStateChanged
-} from "https://www.gstatic.com/firebasejs/10.12.4/firebase-auth.js";
+import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.4/firebase-auth.js";
 
 // ✅ évite double init
 const app = getApps().length ? getApp() : initializeApp(firebaseConfig);
 const db = getFirestore(app);
 const auth = getAuth(app);
 
-// ====== UI (adapte si tes IDs diffèrent) ======
+// ====== UI (IDs de TON blog.html) ======
 const postsRoot =
   document.getElementById("postsRoot") ||
   document.getElementById("postsList") ||
   document.getElementById("postsContainer");
 
 const createBtn =
+  document.getElementById("openPostForm") ||     // ✅ TON HTML
   document.getElementById("createPostBtn") ||
   document.querySelector(".create-post");
 
-const form =
-  document.getElementById("postForm") ||
-  document.getElementById("createPostForm");
+const form = document.getElementById("postForm");
 
-const titleInput =
-  document.getElementById("postTitle") ||
-  document.getElementById("titleInput");
-
-const textInput =
-  document.getElementById("postText") ||
-  document.getElementById("contentInput");
+const titleInput = document.getElementById("postTitle");
+const textInput  = document.getElementById("postBody");     // ✅ TON HTML
 
 const submitBtn =
-  document.getElementById("postSubmit") ||
-  document.getElementById("submitPostBtn");
+  document.getElementById("publishPost") ||      // ✅ TON HTML
+  document.getElementById("postSubmit");
 
 const cancelBtn =
-  document.getElementById("postCancel") ||
-  document.getElementById("cancelPostBtn");
+  document.getElementById("cancelPost") ||       // ✅ TON HTML
+  document.getElementById("postCancel");
 
 // ====== Helpers ======
-function isAdmin() {
-  return !!window.TIDOC_AUTH?.isAdmin;
-}
-
 function requireLogin(actionText = "faire ça") {
   if (!auth.currentUser) {
-    alert(
-      "Connexion requise 🔒\n\n" +
-      `Pour ${actionText}, connecte-toi avec Google via l’icône Profil (en haut à gauche).`
-    );
+    alert("Connexion requise 🔒\n\n" + `Pour ${actionText}, connecte-toi.`);
     return false;
   }
   return true;
@@ -96,17 +80,18 @@ function currentUserEmail() {
   return (auth.currentUser?.email || "").toLowerCase();
 }
 
+// ====== Permissions (soft côté UI) ======
+function isAdmin() {
+  return !!window.TIDOC_AUTH?.isAdmin;
+}
 function canDeletePost(post) {
   const uid = currentUserId();
   const email = currentUserEmail();
   const owner =
     (post.authorUid && post.authorUid === uid) ||
     (post.authorEmail && post.authorEmail.toLowerCase() === email);
-
   return isAdmin() || owner;
 }
-
-// ✅ Admin OR auteur du commentaire OR (bonus) propriétaire du post
 function canDeleteComment(comment, post) {
   const uid = currentUserId();
   const email = currentUserEmail();
@@ -122,9 +107,12 @@ function canDeleteComment(comment, post) {
   return isAdmin() || isCommentOwner || isPostOwner;
 }
 
+// ====== Form show/hide ======
 function showForm(show) {
   if (!form) return;
-  form.style.display = show ? "" : "none";
+  // ton HTML utilise hidden -> on gère proprement
+  form.hidden = !show;
+  if (show) form.scrollIntoView({ behavior: "smooth", block: "start" });
 }
 function clearForm() {
   if (titleInput) titleInput.value = "";
@@ -135,23 +123,19 @@ function clearForm() {
 const HEART_SVG = `
 <svg viewBox="0 0 16 16" class="heart-icon" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
   <path d="M1.24264 8.24264L8 15L14.7574 8.24264C15.553 7.44699 16 6.36786 16 5.24264V5.05234C16 2.8143 14.1857 1 11.9477 1C10.7166 1 9.55233 1.55959 8.78331 2.52086L8 3.5L7.21669 2.52086C6.44767 1.55959 5.28338 1 4.05234 1C1.8143 1 0 2.8143 0 5.05234V5.24264C0 6.36786 0.44699 7.44699 1.24264 8.24264Z"/>
-</svg>
-`;
+</svg>`;
 
 // ===== Likes =====
 async function getLikesCount(postId) {
   const snap = await getDocs(collection(db, "posts", postId, "likes"));
   return snap.size;
 }
-
 async function isLikedByMe(postId) {
   const uid = currentUserId();
   if (!uid) return false;
-  const ref = doc(db, "posts", postId, "likes", uid);
-  const snap = await getDoc(ref);
+  const snap = await getDoc(doc(db, "posts", postId, "likes", uid));
   return snap.exists();
 }
-
 async function toggleLike(postId) {
   if (!requireLogin("liker ce post")) return;
 
@@ -159,23 +143,17 @@ async function toggleLike(postId) {
   const ref = doc(db, "posts", postId, "likes", uid);
   const snap = await getDoc(ref);
 
-  if (snap.exists()) {
-    await deleteDoc(ref);
-  } else {
-    await setDoc(ref, { createdAt: serverTimestamp() });
-  }
+  if (snap.exists()) await deleteDoc(ref);
+  else await setDoc(ref, { createdAt: serverTimestamp() });
 
-  await loadPosts(); // simple et fiable
+  await loadPosts(); // simple
 }
 
 // ====== Comments ======
 async function loadComments(postId, postData, containerEl) {
   containerEl.innerHTML = `<div style="opacity:.7;font-size:13px;">Chargement des commentaires…</div>`;
 
-  const qy = query(
-    collection(db, "posts", postId, "comments"),
-    orderBy("createdAt", "asc")
-  );
+  const qy = query(collection(db, "posts", postId, "comments"), orderBy("createdAt", "asc"));
   const snap = await getDocs(qy);
 
   if (snap.empty) {
@@ -184,15 +162,14 @@ async function loadComments(postId, postData, containerEl) {
   }
 
   const uid = currentUserId();
-
   containerEl.innerHTML = "";
+
   snap.forEach((d) => {
     const c = d.data();
     const canDel = !!uid && canDeleteComment(c, postData);
 
     const row = document.createElement("div");
     row.className = "comment";
-
     row.innerHTML = `
       <div class="comment-row">
         <div>
@@ -260,31 +237,13 @@ function renderPostCard(postId, p) {
     <div class="post-body">${escapeHTML(p.text || "")}</div>
 
     <div class="post-actions">
-  <button class="like-btn" type="button" data-like="${postId}">
-    ${HEART_SVG}
-  </button>
-  <span class="like-count" data-likecount="${postId}">0</span>
+      <button class="like-btn" type="button" data-like="${postId}">${HEART_SVG}</button>
+      <span class="like-count" data-likecount="${postId}">…</span>
 
-  <button class="btn-outline" type="button" data-togglecomments="${postId}">
-    Commentaires
-  </button>
-</div>
-
-// click like
-card.querySelector(`[data-like="${postId}"]`)
-  ?.addEventListener("click", () => toggleLike(postId));
-
-// état initial (liked + compteur)
-(async () => {
-  const count = await getLikesCount(postId);
-  const liked = await isLikedByMe(postId);
-
-  const countEl = card.querySelector(`[data-likecount="${postId}"]`);
-  const btn = card.querySelector(`[data-like="${postId}"]`);
-
-  if (countEl) countEl.textContent = count;
-  if (btn) btn.classList.toggle("liked", liked);
-})();
+      <button class="btn-outline" type="button" data-togglecomments="${postId}">
+        Commentaires
+      </button>
+    </div>
 
     <div class="comments" data-commentswrap="${postId}" style="display:none;">
       <div data-commentslist="${postId}" style="margin-top:8px;"></div>
@@ -301,7 +260,17 @@ card.querySelector(`[data-like="${postId}"]`)
     card.querySelector(`[data-del="${postId}"]`)?.addEventListener("click", () => deletePost(postId));
   }
 
-  card.querySelector(`[data-like="${postId}"]`)?.addEventListener("click", () => toggleLike(postId));
+  // like
+  const likeBtn = card.querySelector(`[data-like="${postId}"]`);
+  likeBtn?.addEventListener("click", () => toggleLike(postId));
+
+  // init like state
+  (async () => {
+    const count = await getLikesCount(postId);
+    const liked = await isLikedByMe(postId);
+    card.querySelector(`[data-likecount="${postId}"]`).textContent = String(count);
+    likeBtn?.classList.toggle("liked", liked);
+  })();
 
   // comments toggle
   const wrap = card.querySelector(`[data-commentswrap="${postId}"]`);
@@ -318,7 +287,6 @@ card.querySelector(`[data-like="${postId}"]`)
   const input = card.querySelector(`[data-cinput="${postId}"]`);
   const sendBtn = card.querySelector(`[data-csend="${postId}"]`);
 
-  // si pas connecté → désactive visuellement
   if (!uid) {
     if (input) {
       input.disabled = true;
@@ -351,8 +319,7 @@ async function loadPosts() {
   }
 
   snap.forEach((d) => {
-    const p = d.data();
-    postsRoot.appendChild(renderPostCard(d.id, p));
+    postsRoot.appendChild(renderPostCard(d.id, d.data()));
   });
 }
 
@@ -363,7 +330,7 @@ async function createPost() {
   const text = (textInput?.value || "").trim();
 
   if (!title || !text) {
-    alert("Titre + texte requis 🙂");
+    alert("Titre + contenu requis 🙂");
     return;
   }
 
@@ -385,7 +352,7 @@ async function createPost() {
 
 // ====== Boot ======
 document.addEventListener("DOMContentLoaded", () => {
-  // ouverture du formulaire
+  // ✅ tout le monde peut ouvrir le form
   createBtn?.addEventListener("click", () => {
     if (!requireLogin("écrire un post")) return;
     showForm(true);
@@ -396,12 +363,15 @@ document.addEventListener("DOMContentLoaded", () => {
     showForm(false);
   });
 
-  submitBtn?.addEventListener("click", createPost);
+  submitBtn?.addEventListener("click", async () => {
+    try {
+      await createPost();
+    } catch (e) {
+      console.log(e);
+      alert("Erreur публикации:\n" + (e?.code || "") + "\n" + (e?.message || e));
+    }
+  });
 
-  // état auth → reload posts (et permissions)
   onAuthStateChanged(auth, () => loadPosts());
-
-  // premier chargement
   loadPosts();
 });
-
