@@ -883,8 +883,8 @@ img, svg{
   align-items:center;
 }
 
-/* "Utilisateur" en bleu Ti'Doc */
-.profile-name{
-  font-weight:900;
-  color:var(--tidoc);
+/* FORCE le bleu Ti'Doc sur le nom du profil */
+#profileName{
+  color: var(--tidoc) !important;
+  font-weight: 900;
 }
