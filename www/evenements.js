@@ -1,4 +1,4 @@
-// evenements.js (MODULE) — clean & fiable (admin via auth.js)
+// evenements.js (MODULE) — admin button fiable
 import { firebaseConfig } from "./firebase-config.js";
 import { initializeApp, getApps, getApp } from "https://www.gstatic.com/firebasejs/10.12.4/firebase-app.js";
 import {
@@ -15,15 +15,12 @@ import {
 } from "https://www.gstatic.com/firebasejs/10.12.4/firebase-firestore.js";
 import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.4/firebase-auth.js";
 
-// ✅ IMPORTANT : on utilise auth.js pour admin + profil
-import { isAdminUser, ensureUserDoc } from "./auth.js";
-
 // ✅ init
 const app = getApps().length ? getApp() : initializeApp(firebaseConfig);
 const db = getFirestore(app);
 const auth = getAuth(app);
 
-// ===== DOM
+// DOM
 const openEventForm = document.getElementById("openEventForm");
 const eventForm = document.getElementById("eventForm");
 const cancelEvent = document.getElementById("cancelEvent");
@@ -31,10 +28,10 @@ const publishEvent = document.getElementById("publishEvent");
 const eventsList = document.getElementById("eventsList");
 const eventMsg = document.getElementById("eventMsg");
 
-// ===== helpers
-let IS_ADMIN = false;
+// helpers
 function isAdmin() {
-  return IS_ADMIN;
+  // ✅ marche même si Firestore est lent
+  return !!window.TIDOC_AUTH?.isAdmin;
 }
 
 function showMsg(t = "") {
@@ -66,19 +63,26 @@ function formatTime(dateObj) {
 
 function showForm(show) {
   if (!eventForm) return;
+  eventForm.hidden = false;
   eventForm.style.display = show ? "" : "none";
 }
 
 function clearForm() {
-  const ids = ["eventDate", "eventStart", "eventEnd", "eventTitle", "eventPlace", "eventDesc"];
-  ids.forEach((id) => {
+  ["eventDate", "eventStart", "eventEnd", "eventTitle", "eventPlace", "eventDesc"].forEach((id) => {
     const el = document.getElementById(id);
     if (el) el.value = "";
   });
   showMsg("");
 }
 
-// ===== CRUD
+// ✅ FORCE l’affichage/masquage du bouton admin
+function applyAdminUI() {
+  const admin = isAdmin();
+  if (openEventForm) openEventForm.style.display = admin ? "flex" : "none";
+  if (!admin) showForm(false);
+}
+
+// CRUD
 async function createEvent() {
   if (!isAdmin()) {
     alert("Réservé à l’admin Ti’Doc.");
@@ -99,14 +103,12 @@ async function createEvent() {
       return;
     }
 
-    // startAt
     const startHHMM = start || "00:00";
     const [sh, sm] = startHHMM.split(":").map(Number);
     const startDate = new Date(d + "T00:00:00");
     startDate.setHours(sh, sm, 0, 0);
     const startAt = Timestamp.fromDate(startDate);
 
-    // endAt (optionnel)
     let endAt = null;
     if (end) {
       const [eh, em] = end.split(":").map(Number);
@@ -124,15 +126,14 @@ async function createEvent() {
       endAt,
       createdAt: serverTimestamp(),
       createdBy: auth.currentUser?.uid || "",
-      createdByEmail: (auth.currentUser?.email || "").toLowerCase(),
     });
 
     clearForm();
     showForm(false);
     await loadEvents();
   } catch (e) {
-    console.log("PUBLISH EVENT ERROR:", e);
-    alert("Impossible de publier l’évènement. (Rules Firestore ?)");
+    console.log("createEvent error:", e);
+    alert("Impossible de publier l’évènement (Rules Firestore ?)");
   }
 }
 
@@ -144,12 +145,11 @@ async function deleteEvent(eventId) {
     await deleteDoc(doc(db, "events", eventId));
     await loadEvents();
   } catch (e) {
-    console.log("DELETE EVENT ERROR:", e);
+    console.log("deleteEvent error:", e);
     alert("Suppression impossible (rules ?).");
   }
 }
 
-// ===== render
 function renderEventCard(id, e) {
   const startAtDate = e.startAt?.toDate ? e.startAt.toDate() : null;
   if (!startAtDate) return null;
@@ -157,9 +157,8 @@ function renderEventCard(id, e) {
   const { day, month } = formatDayMonth(startAtDate);
   const timeTxt = formatTime(startAtDate);
   const endTxt = e.endAt?.toDate ? formatTime(e.endAt.toDate()) : "";
-
-  const canDelete = isAdmin();
   const place = (e.place || "").trim();
+  const canDelete = isAdmin();
 
   const card = document.createElement("section");
   card.className = "event-card";
@@ -173,11 +172,7 @@ function renderEventCard(id, e) {
     <div class="event-content">
       <div class="event-head">
         <h3>${escapeHTML(e.title || "")}</h3>
-        ${
-          canDelete
-            ? `<button class="delete-btn" type="button" title="Supprimer" data-del="${id}">🗑️</button>`
-            : ``
-        }
+        ${canDelete ? `<button class="delete-btn" type="button" data-del="${id}">🗑️</button>` : ""}
       </div>
 
       ${e.desc ? `<p class="event-desc">${escapeHTML(e.desc)}</p>` : ""}
@@ -191,24 +186,12 @@ function renderEventCard(id, e) {
             : ""
         }
       </div>
-
-      <div class="event-select" style="margin-top:10px">
-        <button class="btn-outline event-add" type="button" data-add="${id}">
-          Ajouter à mon billet
-        </button>
-      </div>
     </div>
   `;
 
-  // delete (admin)
   if (canDelete) {
     card.querySelector(`[data-del="${id}"]`)?.addEventListener("click", () => deleteEvent(id));
   }
-
-  // placeholder add ticket
-  card.querySelector(`[data-add="${id}"]`)?.addEventListener("click", () => {
-    alert("On le branche à Billets après 🙂");
-  });
 
   return card;
 }
@@ -234,13 +217,14 @@ async function loadEvents() {
   });
 }
 
-// ===== boot
+// boot
 document.addEventListener("DOMContentLoaded", () => {
+  // ✅ affichage admin dès que window.TIDOC_AUTH arrive
+  applyAdminUI();
+  window.addEventListener("tidoc:auth", applyAdminUI);
+
   openEventForm?.addEventListener("click", () => {
-    if (!isAdmin()) {
-      alert("Réservé à l’admin Ti’Doc.");
-      return;
-    }
+    if (!isAdmin()) return alert("Réservé à l’admin Ti’Doc.");
     showForm(true);
     document.getElementById("eventDate")?.focus();
   });
@@ -252,18 +236,8 @@ document.addEventListener("DOMContentLoaded", () => {
 
   publishEvent?.addEventListener("click", createEvent);
 
-  onAuthStateChanged(auth, async (user) => {
-    if (user) {
-      // ✅ s’assure que /users/<uid> existe (displayName etc)
-      await ensureUserDoc(user);
-      IS_ADMIN = isAdminUser(user);
-    } else {
-      IS_ADMIN = false;
-    }
-
-    if (openEventForm) openEventForm.style.display = IS_ADMIN ? "" : "none";
-    if (!IS_ADMIN) showForm(false);
-
+  onAuthStateChanged(auth, () => {
+    applyAdminUI();
     loadEvents();
   });
 
