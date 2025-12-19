@@ -44,8 +44,7 @@ async function getAvatarUrl(user) {
 
 // ---------- build topbar ----------
 function ensureTopbar() {
-  // Si tu as déjà une topbar dans tes pages (div.blog-topbar), on la réutilise.
-  // Sinon on en crée une.
+  // Réutilise la topbar existante sinon crée
   let topbar = document.querySelector(".blog-topbar");
   if (!topbar) {
     topbar = document.createElement("header");
@@ -53,7 +52,6 @@ function ensureTopbar() {
     document.body.prepend(topbar);
   }
 
-  // Structure minimale attendue
   let left = topbar.querySelector(".blog-topbar-left");
   if (!left) {
     left = document.createElement("div");
@@ -68,7 +66,39 @@ function ensureTopbar() {
     topbar.appendChild(right);
   }
 
+  // petit style safe si jamais .blog-topbar-right n’a pas de CSS
+  right.style.display = "flex";
+  right.style.alignItems = "center";
+  right.style.gap = "8px";
+
   return { topbar, left, right };
+}
+
+function buildBell(right) {
+  // évite doublons
+  right.querySelector("#tidocNotifBtn")?.remove();
+
+  const btn = document.createElement("button");
+  btn.id = "tidocNotifBtn";
+  btn.type = "button";
+  btn.className = "icon-btn"; // ✅ utilise ton CSS existant (.blog-topbar .icon-btn)
+  btn.setAttribute("aria-label", "Notifications");
+
+  // SVG cloche (fill currentColor => blanc via .icon-btn)
+  btn.innerHTML = `
+    <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M12 22a2.5 2.5 0 0 0 2.45-2h-4.9A2.5 2.5 0 0 0 12 22Zm6-6V11a6 6 0 1 0-12 0v5l-2 2v1h16v-1l-2-2Z"></path>
+    </svg>
+  `;
+
+  // Pour l’instant : placeholder (plus tard tu feras notifications.html)
+  btn.addEventListener("click", () => {
+    // window.location.href = "./notifications.html";
+    alert("Notifications (bientôt 👀)");
+  });
+
+  right.appendChild(btn);
+  return btn;
 }
 
 function buildProfileButton(left) {
@@ -94,7 +124,7 @@ function buildProfileButton(left) {
   const menu = document.createElement("div");
   menu.id = "tidocProfileMenu";
   menu.className = "profile-menu";
-  menu.style.display = "none"; // ✅ IMPORTANT : caché par défaut
+  menu.style.display = "none"; // ✅ caché par défaut
   menu.setAttribute("aria-hidden", "true");
 
   menu.innerHTML = `
@@ -126,7 +156,7 @@ function buildProfileButton(left) {
     if (!act) return;
 
     if (act === "settings") {
-      window.location.href = "./settings.html"; // ✅ ta page Paramètres
+      window.location.href = "./settings.html";
     }
 
     if (act === "logout") {
@@ -168,18 +198,19 @@ async function applyAvatarToButton(user) {
     img.removeAttribute("src");
     img.style.display = "none";
     initial.style.display = "block";
-    initial.textContent = (user?.displayName || "Ti’Doc").trim().charAt(0).toUpperCase() || "T";
+    initial.textContent =
+      (user?.displayName || "Ti’Doc").trim().charAt(0).toUpperCase() || "T";
   }
 }
 
 // ---------- init ----------
-const { left } = ensureTopbar();
+const { left, right } = ensureTopbar();
 buildProfileButton(left);
+buildBell(right);
 
 onAuthStateChanged(auth, async (user) => {
-  // si pas connecté → renvoie vers login (sauf si tu veux autoriser pages publiques)
+  // si pas connecté → renvoie vers login (sauf sur login)
   if (!user) {
-    // sur la page login, ne redirige pas
     if (!location.pathname.endsWith("login.html")) {
       window.location.href = "./login.html";
     }
@@ -188,7 +219,7 @@ onAuthStateChanged(auth, async (user) => {
   await applyAvatarToButton(user);
 });
 
-// 🔁 quand avatars.js enregistre → on met à jour direct le header
+// 🔁 quand avatars.js enregistre → MAJ direct du header
 window.addEventListener("tidoc:avatar", async (e) => {
   const url = e?.detail?.url || "";
   if (url) localStorage.setItem(LS_KEY, url);
