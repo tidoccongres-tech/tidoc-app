@@ -1,1 +1,35 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Ti’Doc – Avatars</title>
+  <link rel="stylesheet" href="style.css?v=2" />
+</head>
 
+<body>
+  <main class="page blog-page">
+
+    <section class="card">
+      <h2 style="margin:0;color:var(--tidoc)">Choisir un avatar</h2>
+      <p style="margin:6px 0 0;color:var(--muted);font-size:13px">
+        Sélectionne ton avatar Ti’Doc
+      </p>
+    </section>
+
+    <section class="card" style="margin-top:12px;">
+      <div id="avatarGrid" class="avatar-grid-small"></div>
+
+      <div style="height:12px"></div>
+
+      <button class="btn-primary" id="saveAvatarBtn" style="width:100%">
+        Enregistrer
+      </button>
+    </section>
+
+  </main>
+
+  <script type="module" src="header-user-menu.js"></script>
+  <script type="module" src="avatars.js"></script>
+</body>
+</html>
