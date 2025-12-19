@@ -13,9 +13,13 @@ import {
   orderBy,
   serverTimestamp,
   deleteDoc,
-  doc
+  doc,
+  getDoc
 } from "https://www.gstatic.com/firebasejs/10.12.4/firebase-firestore.js";
-import { getAuth } from "https://www.gstatic.com/firebasejs/10.12.4/firebase-auth.js";
+import {
+  getAuth,
+  onAuthStateChanged
+} from "https://www.gstatic.com/firebasejs/10.12.4/firebase-auth.js";
 
 // ✅ Evite double init
 const app = getApps().length ? getApp() : initializeApp(firebaseConfig);
@@ -26,23 +30,23 @@ const auth = getAuth(app);
 const CLOUD_NAME = "dctwkkvn1";
 const UPLOAD_PRESET = "tidoc_galerie";
 
+// ✅ Admin email (source de vérité simple)
+const ADMIN_EMAIL = "tidoc.congres@gmail.com";
+
 // UI (match ton galerie.html)
 const grid = document.getElementById("galleryGrid");
 const addPhotosBtn = document.getElementById("addPhotosBtn");
 const yearBtns = Array.from(document.querySelectorAll(".year-btn"));
 
 let currentYear = "2025";
+let IS_ADMIN = false;
 
-function isAdmin() {
-  return !!window.TIDOC_AUTH?.isAdmin;
-}
-
+// ---------- helpers ----------
 function requireLogin(actionText = "faire ça") {
   if (!auth.currentUser) {
     alert(
       `Connexion requise 🔒\n\n` +
-      `Pour ${actionText}, connecte-toi avec Google via l’icône Profil (en haut à gauche).\n\n` +
-      `Ensuite tu pourras ajouter des photos 🙂`
+      `Pour ${actionText}, connecte-toi via l’icône Profil (en haut à gauche).`
     );
     return false;
   }
@@ -56,6 +60,23 @@ function escapeHTML(s = "") {
     .replaceAll(">", "&gt;");
 }
 
+// ✅ Admin = email OU role Firestore (fallback)
+async function computeIsAdmin(user) {
+  if (!user) return false;
+
+  const email = (user.email || "").toLowerCase();
+  if (email === ADMIN_EMAIL.toLowerCase()) return true;
+
+  // fallback si tu utilises users/{uid}.role
+  try {
+    const snap = await getDoc(doc(db, "users", user.uid));
+    if (snap.exists() && snap.data()?.role === "admin") return true;
+  } catch (_) {}
+
+  return false;
+}
+
+// ---------- gallery ----------
 async function loadGallery(year) {
   if (!grid) return;
 
@@ -78,7 +99,7 @@ async function loadGallery(year) {
 
   for (const d of snap.docs) {
     const item = d.data();
-    const canDelete = isAdmin();
+    const canDelete = IS_ADMIN;
 
     const wrap = document.createElement("div");
     wrap.className = "gallery-item";
@@ -108,7 +129,7 @@ function setActiveYear(year) {
 }
 
 function openCloudinaryWidget() {
-  if (!isAdmin()) {
+  if (!IS_ADMIN) {
     alert("Réservé à l’admin Ti’Doc.");
     return;
   }
@@ -137,7 +158,6 @@ function openCloudinaryWidget() {
         return;
       }
 
-      // 1 event par fichier uploadé
       if (result?.event === "success") {
         const info = result.info;
 
@@ -152,7 +172,6 @@ function openCloudinaryWidget() {
         });
       }
 
-      // quand tu fermes → reload
       if (result?.event === "close") {
         loadGallery(currentYear);
       }
@@ -172,16 +191,12 @@ document.addEventListener("DOMContentLoaded", () => {
   // bouton upload
   addPhotosBtn?.addEventListener("click", openCloudinaryWidget);
 
-  // affiche/masque bouton admin
-  const timer = setInterval(() => {
-    if (window.TIDOC_AUTH) {
-      if (addPhotosBtn) addPhotosBtn.style.display = isAdmin() ? "" : "none";
-      clearInterval(timer);
-    }
-  }, 100);
+  // ✅ auth => calc admin + affiche bouton
+  onAuthStateChanged(auth, async (user) => {
+    IS_ADMIN = await computeIsAdmin(user);
+    if (addPhotosBtn) addPhotosBtn.style.display = IS_ADMIN ? "" : "none";
+  });
 
   // load initial
   setActiveYear("2025");
 });
-
-  
