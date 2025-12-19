@@ -4,7 +4,60 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Ti’Doc – Paramètres</title>
-  <link rel="stylesheet" href="style.css?v=6" />
+  <link rel="stylesheet" href="style.css?v=99" />
+
+  <style>
+    /* (1) force le style du bouton Home comme "avant" */
+    .page-top-actions{
+      position: sticky;
+      top: 54px;              /* juste sous la barre bleue */
+      z-index: 900;
+      padding: 10px 0 0;
+      background: var(--bg);  /* évite le chevauchement */
+    }
+    .home-icon-btn{
+      width: 44px;
+      height: 44px;
+      border-radius: 14px;
+      border: 1px solid var(--line);
+      background: rgba(23,140,168,.12);
+      color: var(--tidoc);
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      text-decoration: none;
+      box-shadow: 0 10px 24px rgba(0,0,0,.06);
+    }
+    .home-icon{
+      width: 22px;
+      height: 22px;
+      display: block;
+      color: currentColor;
+    }
+
+    /* (2) force le style des items de paramètres (pas violet/souligné) */
+    .settings-item{
+      display:block;
+      border:1px solid var(--line);
+      border-radius:14px;
+      padding:14px;
+      text-decoration:none;     /* <-- enlève souligné */
+      background:#fff;
+      box-shadow:0 10px 24px rgba(0,0,0,.06);
+      margin-top:10px;
+      color: inherit;           /* <-- enlève violet */
+    }
+    .settings-title{
+      font-weight:900;
+      color:var(--tidoc);
+      margin-bottom:4px;
+    }
+    .settings-sub{
+      font-size:13px;
+      color:var(--muted);
+      font-weight:700;
+    }
+  </style>
 </head>
 
 <body>
@@ -13,7 +66,7 @@
 
   <main class="page blog-page">
 
-    <!-- Bouton HOME sous la topbar (mini case) -->
+    <!-- Home sous la topbar -->
     <div class="page-top-actions">
       <a class="home-icon-btn" href="./index.html" aria-label="Accueil">
         <svg class="home-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
@@ -24,7 +77,7 @@
       </a>
     </div>
 
-    <!-- Carte titre -->
+    <!-- Titre -->
     <section class="card" style="margin-top:10px;">
       <h2 style="margin:0;color:var(--tidoc)">Paramètres</h2>
       <p style="margin:6px 0 0;color:var(--muted);font-size:13px">
@@ -32,20 +85,12 @@
       </p>
     </section>
 
-    <!-- Liste paramètres (style “comme avant”) -->
+    <!-- Options -->
     <section class="card" style="margin-top:12px;">
       <a class="settings-item" href="./profile.html">
         <div class="settings-title">Profil</div>
         <div class="settings-sub">Avatar, nom, infos</div>
       </a>
-
-      <!-- plus tard tu ajouteras d’autres blocs ici -->
-      <!--
-      <a class="settings-item" href="./notifications.html">
-        <div class="settings-title">Notifications</div>
-        <div class="settings-sub">Préférences</div>
-      </a>
-      -->
     </section>
 
   </main>
