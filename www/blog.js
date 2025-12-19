@@ -1,4 +1,4 @@
-// blog.js (MODULE)
+// blog.js (MODULE) — version clean
 import { firebaseConfig } from "./firebase-config.js";
 import { initializeApp, getApps, getApp } from "https://www.gstatic.com/firebasejs/10.12.4/firebase-app.js";
 import {
@@ -16,39 +16,27 @@ import {
 } from "https://www.gstatic.com/firebasejs/10.12.4/firebase-firestore.js";
 import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.4/firebase-auth.js";
 
-// ✅ évite double init
+// ✅ init
 const app = getApps().length ? getApp() : initializeApp(firebaseConfig);
 const db = getFirestore(app);
 const auth = getAuth(app);
 
-// ====== UI (IDs de TON blog.html) ======
-const postsRoot =
-  document.getElementById("postsRoot") ||
-  document.getElementById("postsList") ||
-  document.getElementById("postsContainer");
-
-const createBtn =
-  document.getElementById("openPostForm") ||     // ✅ TON HTML
-  document.getElementById("createPostBtn") ||
-  document.querySelector(".create-post");
-
-const form = document.getElementById("postForm");
-
+// ===== UI (IDs de ton blog.html) =====
+const postsRoot  = document.getElementById("postsRoot");
+const createBtn  = document.getElementById("createPostBtn");
+const form       = document.getElementById("postForm");
 const titleInput = document.getElementById("postTitle");
-const textInput  = document.getElementById("postBody");     // ✅ TON HTML
+const textInput  = document.getElementById("postText");
+const submitBtn  = document.getElementById("postSubmit");
+const cancelBtn  = document.getElementById("postCancel");
+const postMsg    = document.getElementById("postMsg");
 
-const submitBtn =
-  document.getElementById("publishPost") ||      // ✅ TON HTML
-  document.getElementById("postSubmit");
+// ===== Helpers =====
+function showMsg(t = "") { if (postMsg) postMsg.textContent = t; }
 
-const cancelBtn =
-  document.getElementById("cancelPost") ||       // ✅ TON HTML
-  document.getElementById("postCancel");
-
-// ====== Helpers ======
 function requireLogin(actionText = "faire ça") {
   if (!auth.currentUser) {
-    alert("Connexion requise 🔒\n\n" + `Pour ${actionText}, connecte-toi.`);
+    alert("Connexion requise 🔒\n\nPour " + actionText + ", connecte-toi.");
     return false;
   }
   return true;
@@ -73,83 +61,44 @@ function fmtDate(ts) {
   }
 }
 
-function currentUserId() {
-  return auth.currentUser?.uid || "";
-}
-function currentUserEmail() {
-  return (auth.currentUser?.email || "").toLowerCase();
-}
+function currentUserId() { return auth.currentUser?.uid || ""; }
+function currentUserEmail() { return (auth.currentUser?.email || "").toLowerCase(); }
 
-// ====== Permissions (soft côté UI) ======
-function isAdmin() {
-  return !!window.TIDOC_AUTH?.isAdmin;
-}
-function canDeletePost(post) {
-  const uid = currentUserId();
-  const email = currentUserEmail();
-  const owner =
-    (post.authorUid && post.authorUid === uid) ||
-    (post.authorEmail && post.authorEmail.toLowerCase() === email);
-  return isAdmin() || owner;
-}
-function canDeleteComment(comment, post) {
-  const uid = currentUserId();
-  const email = currentUserEmail();
-
-  const isCommentOwner =
-    (comment.authorUid && comment.authorUid === uid) ||
-    (comment.authorEmail && comment.authorEmail.toLowerCase() === email);
-
-  const isPostOwner =
-    (post.authorUid && post.authorUid === uid) ||
-    (post.authorEmail && post.authorEmail.toLowerCase() === email);
-
-  return isAdmin() || isCommentOwner || isPostOwner;
-}
-
-// ====== Form show/hide ======
-function showForm(show) {
-  if (!form) return;
-  // ton HTML utilise hidden -> on gère proprement
-  form.hidden = !show;
-  if (show) form.scrollIntoView({ behavior: "smooth", block: "start" });
-}
-function clearForm() {
-  if (titleInput) titleInput.value = "";
-  if (textInput) textInput.value = "";
-}
-
-// ===== Like SVG =====
+// ===== LIKE SVG =====
 const HEART_SVG = `
 <svg viewBox="0 0 16 16" class="heart-icon" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
   <path d="M1.24264 8.24264L8 15L14.7574 8.24264C15.553 7.44699 16 6.36786 16 5.24264V5.05234C16 2.8143 14.1857 1 11.9477 1C10.7166 1 9.55233 1.55959 8.78331 2.52086L8 3.5L7.21669 2.52086C6.44767 1.55959 5.28338 1 4.05234 1C1.8143 1 0 2.8143 0 5.05234V5.24264C0 6.36786 0.44699 7.44699 1.24264 8.24264Z"/>
-</svg>`;
+</svg>
+`;
 
 // ===== Likes =====
 async function getLikesCount(postId) {
   const snap = await getDocs(collection(db, "posts", postId, "likes"));
   return snap.size;
 }
+
 async function isLikedByMe(postId) {
   const uid = currentUserId();
   if (!uid) return false;
-  const snap = await getDoc(doc(db, "posts", postId, "likes", uid));
+  const likeRef = doc(db, "posts", postId, "likes", uid);
+  const snap = await getDoc(likeRef);
   return snap.exists();
 }
+
 async function toggleLike(postId) {
   if (!requireLogin("liker ce post")) return;
 
   const uid = currentUserId();
-  const ref = doc(db, "posts", postId, "likes", uid);
-  const snap = await getDoc(ref);
+  const likeRef = doc(db, "posts", postId, "likes", uid);
+  const snap = await getDoc(likeRef);
 
-  if (snap.exists()) await deleteDoc(ref);
-  else await setDoc(ref, { createdAt: serverTimestamp() });
+  if (snap.exists()) await deleteDoc(likeRef);
+  else await setDoc(likeRef, { createdAt: serverTimestamp() });
 
-  await loadPosts(); // simple
+  await loadPosts();
 }
 
-// ====== Comments ======
+// ===== Comments =====
 async function loadComments(postId, postData, containerEl) {
   containerEl.innerHTML = `<div style="opacity:.7;font-size:13px;">Chargement des commentaires…</div>`;
 
@@ -161,12 +110,9 @@ async function loadComments(postId, postData, containerEl) {
     return;
   }
 
-  const uid = currentUserId();
   containerEl.innerHTML = "";
-
   snap.forEach((d) => {
     const c = d.data();
-    const canDel = !!uid && canDeleteComment(c, postData);
 
     const row = document.createElement("div");
     row.className = "comment";
@@ -176,19 +122,10 @@ async function loadComments(postId, postData, containerEl) {
           <div class="comment-author">${escapeHTML(c.authorName || "Utilisateur")}</div>
           <div class="comment-text">${escapeHTML(c.text || "")}</div>
         </div>
-        ${canDel ? `<button class="comment-del" type="button" data-cdel="${d.id}">Supprimer</button>` : ""}
       </div>
     `;
 
     containerEl.appendChild(row);
-
-    if (canDel) {
-      row.querySelector(`[data-cdel="${d.id}"]`)?.addEventListener("click", async () => {
-        if (!confirm("Supprimer ce commentaire ?")) return;
-        await deleteDoc(doc(db, "posts", postId, "comments", d.id));
-        await loadComments(postId, postData, containerEl);
-      });
-    }
   });
 }
 
@@ -211,16 +148,46 @@ async function addComment(postId, postData, inputEl, commentsWrap) {
   await loadComments(postId, postData, commentsWrap);
 }
 
-// ====== Posts ======
-async function deletePost(postId) {
-  if (!confirm("Supprimer ce post ?")) return;
-  await deleteDoc(doc(db, "posts", postId));
+// ===== Posts =====
+function showForm(show) {
+  if (!form) return;
+  form.style.display = show ? "" : "none";
+}
+function clearForm() {
+  if (titleInput) titleInput.value = "";
+  if (textInput) textInput.value = "";
+  showMsg("");
+}
+
+async function createPost() {
+  if (!requireLogin("publier un post")) return;
+
+  const title = (titleInput?.value || "").trim();
+  const text  = (textInput?.value || "").trim();
+
+  if (!title || !text) {
+    showMsg("Titre + contenu requis 🙂");
+    return;
+  }
+
+  const u = auth.currentUser;
+
+  await addDoc(collection(db, "posts"), {
+    title,
+    text,
+    authorUid: u.uid,
+    authorEmail: u.email || "",
+    authorName: u.displayName || "Utilisateur",
+    createdAt: serverTimestamp()
+  });
+
+  clearForm();
+  showForm(false);
   await loadPosts();
 }
 
 function renderPostCard(postId, p) {
   const uid = currentUserId();
-  const delOk = !!uid && canDeletePost(p);
 
   const card = document.createElement("section");
   card.className = "card post-card";
@@ -231,13 +198,14 @@ function renderPostCard(postId, p) {
         <div class="post-title">${escapeHTML(p.title || "")}</div>
         <div class="post-sub">${escapeHTML(p.authorName || "Utilisateur")} • ${fmtDate(p.createdAt)}</div>
       </div>
-      ${delOk ? `<button class="delete-btn" type="button" data-del="${postId}">Supprimer</button>` : ""}
     </div>
 
     <div class="post-body">${escapeHTML(p.text || "")}</div>
 
     <div class="post-actions">
-      <button class="like-btn" type="button" data-like="${postId}">${HEART_SVG}</button>
+      <button class="like-btn" type="button" data-like="${postId}">
+        ${HEART_SVG}
+      </button>
       <span class="like-count" data-likecount="${postId}">…</span>
 
       <button class="btn-outline" type="button" data-togglecomments="${postId}">
@@ -255,24 +223,21 @@ function renderPostCard(postId, p) {
     </div>
   `;
 
-  // delete post
-  if (delOk) {
-    card.querySelector(`[data-del="${postId}"]`)?.addEventListener("click", () => deletePost(postId));
-  }
+  // Like
+  card.querySelector(`[data-like="${postId}"]`)?.addEventListener("click", () => toggleLike(postId));
 
-  // like
-  const likeBtn = card.querySelector(`[data-like="${postId}"]`);
-  likeBtn?.addEventListener("click", () => toggleLike(postId));
-
-  // init like state
+  // Init like state
   (async () => {
     const count = await getLikesCount(postId);
     const liked = await isLikedByMe(postId);
-    card.querySelector(`[data-likecount="${postId}"]`).textContent = String(count);
-    likeBtn?.classList.toggle("liked", liked);
+
+    const countEl = card.querySelector(`[data-likecount="${postId}"]`);
+    const btn = card.querySelector(`[data-like="${postId}"]`);
+    if (countEl) countEl.textContent = String(count);
+    if (btn) btn.classList.toggle("liked", liked);
   })();
 
-  // comments toggle
+  // Comments toggle
   const wrap = card.querySelector(`[data-commentswrap="${postId}"]`);
   const list = card.querySelector(`[data-commentslist="${postId}"]`);
   const toggleBtn = card.querySelector(`[data-togglecomments="${postId}"]`);
@@ -283,15 +248,12 @@ function renderPostCard(postId, p) {
     if (!open) await loadComments(postId, p, list);
   });
 
-  // add comment
+  // Add comment
   const input = card.querySelector(`[data-cinput="${postId}"]`);
   const sendBtn = card.querySelector(`[data-csend="${postId}"]`);
 
   if (!uid) {
-    if (input) {
-      input.disabled = true;
-      input.placeholder = "Connecte-toi pour commenter.";
-    }
+    if (input) { input.disabled = true; input.placeholder = "Connecte-toi pour commenter."; }
     if (sendBtn) sendBtn.disabled = true;
   } else {
     sendBtn?.addEventListener("click", () => addComment(postId, p, input, list));
@@ -312,50 +274,20 @@ async function loadPosts() {
   const snap = await getDocs(qy);
 
   postsRoot.innerHTML = "";
-
   if (snap.empty) {
     postsRoot.innerHTML = `<section class="card"><p>Aucun post pour l’instant.</p></section>`;
     return;
   }
 
-  snap.forEach((d) => {
-    postsRoot.appendChild(renderPostCard(d.id, d.data()));
-  });
+  snap.forEach((d) => postsRoot.appendChild(renderPostCard(d.id, d.data())));
 }
 
-async function createPost() {
-  if (!requireLogin("publier un post")) return;
-
-  const title = (titleInput?.value || "").trim();
-  const text = (textInput?.value || "").trim();
-
-  if (!title || !text) {
-    alert("Titre + contenu requis 🙂");
-    return;
-  }
-
-  const u = auth.currentUser;
-
-  await addDoc(collection(db, "posts"), {
-    title,
-    text,
-    authorUid: u.uid,
-    authorEmail: u.email || "",
-    authorName: u.displayName || "Utilisateur",
-    createdAt: serverTimestamp()
-  });
-
-  clearForm();
-  showForm(false);
-  await loadPosts();
-}
-
-// ====== Boot ======
+// ===== Boot =====
 document.addEventListener("DOMContentLoaded", () => {
-  // ✅ tout le monde peut ouvrir le form
+  // ✅ Ce click doit marcher (si ton JS ne plante plus)
   createBtn?.addEventListener("click", () => {
-    if (!requireLogin("écrire un post")) return;
     showForm(true);
+    titleInput?.focus();
   });
 
   cancelBtn?.addEventListener("click", () => {
@@ -363,14 +295,7 @@ document.addEventListener("DOMContentLoaded", () => {
     showForm(false);
   });
 
-  submitBtn?.addEventListener("click", async () => {
-    try {
-      await createPost();
-    } catch (e) {
-      console.log(e);
-      alert("Erreur публикации:\n" + (e?.code || "") + "\n" + (e?.message || e));
-    }
-  });
+  submitBtn?.addEventListener("click", () => createPost());
 
   onAuthStateChanged(auth, () => loadPosts());
   loadPosts();
