@@ -915,3 +915,10 @@ img, svg{
   color:var(--muted);
   font-weight:700;
 }
+
+/* Forum : assure que le bouton est cliquable */
+#createPostBtn{
+  position: relative;
+  z-index: 2;
+  pointer-events: auto;
+}
