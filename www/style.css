@@ -862,32 +862,18 @@ img, svg{
   background:rgba(23,140,168,.1);
 }
 
-.back-home{
-  background: transparent;
-  border: none;
-  color: var(--tidoc);
-  font-weight: 600;
-  font-size: 14px;
-  cursor: pointer;
-  margin-bottom: 12px;
+.home-btn{
+  display:flex;
+  align-items:center;
+  gap:8px;
+  height:40px;
 }
 
-.back-home:hover{
-  text-decoration: underline;
+.home-icon{
+  width:18px;
+  height:18px;
+  color: var(--tidoc); /* grâce à fill="currentColor" */
 }
-
-.back-home-btn{
-  background: transparent;
-  border: none;
-  color: var(--tidoc);
-  font-weight: 600;
-  font-size: 14px;
-  cursor: pointer;
-  margin-bottom: 12px;
-}
-
-.back-home-btn:hover{
-  text-decoration: underline;
 }
 
 .username{
