@@ -844,20 +844,47 @@ img, svg{
   background:rgba(23,140,168,.1);
 }
 
-.home-btn{
+/* sous la topbar : bouton accueil */
+.page-actions{
+  margin-top:10px;
+  margin-bottom:10px;
+  display:flex;
+  justify-content:flex-start;
+}
+
+.icon-home-btn{
+  width:42px;
+  height:42px;
+  border-radius:14px;
   display:flex;
   align-items:center;
-  gap:8px;
-  height:40px;
+  justify-content:center;
+  background:#fff;
+  border:1px solid var(--line);
+  box-shadow:0 10px 24px rgba(0,0,0,.06);
+  color:var(--tidoc);
+  text-decoration:none;
+}
+
+.icon-home-btn:active{
+  transform:scale(.98);
 }
 
 .home-icon{
-  width:18px;
-  height:18px;
-  color: var(--tidoc); /* grâce à fill="currentColor" */
+  width:22px;
+  height:22px;
 }
 
-.username{
-  color: var(--tidoc);
-  font-weight: 600;
+/* profil layout */
+.profile-card{
+  margin-top:12px;
+  display:flex;
+  gap:14px;
+  align-items:center;
+}
+
+/* "Utilisateur" en bleu Ti'Doc */
+.profile-name{
+  font-weight:900;
+  color:var(--tidoc);
 }
