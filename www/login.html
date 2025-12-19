@@ -6,7 +6,15 @@
   <title>Ti’Doc – Connexion</title>
   <link rel="stylesheet" href="style.css" />
   <style>
-    body{margin:0;min-height:100vh;display:flex;align-items:center;justify-content:center;background:#178CA8;}
+    body{
+      margin:0;
+      min-height:100vh;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      background:#178CA8;
+      animation: pageFade 320ms ease-out both;
+    }
 
     .box{
       width:min(420px,92vw);
@@ -16,6 +24,7 @@
       padding-top:44px; /* place pour le logo */
       box-shadow:0 10px 30px rgba(0,0,0,.2);
       position:relative;
+      animation: cardIn 420ms cubic-bezier(.2,.9,.2,1) both;
     }
 
     .auth-logo{
@@ -29,6 +38,8 @@
       border:1px solid rgba(0,0,0,.08);
       box-shadow:0 10px 24px rgba(0,0,0,.12);
       object-fit:cover;
+      animation: logoPop 520ms cubic-bezier(.2,1.2,.2,1) both;
+      animation-delay:120ms;
     }
 
     .logo{font-weight:800;font-size:26px;margin-bottom:6px}
@@ -44,6 +55,20 @@
     button{padding:12px;border:none;border-radius:12px;background:#178CA8;color:#fff;font-weight:700}
     .link{background:transparent;color:#178CA8;text-decoration:underline}
     .small{font-size:13px;opacity:.75}
+
+    @keyframes pageFade{
+      from{opacity:0}
+      to{opacity:1}
+    }
+    @keyframes cardIn{
+      from{opacity:0; transform: translateY(18px) scale(.98);}
+      to{opacity:1; transform: translateY(0) scale(1);}
+    }
+    @keyframes logoPop{
+      0%{transform:translateX(-50%) scale(.7); opacity:0}
+      60%{transform:translateX(-50%) scale(1.08); opacity:1}
+      100%{transform:translateX(-50%) scale(1)}
+    }
   </style>
 </head>
 
@@ -104,7 +129,6 @@
     tabSignup.onclick = () => setTab("signup");
     tabLogin.onclick  = () => setTab("login");
 
-    // si déjà connecté → go home
     onAuthStateChanged(auth, (u) => {
       if (u) window.location.href = "./index.html";
     });
@@ -115,9 +139,7 @@
         const displayName = document.getElementById("suName").value.trim();
         const email = document.getElementById("suEmail").value.trim();
         const password = document.getElementById("suPass").value;
-
         await signupEmail({ email, password, displayName });
-        msg.textContent = "Compte créé ✅ Redirection…";
         window.location.href = "./index.html";
       } catch(e){
         msg.textContent = "Erreur: " + (e?.message || e);
@@ -130,7 +152,6 @@
         const email = document.getElementById("liEmail").value.trim();
         const password = document.getElementById("liPass").value;
         await loginEmail({ email, password });
-        msg.textContent = "Connecté ✅";
         window.location.href = "./index.html";
       } catch(e){
         msg.textContent = "Erreur: " + (e?.message || e);
@@ -148,6 +169,5 @@
       }
     };
   </script>
-  <img class="auth-logo anim" src="./icons/icon-512.png" alt="Ti'Doc">
 </body>
 </html>
