@@ -32,7 +32,7 @@ const HELLOASSO_PUBLIC_URL =
 if (openHelloAssoBtn) {
   openHelloAssoBtn.href = HELLOASSO_PUBLIC_URL;
   openHelloAssoBtn.target = "_blank";
-  openHelloAssoBtn.rel = "noreferrer";
+  openHelloAssoBtn.rel = "noopener noreferrer";
 }
 
 // --- helpers UI
@@ -48,7 +48,7 @@ function requireLogin(actionText = "faire cette action") {
 }
 
 function show(msg) {
-  if (ticketStatus) ticketStatus.textContent = msg;
+  if (ticketStatus) ticketStatus.textContent = msg || "";
 }
 
 function renderTicketBox(t) {
@@ -97,7 +97,7 @@ async function loadExistingTicket() {
   }
 }
 
-// --- fetch robuste : essaye plusieurs endpoints + affiche l’erreur réelle
+// --- fetch robuste : essaye plusieurs endpoints + gère HTML/JSON
 async function postJsonWithFallback(urls, bodyObj) {
   let lastError = null;
 
@@ -106,26 +106,49 @@ async function postJsonWithFallback(urls, bodyObj) {
       const res = await fetch(url, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(bodyObj)
+        body: JSON.stringify(bodyObj),
       });
 
+      const contentType = (res.headers.get("content-type") || "").toLowerCase();
+      const raw = await res.text().catch(() => "");
+
       if (!res.ok) {
-        const txt = await res.text().catch(() => "");
-        lastError = { url, status: res.status, text: txt };
+        lastError = {
+          url,
+          status: res.status,
+          text: raw.slice(0, 300),
+          contentType
+        };
         continue;
       }
 
-      // tente JSON
-      const data = await res.json().catch(() => null);
-      if (!data) {
-        const txt = await res.text().catch(() => "");
-        lastError = { url, status: res.status, text: "Réponse non-JSON: " + txt };
+      // si JSON → parse
+      if (contentType.includes("application/json")) {
+        const data = JSON.parse(raw || "{}");
+        return { ok: true, url, data };
+      }
+
+      // sinon on tente quand même un parse JSON
+      try {
+        const data = JSON.parse(raw);
+        return { ok: true, url, data };
+      } catch {
+        lastError = {
+          url,
+          status: res.status,
+          text: "Réponse non JSON (ex: HTML): " + raw.slice(0, 300),
+          contentType
+        };
         continue;
       }
 
-      return { ok: true, url, data };
     } catch (e) {
-      lastError = { url, status: "NETWORK", text: String(e?.message || e) };
+      lastError = {
+        url,
+        status: "NETWORK",
+        text: String(e?.message || e),
+        contentType: ""
+      };
     }
   }
 
@@ -137,14 +160,13 @@ async function syncTicket() {
 
   const u = auth.currentUser;
 
-  // UX
   if (syncTicketBtn) syncTicketBtn.disabled = true;
   show("⏳ Vérification de ton billet…");
 
   try {
-    // ⚠️ On teste 2 routes possibles :
-    // - Netlify classique : /.netlify/functions/helloasso-ticket
-    // - Alternative si tu as des redirects : /api/helloasso-ticket
+    // ✅ Routes à tester :
+    // 1) Netlify functions direct
+    // 2) /api/... seulement si tu as mis la redirection dans netlify.toml
     const endpoints = [
       "/.netlify/functions/helloasso-ticket",
       "/api/helloasso-ticket"
@@ -162,10 +184,10 @@ async function syncTicket() {
         `(${error?.status || "?"}) sur ${error?.url || "?"}\n` +
         `${(error?.text || "").slice(0, 180)}`
       );
+      renderTicketBox(null);
       return;
     }
 
-    // debug utile
     console.log("helloasso-ticket OK from:", url, data);
 
     if (!data?.ticketType) {
@@ -174,9 +196,8 @@ async function syncTicket() {
       return;
     }
 
-    // Stocke dans Firestore : userTickets/{uid}
     const payload = {
-      ticketType: data.ticketType, // ex: "Essentiel" / "Standard" / "Premium" (selon ta function)
+      ticketType: data.ticketType || "",
       workshopsAllowed: Number(data.workshopsAllowed ?? 0),
       conferencesAllowed: Number(data.conferencesAllowed ?? 0),
       helloassoOrderId: data.helloassoOrderId || "",
