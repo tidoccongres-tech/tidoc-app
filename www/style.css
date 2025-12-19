@@ -841,3 +841,31 @@ img, svg{
   object-fit:cover;
   display:block;
 }
+
+.avatar-grid{
+  margin-top:8px;
+  display:grid;
+  grid-template-columns:repeat(5, 1fr);
+  gap:10px;
+}
+
+.avatar-item{
+  border:2px solid transparent;
+  background:#fff;
+  border-radius:14px;
+  padding:6px;
+  cursor:pointer;
+  box-shadow:0 10px 24px rgba(0,0,0,.06);
+}
+
+.avatar-item img{
+  width:100%;
+  height:auto;
+  display:block;
+  border-radius:10px;
+}
+
+.avatar-item.active{
+  border-color: rgba(23,140,168,.9);
+  background: rgba(23,140,168,.08);
+}
