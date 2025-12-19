@@ -4,51 +4,107 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Ti’Doc – Profil</title>
-  <link rel="stylesheet" href="style.css?v=2" />
+  <link rel="stylesheet" href="style.css?v=3" />
+
+  <style>
+    /* Bouton accueil sous la barre bleue */
+    .profile-topbar {
+      max-width: 980px;
+      margin: 14px auto 0;
+      padding: 0 16px;
+      display: flex;
+      align-items: center;
+      justify-content: flex-start;
+    }
+
+    .home-icon-btn{
+      width: 44px;
+      height: 44px;
+      border-radius: 12px;
+      border: 1px solid rgba(0,0,0,.08);
+      background: #fff;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      box-shadow: 0 6px 18px rgba(0,0,0,.08);
+    }
+
+    .home-icon-btn svg{
+      width: 22px;
+      height: 22px;
+      color: var(--tidoc);
+    }
+
+    /* Carte profil */
+    .profile-card-row{
+      display:flex;
+      gap:14px;
+      align-items:center;
+    }
+
+    .profile-name{
+      font-weight: 900;
+      color: var(--tidoc); /* <-- Utilisateur en bleu Ti’Doc */
+      line-height: 1.1;
+    }
+  </style>
 </head>
 
 <body>
-  <main class="page blog-page">
 
-    <!-- En-tête page -->
+  <!-- Header global (barre bleue + avatar + menu) -->
+  <script type="module" src="header-user-menu.js"></script>
+
+  <!-- Bouton Accueil (sous la barre bleue) -->
+  <div class="profile-topbar">
+    <button class="home-icon-btn" id="goHomeBtn" type="button" aria-label="Accueil" title="Accueil">
+      <svg viewBox="0 0 24 24" fill="none" aria-hidden="true" xmlns="http://www.w3.org/2000/svg">
+        <path fill-rule="evenodd" clip-rule="evenodd"
+          d="M2.5192 7.82274C2 8.77128 2 9.91549 2 12.2039V13.725C2 17.6258 2 19.5763 3.17157 20.7881C4.34315 22 6.22876 22 10 22H14C17.7712 22 19.6569 22 20.8284 20.7881C22 19.5763 22 17.6258 22 13.725V12.2039C22 9.91549 22 8.77128 21.4808 7.82274C20.9616 6.87421 20.0131 6.28551 18.116 5.10812L16.116 3.86687C14.1106 2.62229 13.1079 2 12 2C10.8921 2 9.88939 2.62229 7.88403 3.86687L5.88403 5.10813C3.98695 6.28551 3.0384 6.87421 2.5192 7.82274ZM11.25 18C11.25 18.4142 11.5858 18.75 12 18.75C12.4142 18.75 12.75 18.4142 12.75 18V15C12.75 14.5858 12.4142 14.25 12 14.25C11.5858 14.25 11.25 14.5858 11.25 15V18Z"
+          fill="currentColor"/>
+      </svg>
+    </button>
+  </div>
+
+  <main class="page blog-page" style="max-width:980px;margin:12px auto 0;padding:0 16px;">
+
+    <!-- Titre page -->
     <section class="card">
       <h2 style="margin:0;color:var(--tidoc)">Profil</h2>
       <p style="margin:6px 0 0;color:var(--muted);font-size:13px">
         Gère ton compte Ti’Doc
       </p>
-
-      <div style="height:10px"></div>
-
-      <!-- Bouton Accueil -->
-      <button class="btn-outline home-btn" id="goHomeBtn" type="button">
-        <svg class="home-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true" xmlns="http://www.w3.org/2000/svg">
-          <path fill-rule="evenodd" clip-rule="evenodd"
-            d="M2.5192 7.82274C2 8.77128 2 9.91549 2 12.2039V13.725C2 17.6258 2 19.5763 3.17157 20.7881C4.34315 22 6.22876 22 10 22H14C17.7712 22 19.6569 22 20.8284 20.7881C22 19.5763 22 17.6258 22 13.725V12.2039C22 9.91549 22 8.77128 21.4808 7.82274C20.9616 6.87421 20.0131 6.28551 18.116 5.10812L16.116 3.86687C14.1106 2.62229 13.1079 2 12 2C10.8921 2 9.88939 2.62229 7.88403 3.86687L5.88403 5.10813C3.98695 6.28551 3.0384 6.87421 2.5192 7.82274ZM11.25 18C11.25 18.4142 11.5858 18.75 12 18.75C12.4142 18.75 12.75 18.4142 12.75 18V15C12.75 14.5858 12.4142 14.25 12 14.25C11.5858 14.25 11.25 14.5858 11.25 15V18Z"
-            fill="currentColor"/>
-        </svg>
-        Accueil
-      </button>
     </section>
 
-    <!-- Carte infos profil -->
-    <section class="card" style="margin-top:12px;display:flex;gap:14px;align-items:center;">
-      <div id="currentAvatar" class="profile-avatar"></div>
+    <!-- Contenu profil -->
+    <section class="card" style="margin-top:12px;">
+      <div class="profile-card-row">
+        <div id="currentAvatar" class="profile-avatar"></div>
 
-      <div style="flex:1">
-        <div id="profileName" style="font-weight:800"></div>
-        <div id="profileEmail" style="font-size:13px;color:var(--muted)"></div>
+        <div style="flex:1">
+          <div id="profileName" class="profile-name">Utilisateur</div>
+          <div id="profileEmail" style="font-size:13px;color:var(--muted)"></div>
 
-        <div style="height:10px"></div>
+          <div style="height:10px"></div>
 
-        <button class="btn-outline" id="changeAvatarBtn" type="button">
-          Changer d’avatar
-        </button>
+          <button class="btn-outline" id="changeAvatarBtn" type="button">
+            Changer d’avatar
+          </button>
+        </div>
       </div>
     </section>
 
   </main>
 
-  <script type="module" src="header-user-menu.js"></script>
   <script type="module" src="profile.js"></script>
+
+  <script>
+    // Bouton Accueil
+    document.getElementById("goHomeBtn")?.addEventListener("click", () => {
+      window.location.href = "./index.html";
+    });
+  </script>
+
 </body>
 </html>
