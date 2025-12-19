@@ -967,3 +967,25 @@ img, svg{
   display:block;
   flex:0 0 auto;
 }
+
+.gallery-actions{
+  position:absolute;
+  top:8px;
+  right:8px;
+  display:flex;
+  gap:8px;
+  z-index:20;
+}
+
+.gallery-btn{
+  border:none;
+  background:#fff;
+  border-radius:10px;
+  padding:6px 8px;
+  cursor:pointer;
+  box-shadow:0 10px 24px rgba(0,0,0,.10);
+  text-decoration:none;
+  color:inherit;
+  font-size:14px;
+  line-height:1;
+}
