@@ -18,6 +18,8 @@ import {
   serverTimestamp
 } from "https://www.gstatic.com/firebasejs/10.12.4/firebase-firestore.js";
 
+export const ADMIN_EMAILS = ["tidoc.congres@gmail.com"].map(e => e.toLowerCase());
+
 // ✅ init Firebase (anti double init)
 const app = getApps().length ? getApp() : initializeApp(firebaseConfig);
 export const auth = getAuth(app);
