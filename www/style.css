@@ -835,37 +835,44 @@ img, svg{
   box-shadow:0 6px 18px rgba(0,0,0,.15);
 }
 
-#profileAvatar{
+.profile-avatar{
+  width:64px;
+  height:64px;
+  border-radius:50%;
+  overflow:hidden;
+  background:#e9f7fb;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+}
+
+.profile-avatar img{
   width:100%;
   height:100%;
   object-fit:cover;
-  display:block;
 }
 
-.avatar-grid{
-  margin-top:8px;
+.avatar-grid-small{
   display:grid;
   grid-template-columns:repeat(5, 1fr);
-  gap:10px;
+  gap:8px;
 }
 
-.avatar-item{
+.avatar-item-small{
   border:2px solid transparent;
   background:#fff;
-  border-radius:14px;
-  padding:6px;
+  border-radius:12px;
+  padding:4px;
   cursor:pointer;
-  box-shadow:0 10px 24px rgba(0,0,0,.06);
 }
 
-.avatar-item img{
+.avatar-item-small img{
   width:100%;
-  height:auto;
   display:block;
-  border-radius:10px;
+  border-radius:8px;
 }
 
-.avatar-item.active{
-  border-color: rgba(23,140,168,.9);
-  background: rgba(23,140,168,.08);
+.avatar-item-small.active{
+  border-color:var(--tidoc);
+  background:rgba(23,140,168,.1);
 }
