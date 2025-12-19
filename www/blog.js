@@ -1,4 +1,4 @@
-// blog.js (MODULE) — version clean
+// blog.js (MODULE) — FIX create button
 import { firebaseConfig } from "./firebase-config.js";
 import { initializeApp, getApps, getApp } from "https://www.gstatic.com/firebasejs/10.12.4/firebase-app.js";
 import {
@@ -21,19 +21,7 @@ const app = getApps().length ? getApp() : initializeApp(firebaseConfig);
 const db = getFirestore(app);
 const auth = getAuth(app);
 
-// ===== UI (IDs de ton blog.html) =====
-const postsRoot  = document.getElementById("postsRoot");
-const createBtn  = document.getElementById("createPostBtn");
-const form       = document.getElementById("postForm");
-const titleInput = document.getElementById("postTitle");
-const textInput  = document.getElementById("postText");
-const submitBtn  = document.getElementById("postSubmit");
-const cancelBtn  = document.getElementById("postCancel");
-const postMsg    = document.getElementById("postMsg");
-
 // ===== Helpers =====
-function showMsg(t = "") { if (postMsg) postMsg.textContent = t; }
-
 function requireLogin(actionText = "faire ça") {
   if (!auth.currentUser) {
     alert("Connexion requise 🔒\n\nPour " + actionText + ", connecte-toi.");
@@ -62,7 +50,6 @@ function fmtDate(ts) {
 }
 
 function currentUserId() { return auth.currentUser?.uid || ""; }
-function currentUserEmail() { return (auth.currentUser?.email || "").toLowerCase(); }
 
 // ===== LIKE SVG =====
 const HEART_SVG = `
@@ -113,7 +100,6 @@ async function loadComments(postId, postData, containerEl) {
   containerEl.innerHTML = "";
   snap.forEach((d) => {
     const c = d.data();
-
     const row = document.createElement("div");
     row.className = "comment";
     row.innerHTML = `
@@ -124,7 +110,6 @@ async function loadComments(postId, postData, containerEl) {
         </div>
       </div>
     `;
-
     containerEl.appendChild(row);
   });
 }
@@ -148,17 +133,23 @@ async function addComment(postId, postData, inputEl, commentsWrap) {
   await loadComments(postId, postData, commentsWrap);
 }
 
-// ===== Posts =====
+// ===== UI refs (déclarés ici, initialisés dans init()) =====
+let postsRoot, createBtn, form, titleInput, textInput, submitBtn, cancelBtn, postMsg;
+
+function showMsg(t = "") { if (postMsg) postMsg.textContent = t; }
+
 function showForm(show) {
   if (!form) return;
   form.style.display = show ? "" : "none";
 }
+
 function clearForm() {
   if (titleInput) titleInput.value = "";
   if (textInput) textInput.value = "";
   showMsg("");
 }
 
+// ===== Posts =====
 async function createPost() {
   if (!requireLogin("publier un post")) return;
 
@@ -282,9 +273,21 @@ async function loadPosts() {
   snap.forEach((d) => postsRoot.appendChild(renderPostCard(d.id, d.data())));
 }
 
-// ===== Boot =====
-document.addEventListener("DOMContentLoaded", () => {
-  // ✅ Ce click doit marcher (si ton JS ne plante plus)
+// ===== init =====
+function initUI() {
+  postsRoot  = document.getElementById("postsRoot");
+  createBtn  = document.getElementById("createPostBtn");
+  form       = document.getElementById("postForm");
+  titleInput = document.getElementById("postTitle");
+  textInput  = document.getElementById("postText");
+  submitBtn  = document.getElementById("postSubmit");
+  cancelBtn  = document.getElementById("postCancel");
+  postMsg    = document.getElementById("postMsg");
+
+  // ✅ DEBUG utile
+  console.log("[TiDoc Forum] createBtn =", createBtn);
+
+  // bind
   createBtn?.addEventListener("click", () => {
     showForm(true);
     titleInput?.focus();
@@ -296,6 +299,10 @@ document.addEventListener("DOMContentLoaded", () => {
   });
 
   submitBtn?.addEventListener("click", () => createPost());
+}
+
+document.addEventListener("DOMContentLoaded", () => {
+  initUI();
 
   onAuthStateChanged(auth, () => loadPosts());
   loadPosts();
