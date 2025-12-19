@@ -9,15 +9,6 @@
   <link rel="manifest" href="/manifest.webmanifest" />
   <meta name="theme-color" content="#178CA8" />
 
-  <!-- Protège la page (redirige si pas connecté) -->
-  <script type="module">
-    import { requireAuthOrRedirect } from "./auth.js";
-    requireAuthOrRedirect("./login.html");
-  </script>
-</head>
-
-<body>
-
   <main class="page blog-page">
 
     <!-- ✅ Bouton créer un post (tout le monde connecté) -->
