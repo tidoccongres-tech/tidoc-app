@@ -807,21 +807,6 @@ img, svg{
   animation-delay: 120ms;
 }
 
-/* Cascade sur les éléments du formulaire */
-.login-card h2 { animation: fieldIn 350ms ease-out both; animation-delay: 120ms; }
-.login-card form { animation: fieldIn 350ms ease-out both; animation-delay: 180ms; }
-
-.login-card input:nth-of-type(1) { animation: fieldIn 350ms ease-out both; animation-delay: 220ms; }
-.login-card input:nth-of-type(2) { animation: fieldIn 350ms ease-out both; animation-delay: 280ms; }
-.login-card button { animation: fieldIn 350ms ease-out both; animation-delay: 340ms; }
-
-/* Important: pour que ça marche, faut que les inputs/buttons soient visibles au départ */
-.login-card h2,
-.login-card form,
-.login-card input,
-.login-card button {
-  opacity: 0;
-}
 
 .profile-circle{
   width:34px;
@@ -875,4 +860,18 @@ img, svg{
 .avatar-item-small.active{
   border-color:var(--tidoc);
   background:rgba(23,140,168,.1);
+}
+
+.back-home{
+  background: transparent;
+  border: none;
+  color: var(--tidoc);
+  font-weight: 600;
+  font-size: 14px;
+  cursor: pointer;
+  margin-bottom: 12px;
+}
+
+.back-home:hover{
+  text-decoration: underline;
 }
