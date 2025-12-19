@@ -5,9 +5,26 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Ti'Doc — Événements</title>
 
-  <link rel="stylesheet" href="style.css?v=2" />
+  <!-- ✅ IMPORTANT : ./ + gros v= pour casser le cache -->
+  <link rel="stylesheet" href="./style.css?v=999" />
   <link rel="manifest" href="/manifest.webmanifest">
   <meta name="theme-color" content="#178CA8">
+
+  <!-- ✅ Fallback si jamais style.css ne charge pas (barre bleue garantie) -->
+  <style>
+    .blog-topbar{
+      position: sticky;
+      top: 0;
+      height: 54px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 0 14px;
+      background: #178CA8;
+      z-index: 10000;
+    }
+    .blog-topbar-left,.blog-topbar-right{display:flex;align-items:center;gap:10px;}
+  </style>
 
   <!-- protège la page (redirige si pas connecté) -->
   <script type="module">
@@ -18,7 +35,7 @@
 
 <body>
   <!-- ✅ Topbar bleue injectée automatiquement -->
-  <script type="module" src="./header-user-menu.js"></script>
+  <script type="module" src="./header-user-menu.js?v=999"></script>
 
   <main class="page blog-page">
 
@@ -98,8 +115,8 @@
     <a class="tab" href="billets.html" aria-label="Billets">Billets</a>
   </nav>
 
-  <!-- ✅ JS page -->
-  <script type="module" src="evenements.js?v=7"></script>
+  <!-- JS page -->
+  <script type="module" src="./evenements.js?v=999"></script>
   <script src="pwa.js"></script>
 </body>
 </html>
