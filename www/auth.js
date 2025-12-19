@@ -1,6 +1,8 @@
-// auth.js (MODULE) — Email/Password + Avatars Firestore
+// auth.js (MODULE) — Email/Password + Avatars Firestore + état global
 import { firebaseConfig } from "./firebase-config.js";
+
 import { initializeApp, getApps, getApp } from "https://www.gstatic.com/firebasejs/10.12.4/firebase-app.js";
+
 import {
   getAuth,
   onAuthStateChanged,
@@ -10,6 +12,7 @@ import {
   signOut,
   updateProfile
 } from "https://www.gstatic.com/firebasejs/10.12.4/firebase-auth.js";
+
 import {
   getFirestore,
   doc,
@@ -18,19 +21,25 @@ import {
   serverTimestamp
 } from "https://www.gstatic.com/firebasejs/10.12.4/firebase-firestore.js";
 
+// =====================
+// CONFIG
+// =====================
 export const ADMIN_EMAILS = ["tidoc.congres@gmail.com"].map(e => e.toLowerCase());
 
-// ✅ init Firebase (anti double init)
+// Avatars (dossier: /avatars/)
+export const AVATARS = Array.from({ length: 10 }, (_, i) => `./avatars/avatar-${i + 1}.png`);
+
+// =====================
+// INIT FIREBASE (anti double init)
+// =====================
 const app = getApps().length ? getApp() : initializeApp(firebaseConfig);
+
 export const auth = getAuth(app);
 export const db = getFirestore(app);
 
-// ✅ Admins
-export const ADMIN_EMAILS = ["tidoc.congres@gmail.com"];
-
-// ✅ Avatars (dossier: /avatars/)
-export const AVATARS = Array.from({ length: 10 }, (_, i) => `./avatars/avatar-${i + 1}.png`);
-
+// =====================
+// HELPERS
+// =====================
 export function pickRandomAvatar() {
   return AVATARS[Math.floor(Math.random() * AVATARS.length)];
 }
@@ -40,40 +49,49 @@ export function isAdminUser(user = auth.currentUser) {
   return ADMIN_EMAILS.includes(email);
 }
 
+// Crée/complète users/{uid}
 export async function ensureUserDoc(user, { displayName, avatarUrl } = {}) {
   if (!user?.uid) return null;
 
   const ref = doc(db, "users", user.uid);
   const snap = await getDoc(ref);
 
-  // Si doc existe déjà, compléter si manque avatar
+  // ✅ si doc existe : complète si manque avatarUrl / displayName
   if (snap.exists()) {
     const data = snap.data() || {};
-    if (!data.avatarUrl) {
-      const newAvatar = avatarUrl || pickRandomAvatar();
-      await setDoc(ref, { avatarUrl: newAvatar }, { merge: true });
-      return { ...data, avatarUrl: newAvatar };
+
+    const patch = {};
+    if (!data.avatarUrl) patch.avatarUrl = avatarUrl || pickRandomAvatar();
+    if (!data.displayName) patch.displayName = (displayName || user.displayName || "Utilisateur").trim();
+
+    if (Object.keys(patch).length) {
+      patch.updatedAt = serverTimestamp();
+      await setDoc(ref, patch, { merge: true });
+      return { ...data, ...patch };
     }
+
     return data;
   }
 
-  // Sinon créer doc
-  const finalName = displayName || user.displayName || "Utilisateur";
+  // ✅ sinon : crée doc
+  const finalName = (displayName || user.displayName || "Utilisateur").trim();
   const finalAvatar = avatarUrl || pickRandomAvatar();
 
-  await setDoc(ref, {
+  const newDoc = {
     email: (user.email || "").toLowerCase(),
     displayName: finalName,
     avatarUrl: finalAvatar,
     role: isAdminUser(user) ? "admin" : "user",
     createdAt: serverTimestamp()
-  }, { merge: true });
+  };
+
+  await setDoc(ref, newDoc, { merge: true });
 
   return {
-    email: (user.email || "").toLowerCase(),
+    email: newDoc.email,
     displayName: finalName,
     avatarUrl: finalAvatar,
-    role: isAdminUser(user) ? "admin" : "user"
+    role: newDoc.role
   };
 }
 
@@ -83,16 +101,18 @@ export async function getUserProfile(uid) {
   return snap.exists() ? snap.data() : null;
 }
 
+// =====================
+// AUTH ACTIONS
+// =====================
 export async function signupEmail({ email, password, displayName } = {}) {
   if (!email || !password) throw new Error("Email + mot de passe requis.");
 
   const cred = await createUserWithEmailAndPassword(auth, email, password);
 
-  // ⚠️ Pas de photo. On met juste un displayName.
   const name = (displayName || "Utilisateur").trim();
   await updateProfile(cred.user, { displayName: name });
 
-  // Avatar aléatoire + doc user
+  // ✅ doc Firestore + avatar aléatoire
   await ensureUserDoc(cred.user, { displayName: name, avatarUrl: pickRandomAvatar() });
 
   return cred.user;
@@ -100,9 +120,10 @@ export async function signupEmail({ email, password, displayName } = {}) {
 
 export async function loginEmail({ email, password } = {}) {
   if (!email || !password) throw new Error("Email + mot de passe requis.");
+
   const cred = await signInWithEmailAndPassword(auth, email, password);
 
-  // s’assure qu’on a bien avatarUrl en base
+  // ✅ s’assure qu’on a un doc (et un avatar)
   await ensureUserDoc(cred.user);
 
   return cred.user;
@@ -117,14 +138,16 @@ export async function logout() {
   await signOut(auth);
 }
 
-// (optionnel) helper : exiger connexion pour accéder à une page
+// Helper : exiger connexion pour accéder à une page
 export function requireAuthOrRedirect(redirectTo = "./login.html") {
   onAuthStateChanged(auth, (u) => {
     if (!u) window.location.href = redirectTo;
   });
 }
 
-// ===== GLOBAL STATE (pour toutes les pages) =====
+// =====================
+// ÉTAT GLOBAL (pour toutes les pages)
+// =====================
 window.TIDOC_AUTH = window.TIDOC_AUTH || null;
 
 onAuthStateChanged(auth, async (user) => {
@@ -134,18 +157,18 @@ onAuthStateChanged(auth, async (user) => {
     return;
   }
 
-  // ✅ admin immédiat (pas besoin d'attendre Firestore)
+  // ✅ état rapide (immédiat)
   const base = {
     uid: user.uid,
     email: (user.email || "").toLowerCase(),
-    displayName: user.displayName || "Utilisateur",
-    isAdmin: isAdminUser(user),
+    displayName: (user.displayName || "Utilisateur").trim(),
+    isAdmin: isAdminUser(user)
   };
 
   window.TIDOC_AUTH = base;
   window.dispatchEvent(new CustomEvent("tidoc:auth", { detail: base }));
 
-  // ✅ Ensuite on complète avec Firestore (displayName/avatar/role)
+  // ✅ complète avec Firestore (avatar/role/nom)
   try {
     const profile = await ensureUserDoc(user);
     window.TIDOC_AUTH = { ...base, profile };
