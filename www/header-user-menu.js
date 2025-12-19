@@ -1,33 +1,26 @@
 /* header-user-menu.js (MODULE)
-   - Injecte la topbar Ti'Doc (bleue) partout
-   - Avatar: photoURL Firebase -> sinon avatarUrl Firestore -> sinon avatar aléatoire (persisté)
-   - Menu: Paramètres + Se déconnecter
+   Topbar bleue + avatar + menu Paramètres / Déconnexion
+   Avatar = photoURL Firebase -> Firestore users/{uid}.avatarUrl -> localStorage -> avatar aléatoire
 */
 
 import { auth, db, logout, AVATARS } from "./auth.js";
-import { onAuthStateChanged, updateProfile } from "https://www.gstatic.com/firebasejs/10.12.4/firebase-auth.js";
-import { doc, getDoc, setDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.4/firebase-firestore.js";
+import {
+  onAuthStateChanged,
+  updateProfile
+} from "https://www.gstatic.com/firebasejs/10.12.4/firebase-auth.js";
+import {
+  doc,
+  getDoc,
+  setDoc,
+  serverTimestamp
+} from "https://www.gstatic.com/firebasejs/10.12.4/firebase-firestore.js";
 
-// ============ Config ============
-const SETTINGS_URL = "./profile.html";   // page paramètres/profil (tu peux changer)
-const LOGIN_URL    = "./login.html";     // page login (tu peux changer)
-
-// ============ Helpers ============
-function escapeHTML(s = "") {
-  return String(s)
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;")
-    .replaceAll("'", "&#039;");
-}
+const SETTINGS_URL = "./profile.html";
+const LOGIN_URL = "./login.html";
 
 function getPageTitle() {
-  // option 1 : <body data-title="Billets">
   const t = document.body?.dataset?.title?.trim();
   if (t) return t;
-
-  // option 2 : document.title "Ti'Doc — Billets" -> "Billets"
   const raw = (document.title || "").trim();
   const parts = raw.split("—").map(x => x.trim());
   return parts.length > 1 ? parts[parts.length - 1] : "Ti’Doc";
@@ -43,45 +36,101 @@ function pickRandomAvatar() {
   return AVATARS[Math.floor(Math.random() * AVATARS.length)];
 }
 
-async function getUserDoc(uid) {
-  if (!uid) return null;
-  const ref = doc(db, "users", uid);
-  const snap = await getDoc(ref);
-  return snap.exists() ? snap.data() : null;
+function lsKey(uid) {
+  return `tidoc_avatar_${uid}`;
 }
 
-async function ensureAvatarForUser(user) {
-  // 1) si Firebase a une photoURL -> ok
-  if (user?.photoURL) return { avatarUrl: user.photoURL, source: "firebase" };
+async function getUserAvatarFromFirestore(uid) {
+  try {
+    const ref = doc(db, "users", uid);
+    const snap = await getDoc(ref);
+    if (snap.exists()) {
+      const d = snap.data();
+      if (d?.avatarUrl) return d.avatarUrl;
+    }
+  } catch (e) {
+    // Firestore peut être bloqué -> on ignore et on passera en fallback
+    console.log("Firestore get users/{uid} blocked:", e?.code || e);
+  }
+  return "";
+}
 
-  // 2) si Firestore users/{uid}.avatarUrl -> ok
-  const profile = await getUserDoc(user?.uid);
-  if (profile?.avatarUrl) return { avatarUrl: profile.avatarUrl, source: "firestore" };
+async function setUserAvatarToFirestore(uid, email, displayName, avatarUrl) {
+  try {
+    await setDoc(doc(db, "users", uid), {
+      email: (email || "").toLowerCase(),
+      displayName: displayName || "Utilisateur",
+      avatarUrl,
+      updatedAt: serverTimestamp()
+    }, { merge: true });
+    return true;
+  } catch (e) {
+    console.log("Firestore set users/{uid} blocked:", e?.code || e);
+    return false;
+  }
+}
 
-  // 3) sinon avatar aléatoire -> on le persiste dans Firestore + updateProfile
+async function ensureAvatarUrl(user) {
+  // 1) Firebase photoURL
+  if (user?.photoURL) return user.photoURL;
+
+  // 2) Firestore
+  const fsAvatar = await getUserAvatarFromFirestore(user.uid);
+  if (fsAvatar) {
+    try { await updateProfile(user, { photoURL: fsAvatar }); } catch {}
+    localStorage.setItem(lsKey(user.uid), fsAvatar);
+    return fsAvatar;
+  }
+
+  // 3) localStorage
+  const lsAvatar = localStorage.getItem(lsKey(user.uid)) || "";
+  if (lsAvatar) return lsAvatar;
+
+  // 4) random fallback (même si Firestore bloqué)
   const random = pickRandomAvatar();
-  if (!random) return { avatarUrl: "", source: "none" };
+  if (!random) return "";
 
-  // Firestore
-  await setDoc(doc(db, "users", user.uid), {
-    email: (user.email || "").toLowerCase(),
-    displayName: user.displayName || "Utilisateur",
-    avatarUrl: random,
-    updatedAt: serverTimestamp()
-  }, { merge: true });
+  localStorage.setItem(lsKey(user.uid), random);
 
-  // Firebase Auth profile (pour que ce soit dispo partout rapidement)
+  // on tente d’écrire dans Firestore (si bloqué, pas grave)
+  await setUserAvatarToFirestore(
+    user.uid,
+    user.email || "",
+    user.displayName || "Utilisateur",
+    random
+  );
+
+  // on tente d’écrire dans Firebase auth (si ça échoue, pas grave)
   try { await updateProfile(user, { photoURL: random }); } catch {}
 
-  return { avatarUrl: random, source: "random" };
+  return random;
 }
 
-// ============ UI Injection ============
+function updateAvatarUI(user, avatarUrl) {
+  const img = document.getElementById("profileImg");
+  const initial = document.getElementById("profileInitial");
+  const dot = document.getElementById("statusDot");
+
+  if (dot) dot.style.background = user ? "#2ecc71" : "#cfcfcf";
+
+  if (user && avatarUrl && img && initial) {
+    img.src = avatarUrl;
+
+    // important: forcer l’affichage
+    img.style.display = "block";
+    initial.style.display = "none";
+  } else {
+    if (img) img.style.display = "none";
+    if (initial) {
+      initial.textContent = initials(user);
+      initial.style.display = "block";
+    }
+  }
+}
+
 function injectHeader() {
   const root = document.getElementById("appHeader");
   if (!root) return;
-
-  const title = escapeHTML(getPageTitle());
 
   root.innerHTML = `
     <header class="blog-topbar">
@@ -94,8 +143,8 @@ function injectHeader() {
           <span class="status-dot" id="statusDot" aria-hidden="true"></span>
         </button>
 
-        <div style="color:#fff;font-weight:900;font-size:14px;letter-spacing:.2px;opacity:.95;">
-          ${title}
+        <div style="color:#fff;font-weight:900;font-size:14px;opacity:.95;">
+          ${getPageTitle()}
         </div>
       </div>
 
@@ -116,83 +165,45 @@ function injectHeader() {
 }
 
 function bindHeaderEvents() {
-  const profileBtn  = document.getElementById("profileBtn");
-  const menu        = document.getElementById("profileMenu");
-  const menuSettings= document.getElementById("menuSettings");
-  const menuLogout  = document.getElementById("menuLogout");
-
+  const profileBtn = document.getElementById("profileBtn");
+  const menu = document.getElementById("profileMenu");
   if (!profileBtn || !menu) return;
 
-  function toggleMenu() { menu.hidden = !menu.hidden; }
-  function closeMenu()  { menu.hidden = true; }
+  const closeMenu = () => { menu.hidden = true; };
 
   profileBtn.addEventListener("click", (e) => {
     e.preventDefault();
     e.stopPropagation();
-    toggleMenu();
+    menu.hidden = !menu.hidden;
   });
 
   document.addEventListener("click", (e) => {
     if (!menu.contains(e.target) && !profileBtn.contains(e.target)) closeMenu();
   });
 
-  menuSettings?.addEventListener("click", () => {
+  document.getElementById("menuSettings")?.addEventListener("click", () => {
     closeMenu();
     window.location.href = SETTINGS_URL;
   });
 
-  menuLogout?.addEventListener("click", async () => {
+  document.getElementById("menuLogout")?.addEventListener("click", async () => {
     closeMenu();
     await logout();
-    // option: forcer retour login
     window.location.href = LOGIN_URL;
   });
-
-  // notif: pour l’instant on laisse neutre
-  document.getElementById("notifBtn")?.addEventListener("click", () => {
-    // à brancher plus tard
-    // alert("Notifications bientôt 👀");
-  });
 }
 
-// ============ Avatar render ============
-function updateAvatarUI({ user, avatarUrl }) {
-  const img     = document.getElementById("profileImg");
-  const initial = document.getElementById("profileInitial");
-  const dot     = document.getElementById("statusDot");
-
-  if (dot) dot.style.background = user ? "#2ecc71" : "#cfcfcf";
-
-  if (user && avatarUrl && img && initial) {
-    img.src = avatarUrl;
-    img.style.display = "block";
-    initial.style.display = "none";
-  } else {
-    if (img) img.style.display = "none";
-    if (initial) {
-      initial.textContent = initials(user);
-      initial.style.display = "block";
-    }
-  }
-}
-
-// ============ Boot ============
 document.addEventListener("DOMContentLoaded", () => {
   injectHeader();
   bindHeaderEvents();
 
   onAuthStateChanged(auth, async (user) => {
     if (!user) {
-      updateAvatarUI({ user: null, avatarUrl: "" });
+      updateAvatarUI(null, "");
       return;
     }
 
-    try {
-      const { avatarUrl } = await ensureAvatarForUser(user);
-      updateAvatarUI({ user, avatarUrl });
-    } catch {
-      // fallback si Firestore bug
-      updateAvatarUI({ user, avatarUrl: user.photoURL || "" });
-    }
+    const avatarUrl = await ensureAvatarUrl(user);
+    updateAvatarUI(user, avatarUrl);
   });
 });
