@@ -1,8 +1,6 @@
 <!DOCTYPE html>
 <html lang="fr">
 <head>
-
-  <div style="position:sticky;top:0;height:54px;background:#178CA8;z-index:999999;"></div>
   
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -12,14 +10,6 @@
   <link rel="manifest" href="manifest.webmanifest" />
   <meta name="theme-color" content="#178CA8" />
 
-  <!-- ✅ Protège la page (redirige si pas connecté) -->
-  <script type="module">
-    import { requireAuthOrRedirect } from "./auth.js";
-    requireAuthOrRedirect("./login.html");
-  </script>
-</head>
-
-<body>
   <!-- ✅ Topbar bleue injectée -->
   <script type="module" src="./header-user-menu.js"></script>
 
@@ -158,5 +148,6 @@
 
   <script src="script.js?v=2"></script>
   <script src="pwa.js?v=2"></script>
+  <script type="module" src="./auth.js"></script>
 </body>
 </html>
