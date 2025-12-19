@@ -8,6 +8,10 @@
 </head>
 
 <body>
+
+  <!-- Header commun (topbar + menu profil) -->
+  <script type="module" src="header-user-menu.js"></script>
+
   <main class="page blog-page">
 
     <section class="card">
@@ -15,28 +19,48 @@
       <p style="margin:6px 0 0;color:var(--muted);font-size:13px">
         Gère ton compte Ti’Doc
       </p>
+
+      <div style="height:10px"></div>
+
+      <!-- Retour accueil -->
+      <a class="btn-outline" href="index.html" style="height:40px;">
+        Accueil
+      </a>
     </section>
 
     <section class="card" style="margin-top:12px;display:flex;gap:14px;align-items:center;">
-      <div id="currentAvatar" class="profile-avatar"></div>
+      <!-- Avatar -->
+      <img id="currentAvatar" class="profile-avatar" alt="Avatar" />
 
       <div style="flex:1">
-        <div id="profileName" style="font-weight:800"></div>
-        <div id="profileEmail" style="font-size:13px;color:var(--muted)"></div>
+        <!-- Nom modifiable -->
+        <label style="font-size:12px;color:var(--muted);font-weight:700;">Nom</label>
+        <input id="profileNameInput" type="text" placeholder="Ton nom" style="margin-top:6px;width:100%;" />
 
         <div style="height:10px"></div>
 
-        <button class="btn-outline" id="changeAvatarBtn" type="button">
+        <!-- Email (lecture seule) -->
+        <div style="font-size:12px;color:var(--muted);font-weight:700;">Email</div>
+        <div id="profileEmail" style="font-size:13px;color:var(--muted)"></div>
+
+        <div style="height:12px"></div>
+
+        <button class="btn-outline" id="changeAvatarBtn" type="button" style="height:40px;">
           Changer d’avatar
         </button>
+
+        <div style="height:10px"></div>
+
+        <button class="btn-primary" id="saveProfileBtn" type="button" style="height:44px;">
+          Enregistrer
+        </button>
+
+        <div id="saveMsg" style="margin-top:10px;font-size:13px;color:var(--muted)"></div>
       </div>
     </section>
 
   </main>
 
-<span class="username">Utilisateur</span>
-  
-  <script type="module" src="header-user-menu.js"></script>
   <script type="module" src="profile.js"></script>
 </body>
 </html>
