@@ -4,114 +4,50 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Ti’Doc – Paramètres</title>
-
-  <link rel="stylesheet" href="style.css" />
-
-  <a class="icon-btn" href="index.html" aria-label="Retour accueil">
-</a>
-
-<style>
-    body{
-      margin:0;
-      font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto;
-      background:#f6f7f8;
-    }
-
-    .settings-page{
-      display:flex;
-      min-height:100vh;
-    }
-
-    /* menu gauche */
-    .settings-nav{
-      width:220px;
-      background:#178CA8;
-      color:#fff;
-      padding:20px;
-    }
-
-    .settings-nav h2{
-      margin:0 0 20px;
-      font-size:20px;
-    }
-
-    .settings-link{
-      display:block;
-      padding:10px 12px;
-      border-radius:10px;
-      cursor:pointer;
-      font-weight:600;
-      background:rgba(255,255,255,.15);
-    }
-
-    /* contenu */
-    .settings-content{
-      flex:1;
-      padding:24px;
-    }
-
-    .card{
-      background:#fff;
-      border-radius:16px;
-      padding:20px;
-      max-width:520px;
-      box-shadow:0 10px 30px rgba(0,0,0,.08);
-    }
-
-    .avatar-grid{
-      display:grid;
-      grid-template-columns:repeat(5, 1fr);
-      gap:12px;
-      margin-top:16px;
-    }
-
-    .avatar-item{
-      border-radius:50%;
-      border:3px solid transparent;
-      cursor:pointer;
-      overflow:hidden;
-    }
-
-    .avatar-item img{
-      width:100%;
-      height:100%;
-      display:block;
-    }
-
-    .avatar-item.selected{
-      border-color:#178CA8;
-    }
-  </style>
+  <link rel="stylesheet" href="style.css?v=6" />
 </head>
 
 <body>
+  <!-- Topbar + menu profil -->
+  <script type="module" src="header-user-menu.js"></script>
 
-<div class="settings-page">
+  <main class="page blog-page">
 
-  <!-- NAV -->
-  <aside class="settings-nav">
-    <h2>Paramètres</h2>
-    <div class="settings-link">Profil</div>
-  </aside>
-
-  <!-- CONTENT -->
-  <main class="settings-content">
-    <div class="card">
-      <h3>Profil</h3>
-      <p>Choisis ton avatar Ti’Doc :</p>
-
-      <div class="avatar-grid" id="avatarGrid"></div>
+    <!-- Bouton HOME sous la topbar (mini case) -->
+    <div class="page-top-actions">
+      <a class="home-icon-btn" href="./index.html" aria-label="Accueil">
+        <svg class="home-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+          <path fill-rule="evenodd" clip-rule="evenodd"
+            d="M2.5192 7.82274C2 8.77128 2 9.91549 2 12.2039V13.725C2 17.6258 2 19.5763 3.17157 20.7881C4.34315 22 6.22876 22 10 22H14C17.7712 22 19.6569 22 20.8284 20.7881C22 19.5763 22 17.6258 22 13.725V12.2039C22 9.91549 22 8.77128 21.4808 7.82274C20.9616 6.87421 20.0131 6.28551 18.116 5.10812L16.116 3.86687C14.1106 2.62229 13.1079 2 12 2C10.8921 2 9.88939 2.62229 7.88403 3.86687L5.88403 5.10813C3.98695 6.28551 3.0384 6.87421 2.5192 7.82274ZM11.25 18C11.25 18.4142 11.5858 18.75 12 18.75C12.4142 18.75 12.75 18.4142 12.75 18V15C12.75 14.5858 12.4142 14.25 12 14.25C11.5858 14.25 11.25 14.5858 11.25 15V18Z"
+            fill="currentColor"/>
+        </svg>
+      </a>
     </div>
+
+    <!-- Carte titre -->
+    <section class="card" style="margin-top:10px;">
+      <h2 style="margin:0;color:var(--tidoc)">Paramètres</h2>
+      <p style="margin:6px 0 0;color:var(--muted);font-size:13px">
+        Gère ton compte Ti’Doc
+      </p>
+    </section>
+
+    <!-- Liste paramètres (style “comme avant”) -->
+    <section class="card" style="margin-top:12px;">
+      <a class="settings-item" href="./profile.html">
+        <div class="settings-title">Profil</div>
+        <div class="settings-sub">Avatar, nom, infos</div>
+      </a>
+
+      <!-- plus tard tu ajouteras d’autres blocs ici -->
+      <!--
+      <a class="settings-item" href="./notifications.html">
+        <div class="settings-title">Notifications</div>
+        <div class="settings-sub">Préférences</div>
+      </a>
+      -->
+    </section>
+
   </main>
-
-</div>
-
-<script type="module" src="./settings.js"></script> 
-  <script>
-  document.getElementById("backHomeBtn")?.addEventListener("click", () => {
-    window.location.href = "./index.html";
-  });
-</script>
-  
 </body>
 </html>
