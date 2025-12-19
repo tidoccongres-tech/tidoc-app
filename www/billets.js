@@ -1,4 +1,147 @@
-// billets.js (MODULE) — robuste + debug Netlify Function
+// billets.js — récupération billet HelloAsso (Netlify Function)
+
+import { firebaseConfig } from "./firebase-config.js";
+import { initializeApp, getApps, getApp } from
+  "https://www.gstatic.com/firebasejs/10.12.4/firebase-app.js";
+
+import {
+  getFirestore,
+  doc,
+  setDoc,
+  getDoc
+} from "https://www.gstatic.com/firebasejs/10.12.4/firebase-firestore.js";
+
+import {
+  getAuth,
+  onAuthStateChanged
+} from "https://www.gstatic.com/firebasejs/10.12.4/firebase-auth.js";
+
+/* ================= INIT ================= */
+
+const app = getApps().length ? getApp() : initializeApp(firebaseConfig);
+const db = getFirestore(app);
+const auth = getAuth(app);
+
+/* ================= UI ================= */
+
+const syncTicketBtn = document.getElementById("syncTicketBtn");
+const ticketStatus  = document.getElementById("ticketStatus");
+const ticketBox     = document.getElementById("ticketBox");
+
+/* ================= HELPERS ================= */
+
+function show(msg = "") {
+  if (ticketStatus) ticketStatus.textContent = msg;
+}
+
+function renderTicket(ticket) {
+  if (!ticketBox) return;
+
+  if (!ticket) {
+    ticketBox.textContent = "Aucun billet détecté.";
+    return;
+  }
+
+  ticketBox.innerHTML = `
+    <div style="display:flex;flex-direction:column;gap:6px;">
+      <div><b>Pack :</b> ${ticket.ticketType}</div>
+      <div><b>Conférences :</b> ${ticket.conferencesAllowed}</div>
+      <div><b>Workshops :</b> ${ticket.workshopsAllowed}</div>
+      ${ticket.helloassoOrderId
+        ? `<div style="font-size:12px;opacity:.7;">Commande : ${ticket.helloassoOrderId}</div>`
+        : ""}
+    </div>
+  `;
+}
+
+/* ================= FIRESTORE ================= */
+
+async function loadExistingTicket() {
+  const user = auth.currentUser;
+  if (!user) return;
+
+  const snap = await getDoc(doc(db, "userTickets", user.uid));
+  if (snap.exists()) {
+    const data = snap.data();
+    show(`✅ Pack détecté : ${data.ticketType}`);
+    renderTicket(data);
+  } else {
+    show("Aucun billet pour l’instant.");
+    renderTicket(null);
+  }
+}
+
+/* ================= SYNC HELLOASSO ================= */
+
+async function syncTicket() {
+  const user = auth.currentUser;
+  if (!user) {
+    alert("Tu dois être connectée.");
+    return;
+  }
+
+  syncTicketBtn.disabled = true;
+  show("⏳ Vérification de ton billet…");
+
+  try {
+    const res = await fetch(
+      "/.netlify/functions/helloasso-ticket",
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email: user.email.toLowerCase(),
+          uid: user.uid
+        })
+      }
+    );
+
+    if (!res.ok) {
+      const txt = await res.text();
+      throw new Error(`${res.status} — ${txt}`);
+    }
+
+    const data = await res.json();
+
+    if (!data.ticketType) {
+      show("❌ Aucun billet trouvé pour cet email.");
+      renderTicket(null);
+      return;
+    }
+
+    const payload = {
+      ticketType: data.ticketType,
+      workshopsAllowed: Number(data.workshopsAllowed ?? 0),
+      conferencesAllowed: Number(data.conferencesAllowed ?? 0),
+      helloassoOrderId: data.helloassoOrderId || "",
+      helloassoPayerEmail: data.email || user.email,
+      updatedAt: Date.now()
+    };
+
+    await setDoc(
+      doc(db, "userTickets", user.uid),
+      payload,
+      { merge: true }
+    );
+
+    show(`✅ Pack détecté : ${payload.ticketType}`);
+    renderTicket(payload);
+
+  } catch (err) {
+    console.error("Billet error:", err);
+    show("❌ Impossible de récupérer le billet.");
+  } finally {
+    syncTicketBtn.disabled = false;
+  }
+}
+
+/* ================= EVENTS ================= */
+
+syncTicketBtn?.addEventListener("click", syncTicket);
+
+onAuthStateChanged(auth, () => {
+  loadExistingTicket();
+});// billets.js (MODULE) — robuste + debug Netlify Function
 import { firebaseConfig } from "./firebase-config.js";
 import { initializeApp, getApps, getApp } from "https://www.gstatic.com/firebasejs/10.12.4/firebase-app.js";
 
