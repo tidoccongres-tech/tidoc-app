@@ -1,4 +1,4 @@
-// blog.js (MODULE) — FIX create button
+// blog.js (MODULE)
 import { firebaseConfig } from "./firebase-config.js";
 import { initializeApp, getApps, getApp } from "https://www.gstatic.com/firebasejs/10.12.4/firebase-app.js";
 import {
@@ -12,7 +12,7 @@ import {
   deleteDoc,
   doc,
   setDoc,
-  getDoc
+  getDoc,
 } from "https://www.gstatic.com/firebasejs/10.12.4/firebase-firestore.js";
 import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.4/firebase-auth.js";
 
@@ -21,7 +21,19 @@ const app = getApps().length ? getApp() : initializeApp(firebaseConfig);
 const db = getFirestore(app);
 const auth = getAuth(app);
 
+// ===== UI (IDs de ton blog.html) =====
+const postsRoot  = document.getElementById("postsRoot");
+const createBtn  = document.getElementById("createPostBtn");
+const form       = document.getElementById("postForm");
+const titleInput = document.getElementById("postTitle");
+const textInput  = document.getElementById("postText");
+const submitBtn  = document.getElementById("postSubmit");
+const cancelBtn  = document.getElementById("postCancel");
+const postMsg    = document.getElementById("postMsg");
+
 // ===== Helpers =====
+function showMsg(t = "") { if (postMsg) postMsg.textContent = t; }
+
 function requireLogin(actionText = "faire ça") {
   if (!auth.currentUser) {
     alert("Connexion requise 🔒\n\nPour " + actionText + ", connecte-toi.");
@@ -50,6 +62,39 @@ function fmtDate(ts) {
 }
 
 function currentUserId() { return auth.currentUser?.uid || ""; }
+function currentUserEmail() { return (auth.currentUser?.email || "").toLowerCase(); }
+
+// ✅ admin = email exact (comme tes rules)
+function isAdminUser() {
+  return currentUserEmail() === "tidoc.congres@gmail.com";
+}
+
+// ✅ joli nom affiché (évite “Utilisateur”)
+function displayNameFrom(email = "") {
+  const e = (email || "").trim();
+  if (!e) return "Utilisateur";
+  return e.split("@")[0] || "Utilisateur";
+}
+
+function bestAuthorName(p) {
+  const n = (p.authorName || "").trim();
+  if (n && n.toLowerCase() !== "utilisateur") return n;
+  return displayNameFrom(p.authorEmail || "");
+}
+
+function myBestName() {
+  const u = auth.currentUser;
+  if (!u) return "Utilisateur";
+  const dn = (u.displayName || "").trim();
+  if (dn) return dn;
+  return displayNameFrom(u.email || "");
+}
+
+function canDeletePost(p) {
+  const uid = currentUserId();
+  if (!uid) return false;
+  return isAdminUser() || (p.authorUid && p.authorUid === uid);
+}
 
 // ===== LIKE SVG =====
 const HEART_SVG = `
@@ -63,7 +108,6 @@ async function getLikesCount(postId) {
   const snap = await getDocs(collection(db, "posts", postId, "likes"));
   return snap.size;
 }
-
 async function isLikedByMe(postId) {
   const uid = currentUserId();
   if (!uid) return false;
@@ -71,7 +115,6 @@ async function isLikedByMe(postId) {
   const snap = await getDoc(likeRef);
   return snap.exists();
 }
-
 async function toggleLike(postId) {
   if (!requireLogin("liker ce post")) return;
 
@@ -85,7 +128,7 @@ async function toggleLike(postId) {
   await loadPosts();
 }
 
-// ===== Comments =====
+// ===== Comments (lecture simple) =====
 async function loadComments(postId, postData, containerEl) {
   containerEl.innerHTML = `<div style="opacity:.7;font-size:13px;">Chargement des commentaires…</div>`;
 
@@ -105,7 +148,7 @@ async function loadComments(postId, postData, containerEl) {
     row.innerHTML = `
       <div class="comment-row">
         <div>
-          <div class="comment-author">${escapeHTML(c.authorName || "Utilisateur")}</div>
+          <div class="comment-author">${escapeHTML(c.authorName || displayNameFrom(c.authorEmail || ""))}</div>
           <div class="comment-text">${escapeHTML(c.text || "")}</div>
         </div>
       </div>
@@ -125,7 +168,7 @@ async function addComment(postId, postData, inputEl, commentsWrap) {
     text: txt,
     authorUid: u.uid,
     authorEmail: u.email || "",
-    authorName: u.displayName || "Utilisateur",
+    authorName: (u.displayName || "").trim() || displayNameFrom(u.email || ""),
     createdAt: serverTimestamp()
   });
 
@@ -133,23 +176,18 @@ async function addComment(postId, postData, inputEl, commentsWrap) {
   await loadComments(postId, postData, commentsWrap);
 }
 
-// ===== UI refs (déclarés ici, initialisés dans init()) =====
-let postsRoot, createBtn, form, titleInput, textInput, submitBtn, cancelBtn, postMsg;
-
-function showMsg(t = "") { if (postMsg) postMsg.textContent = t; }
-
+// ===== Form =====
 function showForm(show) {
   if (!form) return;
   form.style.display = show ? "" : "none";
 }
-
 function clearForm() {
   if (titleInput) titleInput.value = "";
   if (textInput) textInput.value = "";
   showMsg("");
 }
 
-// ===== Posts =====
+// ===== Create post =====
 async function createPost() {
   if (!requireLogin("publier un post")) return;
 
@@ -168,7 +206,7 @@ async function createPost() {
     text,
     authorUid: u.uid,
     authorEmail: u.email || "",
-    authorName: u.displayName || "Utilisateur",
+    authorName: myBestName(),     // ✅ vrai nom si dispo, sinon email prefix
     createdAt: serverTimestamp()
   });
 
@@ -177,8 +215,16 @@ async function createPost() {
   await loadPosts();
 }
 
+// ===== Delete post =====
+async function deletePost(postId) {
+  if (!confirm("Supprimer ce post ?")) return;
+  await deleteDoc(doc(db, "posts", postId));
+  await loadPosts();
+}
+
+// ===== Render =====
 function renderPostCard(postId, p) {
-  const uid = currentUserId();
+  const delOk = canDeletePost(p);
 
   const card = document.createElement("section");
   card.className = "card post-card";
@@ -187,8 +233,9 @@ function renderPostCard(postId, p) {
     <div class="post-head">
       <div>
         <div class="post-title">${escapeHTML(p.title || "")}</div>
-        <div class="post-sub">${escapeHTML(p.authorName || "Utilisateur")} • ${fmtDate(p.createdAt)}</div>
+        <div class="post-sub">${escapeHTML(bestAuthorName(p))} • ${fmtDate(p.createdAt)}</div>
       </div>
+      ${delOk ? `<button class="delete-btn" type="button" data-del="${postId}">Supprimer</button>` : ""}
     </div>
 
     <div class="post-body">${escapeHTML(p.text || "")}</div>
@@ -214,10 +261,14 @@ function renderPostCard(postId, p) {
     </div>
   `;
 
-  // Like
+  // delete
+  if (delOk) {
+    card.querySelector(`[data-del="${postId}"]`)?.addEventListener("click", () => deletePost(postId));
+  }
+
+  // like
   card.querySelector(`[data-like="${postId}"]`)?.addEventListener("click", () => toggleLike(postId));
 
-  // Init like state
   (async () => {
     const count = await getLikesCount(postId);
     const liked = await isLikedByMe(postId);
@@ -228,7 +279,7 @@ function renderPostCard(postId, p) {
     if (btn) btn.classList.toggle("liked", liked);
   })();
 
-  // Comments toggle
+  // comments toggle
   const wrap = card.querySelector(`[data-commentswrap="${postId}"]`);
   const list = card.querySelector(`[data-commentslist="${postId}"]`);
   const toggleBtn = card.querySelector(`[data-togglecomments="${postId}"]`);
@@ -239,7 +290,8 @@ function renderPostCard(postId, p) {
     if (!open) await loadComments(postId, p, list);
   });
 
-  // Add comment
+  // add comment
+  const uid = currentUserId();
   const input = card.querySelector(`[data-cinput="${postId}"]`);
   const sendBtn = card.querySelector(`[data-csend="${postId}"]`);
 
@@ -273,22 +325,10 @@ async function loadPosts() {
   snap.forEach((d) => postsRoot.appendChild(renderPostCard(d.id, d.data())));
 }
 
-// ===== init =====
-function initUI() {
-  postsRoot  = document.getElementById("postsRoot");
-  createBtn  = document.getElementById("createPostBtn");
-  form       = document.getElementById("postForm");
-  titleInput = document.getElementById("postTitle");
-  textInput  = document.getElementById("postText");
-  submitBtn  = document.getElementById("postSubmit");
-  cancelBtn  = document.getElementById("postCancel");
-  postMsg    = document.getElementById("postMsg");
-
-  // ✅ DEBUG utile
-  console.log("[TiDoc Forum] createBtn =", createBtn);
-
-  // bind
+// ===== Boot =====
+document.addEventListener("DOMContentLoaded", () => {
   createBtn?.addEventListener("click", () => {
+    if (!requireLogin("écrire un post")) return;
     showForm(true);
     titleInput?.focus();
   });
@@ -299,10 +339,6 @@ function initUI() {
   });
 
   submitBtn?.addEventListener("click", () => createPost());
-}
-
-document.addEventListener("DOMContentLoaded", () => {
-  initUI();
 
   onAuthStateChanged(auth, () => loadPosts());
   loadPosts();
