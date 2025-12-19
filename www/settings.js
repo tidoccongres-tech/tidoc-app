@@ -1,57 +1,52 @@
-// settings.js (MODULE)
+// settings.js
 import { auth, db } from "./auth.js";
 import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.4/firebase-auth.js";
 import { doc, getDoc } from "https://www.gstatic.com/firebasejs/10.12.4/firebase-firestore.js";
 
+// éléments HTML
 const avatarBox = document.getElementById("currentAvatar");
 const nameEl = document.getElementById("profileName");
 const emailEl = document.getElementById("profileEmail");
-const changeBtn = document.getElementById("changeAvatarBtn");
+const changeAvatarBtn = document.getElementById("changeAvatarBtn");
 
-function setAvatar(url) {
-  if (!avatarBox) return;
-
-  if (url) {
-    avatarBox.innerHTML = `<img src="${url}" alt="Avatar" />`;
-  } else {
-    // placeholder propre (cercle)
-    avatarBox.innerHTML = `<div style="
-      width:100%;height:100%;
-      border-radius:50%;
-      background:rgba(23,140,168,.12);
-    "></div>`;
-  }
-}
-
+// sécurité : redirection si non connecté
 onAuthStateChanged(auth, async (user) => {
   if (!user) {
     window.location.href = "./login.html";
     return;
   }
 
-  // ✅ fallback immédiat (même si Firestore met du temps)
-  if (nameEl) nameEl.textContent = user.displayName || "Utilisateur";
-  if (emailEl) emailEl.textContent = user.email || "";
+  /* ===== NOM & EMAIL ===== */
+  nameEl.textContent = user.displayName || "Utilisateur";
+  emailEl.textContent = user.email || "";
 
-  // ✅ avatar : Auth d’abord
+  /* ===== AVATAR ===== */
   let avatarUrl = user.photoURL || "";
 
-  // ✅ fallback Firestore si besoin
+  // fallback Firestore (si jamais photoURL pas encore synchro)
   if (!avatarUrl) {
     try {
       const snap = await getDoc(doc(db, "users", user.uid));
-      if (snap.exists()) avatarUrl = snap.data().avatarUrl || "";
+      if (snap.exists()) {
+        avatarUrl = snap.data().avatarUrl || "";
+      }
     } catch (e) {
-      console.log("Firestore avatar error:", e);
+      console.error("Erreur récupération avatar Firestore", e);
     }
   }
 
-  setAvatar(avatarUrl);
+  // affichage avatar ou placeholder
+  avatarBox.innerHTML = avatarUrl
+    ? `<img src="${avatarUrl}" alt="Avatar utilisateur">`
+    : `<div style="
+        width:100%;
+        height:100%;
+        border-radius:50%;
+        background:#e9f7fb;
+      "></div>`;
 });
 
-// bouton changer avatar
-if (changeBtn) {
-  changeBtn.addEventListener("click", () => {
-    window.location.href = "./avatars.html";
-  });
-}
+/* ===== BOUTON CHANGER D’AVATAR ===== */
+changeAvatarBtn.addEventListener("click", () => {
+  window.location.href = "./avatars.html";
+});
