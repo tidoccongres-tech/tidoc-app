@@ -889,3 +889,8 @@ img, svg{
 .back-home-btn:hover{
   text-decoration: underline;
 }
+
+.username{
+  color: var(--tidoc);
+  font-weight: 600;
+}
