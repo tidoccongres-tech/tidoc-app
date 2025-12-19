@@ -13,22 +13,30 @@ onAuthStateChanged(auth, async (user) => {
     return;
   }
 
-  nameEl.textContent = user.displayName || "Utilisateur";
-  emailEl.textContent = user.email || "";
+  if (nameEl) nameEl.textContent = user.displayName || "Utilisateur";
+  if (emailEl) emailEl.textContent = user.email || "";
 
   let avatarUrl = user.photoURL || "";
 
   // fallback Firestore
   if (!avatarUrl) {
-    const snap = await getDoc(doc(db, "users", user.uid));
-    if (snap.exists()) avatarUrl = snap.data().avatarUrl || "";
+    try {
+      const snap = await getDoc(doc(db, "users", user.uid));
+      if (snap.exists()) avatarUrl = snap.data()?.avatarUrl || "";
+    } catch (e) {
+      console.warn("Firestore avatar fallback failed:", e);
+    }
   }
 
-  avatarBox.innerHTML = avatarUrl
-    ? `<img src="${avatarUrl}" alt="Avatar">`
-    : `<div class="avatar-placeholder">?</div>`;
+  if (avatarBox) {
+    avatarBox.innerHTML = avatarUrl
+      ? `<img src="${avatarUrl}" alt="Avatar">`
+      : `<div class="avatar-placeholder">?</div>`;
+  }
 });
 
-changeBtn.addEventListener("click", () => {
-  window.location.href = "./avatars.html";
-});
+if (changeBtn) {
+  changeBtn.addEventListener("click", () => {
+    window.location.href = "./avatars.html";
+  });
+}
