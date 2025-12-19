@@ -1,121 +1,179 @@
 // header-user-menu.js (MODULE)
 import { auth, db } from "./auth.js";
-import { onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.4/firebase-auth.js";
-import { doc, getDoc } from "https://www.gstatic.com/firebasejs/10.12.4/firebase-firestore.js";
+import {
+  onAuthStateChanged,
+  signOut
+} from "https://www.gstatic.com/firebasejs/10.12.4/firebase-auth.js";
+import {
+  doc,
+  getDoc,
+  setDoc,
+  serverTimestamp
+} from "https://www.gstatic.com/firebasejs/10.12.4/firebase-firestore.js";
 
-const AVATAR_COUNT = 10; // avatar-1.png -> avatar-10.png (dans /avatars)
-const AVATAR_BASE = "./avatars/"; // tu as dit: dossier = avatars
-const AVATAR_DEFAULT = () => `${AVATAR_BASE}avatar-${1 + Math.floor(Math.random() * AVATAR_COUNT)}.png`;
+const LS_AVATAR = "tidoc_avatar";
 
-function mountHeader() {
-  // évite doublon si appelé 2 fois
-  if (document.getElementById("tidocHeader")) return;
+// ✅ si pas d’avatar : on pioche aléatoire
+const AVATAR_PATH = "./avatars/";
+const AVATAR_COUNT = 10;
 
-  const header = document.createElement("header");
-  header.className = "blog-topbar";
-  header.id = "tidocHeader";
+function pickRandomAvatar() {
+  const i = Math.floor(Math.random() * AVATAR_COUNT) + 1;
+  return `${AVATAR_PATH}avatar-${i}.png`;
+}
 
-  header.innerHTML = `
+function ensureTopbar() {
+  // si déjà présent -> ok
+  if (document.querySelector(".blog-topbar")) return;
+
+  // injecte la topbar en haut du body
+  const bar = document.createElement("div");
+  bar.className = "blog-topbar";
+  bar.innerHTML = `
     <div class="blog-topbar-left">
       <button class="profile-btn" id="profileBtn" type="button" aria-label="Profil">
-        <span class="profile-circle" id="profileCircle">
-          <img id="profileAvatar" alt="" />
-        </span>
-        <span class="status-dot" id="statusDot" aria-hidden="true"></span>
+        <div class="profile-circle">
+          <img id="profileImg" alt="Avatar" />
+          <span id="profileInitial">T</span>
+        </div>
+        <span class="status-dot" id="statusDot"></span>
+
+        <div class="profile-menu" id="profileMenu" style="display:none;">
+          <button class="menu-item" id="menuSettings" type="button">Paramètres</button>
+          <button class="menu-item" id="menuLogout" type="button">Se déconnecter</button>
+        </div>
       </button>
     </div>
 
-    <div class="profile-menu" id="profileMenu" hidden>
-      <button class="menu-item" id="menuSettings" type="button">Paramètres</button>
-      <button class="menu-item" id="menuLogout" type="button">Se déconnecter</button>
-    </div>
-
-    <div class="blog-topbar-right">
-      <button class="icon-btn" id="notifBtn" type="button" aria-label="Notifications">
-        <svg viewBox="0 0 24 24" class="icon" aria-hidden="true">
-          <path d="M12 22a2.2 2.2 0 0 0 2.2-2.2h-4.4A2.2 2.2 0 0 0 12 22Zm7-6.4V11a7 7 0 1 0-14 0v4.6L3.5 17v1.2h17V17L19 15.6Z"/>
-        </svg>
-      </button>
-    </div>
+    <button class="icon-btn" type="button" aria-label="Notifications">
+      <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M12 22a2.5 2.5 0 0 0 2.45-2h-4.9A2.5 2.5 0 0 0 12 22Zm7-6V11a7 7 0 1 0-14 0v5l-2 2v1h18v-1l-2-2Z"></path>
+      </svg>
+    </button>
   `;
 
-  document.body.prepend(header);
+  document.body.prepend(bar);
+}
 
-  // --- interactions menu ---
-  const profileBtn = document.getElementById("profileBtn");
+function applyAvatar(url, displayName) {
+  const img = document.getElementById("profileImg");
+  const initial = document.getElementById("profileInitial");
+
+  if (!img || !initial) return;
+
+  if (url) {
+    img.src = url;
+    img.style.display = "block";
+    initial.style.display = "none";
+  } else {
+    img.style.display = "none";
+    initial.style.display = "block";
+    const letter = (displayName || "T").trim().charAt(0).toUpperCase() || "T";
+    initial.textContent = letter;
+  }
+}
+
+function setupMenuHandlers() {
+  const btn = document.getElementById("profileBtn");
   const menu = document.getElementById("profileMenu");
+  const settings = document.getElementById("menuSettings");
+  const logout = document.getElementById("menuLogout");
 
-  function closeMenu() { if (menu) menu.hidden = true; }
-  function toggleMenu() { if (menu) menu.hidden = !menu.hidden; }
+  if (!btn || !menu) return;
 
-  profileBtn?.addEventListener("click", (e) => {
-    e.preventDefault();
+  btn.addEventListener("click", (e) => {
+    // évite fermeture immédiate quand tu cliques dedans
     e.stopPropagation();
-    toggleMenu();
+    const open = menu.style.display !== "none";
+    menu.style.display = open ? "none" : "";
   });
 
-  document.addEventListener("click", (e) => {
-    if (!menu || !profileBtn) return;
-    if (!menu.contains(e.target) && !profileBtn.contains(e.target)) closeMenu();
+  document.addEventListener("click", () => {
+    menu.style.display = "none";
   });
 
-  document.getElementById("menuSettings")?.addEventListener("click", () => {
-    closeMenu();
-    window.location.href = "./profile.html"; // page paramètres → profil
+  settings?.addEventListener("click", (e) => {
+    e.stopPropagation();
+    menu.style.display = "none";
+    window.location.href = "./settings.html"; // ✅ ta page Paramètres (profil dedans)
   });
 
-  document.getElementById("menuLogout")?.addEventListener("click", async () => {
-    closeMenu();
+  logout?.addEventListener("click", async (e) => {
+    e.stopPropagation();
+    menu.style.display = "none";
     await signOut(auth);
+    localStorage.removeItem(LS_AVATAR);
     window.location.href = "./login.html";
   });
 }
 
-async function getUserAvatar(uid) {
-  // on lit users/{uid}.avatarUrl si existe, sinon avatar random (et on le garde en local)
-  const key = `tidoc_avatar_${uid}`;
-  const cached = localStorage.getItem(key);
+async function ensureUserHasAvatar(user) {
+  // 1) priorités : localStorage > Auth photoURL > Firestore avatarUrl
+  const cached = localStorage.getItem(LS_AVATAR) || "";
   if (cached) return cached;
 
+  if (user.photoURL) return user.photoURL;
+
+  const snap = await getDoc(doc(db, "users", user.uid));
+  if (snap.exists() && snap.data().avatarUrl) return snap.data().avatarUrl;
+
+  // 2) si rien : on attribue un avatar random et on le sauvegarde
+  const random = pickRandomAvatar();
+
+  // cache local
+  localStorage.setItem(LS_AVATAR, random);
+
+  // sauvegarde Firestore (autorisé : users/{uid})
+  await setDoc(
+    doc(db, "users", user.uid),
+    { avatarUrl: random, updatedAt: serverTimestamp() },
+    { merge: true }
+  );
+
+  // update Auth (photoURL) pour cohérence
+  // (pas vital si tu veux uniquement avatars)
   try {
-    const snap = await getDoc(doc(db, "users", uid));
-    const url = snap.exists() ? (snap.data().avatarUrl || "") : "";
-    const finalUrl = url || AVATAR_DEFAULT();
-    localStorage.setItem(key, finalUrl);
-    return finalUrl;
-  } catch {
-    const fallback = AVATAR_DEFAULT();
-    localStorage.setItem(key, fallback);
-    return fallback;
-  }
+    // dynamic import pour éviter d’ajouter updateProfile en haut si tu veux
+    const { updateProfile } = await import("https://www.gstatic.com/firebasejs/10.12.4/firebase-auth.js");
+    await updateProfile(user, { photoURL: random });
+  } catch {}
+
+  return random;
 }
 
-function setHeaderAvatar(url, connected) {
-  const img = document.getElementById("profileAvatar");
-  const dot = document.getElementById("statusDot");
-
-  if (dot) dot.style.background = connected ? "#2ecc71" : "#cfcfcf";
-
-  if (img) {
-    img.src = url || `${AVATAR_BASE}avatar-1.png`;
-    img.style.display = "block";
-  }
-}
-
-function bootHeader() {
-  mountHeader();
-
-  // état initial “pas connecté”
-  setHeaderAvatar(`${AVATAR_BASE}avatar-1.png`, false);
-
-  onAuthStateChanged(auth, async (user) => {
-    if (!user) {
-      setHeaderAvatar(`${AVATAR_BASE}avatar-1.png`, false);
-      return;
-    }
-    const avatarUrl = await getUserAvatar(user.uid);
-    setHeaderAvatar(avatarUrl, true);
+function setupAvatarLiveUpdate() {
+  // ✅ quand avatars.js enregistre -> header s’update direct
+  window.addEventListener("tidoc:avatar", (e) => {
+    const url = e.detail?.url || "";
+    if (url) localStorage.setItem(LS_AVATAR, url);
+    applyAvatar(url, auth.currentUser?.displayName || "Utilisateur");
   });
 }
 
+// ===== Boot =====
+ensureTopbar();
+setupMenuHandlers();
+setupAvatarLiveUpdate();
+
+// affichage immédiat si cache local dispo (même avant onAuthStateChanged)
+applyAvatar(localStorage.getItem(LS_AVATAR) || "", "T");
+
+onAuthStateChanged(auth, async (user) => {
+  if (!user) {
+    // pas connecté : lettre "T" par défaut
+    applyAvatar("", "T");
+    return;
+  }
+
+  const displayName = user.displayName || "Utilisateur";
+
+  try {
+    const url = await ensureUserHasAvatar(user);
+    applyAvatar(url, displayName);
+  } catch (e) {
+    console.log(e);
+    // fallback minimal
+    applyAvatar(user.photoURL || localStorage.getItem(LS_AVATAR) || "", displayName);
+  }
+});
 document.addEventListener("DOMContentLoaded", bootHeader);
