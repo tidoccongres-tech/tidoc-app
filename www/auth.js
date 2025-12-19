@@ -123,3 +123,34 @@ export function requireAuthOrRedirect(redirectTo = "./login.html") {
     if (!u) window.location.href = redirectTo;
   });
 }
+
+// ===== GLOBAL STATE (pour toutes les pages) =====
+window.TIDOC_AUTH = window.TIDOC_AUTH || null;
+
+onAuthStateChanged(auth, async (user) => {
+  if (!user) {
+    window.TIDOC_AUTH = null;
+    window.dispatchEvent(new CustomEvent("tidoc:auth", { detail: null }));
+    return;
+  }
+
+  // ✅ admin immédiat (pas besoin d'attendre Firestore)
+  const base = {
+    uid: user.uid,
+    email: (user.email || "").toLowerCase(),
+    displayName: user.displayName || "Utilisateur",
+    isAdmin: isAdminUser(user),
+  };
+
+  window.TIDOC_AUTH = base;
+  window.dispatchEvent(new CustomEvent("tidoc:auth", { detail: base }));
+
+  // ✅ Ensuite on complète avec Firestore (displayName/avatar/role)
+  try {
+    const profile = await ensureUserDoc(user);
+    window.TIDOC_AUTH = { ...base, profile };
+    window.dispatchEvent(new CustomEvent("tidoc:auth", { detail: window.TIDOC_AUTH }));
+  } catch (e) {
+    console.log("ensureUserDoc error:", e);
+  }
+});
