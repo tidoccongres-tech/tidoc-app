@@ -8,7 +8,7 @@
 </head>
 
 <body>
-  <!-- Topbar + menu profil (avatar en haut à gauche + menu Paramètres / Déconnexion) -->
+  <!-- Topbar + menu profil -->
   <script type="module" src="header-user-menu.js"></script>
 
   <main class="page blog-page">
@@ -32,7 +32,7 @@
       </p>
     </section>
 
-    <!-- ✅ DIRECTEMENT la carte Profil (plus de case "Profil" à cliquer) -->
+    <!-- Profil (direct) -->
     <section class="card profile-card" style="margin-top:12px;">
       <div id="currentAvatar" class="profile-avatar"></div>
 
@@ -50,6 +50,7 @@
 
   </main>
 
-  <script type="module" src="parametres.js"></script>
+  <!-- ✅ IMPORTANT: on charge le bon JS + anti-cache -->
+  <script type="module" src="settings.js?v=7"></script>
 </body>
 </html>
