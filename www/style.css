@@ -822,3 +822,10 @@ img, svg{
 .login-card button {
   opacity: 0;
 }
+
+#profileImg{
+  width:100%;
+  height:100%;
+  object-fit:cover;
+  display:block; /* important */
+}
