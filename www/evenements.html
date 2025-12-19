@@ -26,15 +26,6 @@
     .blog-topbar-left,.blog-topbar-right{display:flex;align-items:center;gap:10px;}
   </style>
 
-  <!-- protège la page (redirige si pas connecté) -->
-  <script type="module">
-    import { requireAuthOrRedirect } from "./auth.js";
-    requireAuthOrRedirect("./login.html");
-  </script>
-</head>
-
-<body>
-
   <main class="page blog-page">
 
     <!-- Admin only (affiché par evenements.js si admin) -->
@@ -148,5 +139,6 @@
   <script type="module" src="./evenements.js?v=999"></script>
   <script src="pwa.js"></script>
   <script type="module" src="./header-user-menu.js?v=999"></script>
+  <script type="module" src="./auth.js"></script>
 </body>
 </html>
