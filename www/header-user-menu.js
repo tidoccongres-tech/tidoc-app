@@ -1,9 +1,12 @@
-// header-user-menu.js (MODULE)
+/// header-user-menu.js (MODULE)
 import { auth, db, logout } from "./auth.js";
 import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.4/firebase-auth.js";
 import { doc, getDoc } from "https://www.gstatic.com/firebasejs/10.12.4/firebase-firestore.js";
 
-const LS_KEY = "tidoc_avatar";
+const LS_KEY_AVATAR = "tidoc_avatar";
+const LS_KEY_NAME = "tidoc_name";
+
+// ✅ mets ici ton email admin
 const ADMIN_EMAIL = "tidoc.congres@gmail.com";
 
 // ---------- helpers ----------
@@ -17,29 +20,62 @@ function openMenu(menu) {
   menu.style.display = "block";
   menu.setAttribute("aria-hidden", "false");
 }
-function isAdminUser(user) {
-  const email = (user?.email || "").toLowerCase();
-  return email === ADMIN_EMAIL.toLowerCase();
-}
 
 // Récupère l’avatar : Auth.photoURL -> localStorage -> Firestore
 async function getAvatarUrl(user) {
   if (!user) return "";
   if (user.photoURL) return user.photoURL;
 
-  const cached = localStorage.getItem(LS_KEY) || "";
+  const cached = localStorage.getItem(LS_KEY_AVATAR) || "";
   if (cached) return cached;
 
   try {
     const snap = await getDoc(doc(db, "users", user.uid));
     if (snap.exists()) {
       const url = snap.data()?.avatarUrl || "";
-      if (url) localStorage.setItem(LS_KEY, url);
+      if (url) localStorage.setItem(LS_KEY_AVATAR, url);
       return url;
     }
   } catch (_) {}
 
   return "";
+}
+
+// ✅ Récupère le NOM “saisi à l’inscription”
+// priorité : Firestore users/{uid}.username (ou name) -> Auth.displayName -> email avant @ -> "Utilisateur"
+async function getPrettyName(user) {
+  if (!user) return "Utilisateur";
+
+  const cached = localStorage.getItem(LS_KEY_NAME);
+  if (cached) return cached;
+
+  try {
+    const snap = await getDoc(doc(db, "users", user.uid));
+    if (snap.exists()) {
+      const data = snap.data() || {};
+      const n = (data.username || data.name || data.displayName || "").trim();
+      if (n) {
+        localStorage.setItem(LS_KEY_NAME, n);
+        return n;
+      }
+    }
+  } catch (_) {}
+
+  const dn = (user.displayName || "").trim();
+  if (dn) {
+    localStorage.setItem(LS_KEY_NAME, dn);
+    return dn;
+  }
+
+  const email = (user.email || "").trim();
+  if (email.includes("@")) return email.split("@")[0];
+
+  return "Utilisateur";
+}
+
+function isAdminUser(user) {
+  const email = (user?.email || "").toLowerCase();
+  return !!email && email === ADMIN_EMAIL.toLowerCase();
 }
 
 // ---------- build topbar ----------
@@ -95,14 +131,10 @@ function buildBell(right) {
   return btn;
 }
 
-// ✅ Couronne SVG (blanc)
 function crownSvgWhite() {
   return `
-    <svg class="tidoc-crown" viewBox="0 0 24 24" aria-hidden="true"
-      style="width:16px;height:16px;margin-left:6px;display:inline-block;vertical-align:-3px;"
-      fill="none" xmlns="http://www.w3.org/2000/svg">
-      <path d="M21.609 13.5616L21.8382 11.1263C22.0182 9.2137 22.1082 8.25739 21.781 7.86207C21.604 7.64823 21.3633 7.5172 21.106 7.4946C20.6303 7.45282 20.0329 8.1329 18.8381 9.49307C18.2202 10.1965 17.9113 10.5482 17.5666 10.6027C17.3757 10.6328 17.1811 10.6018 17.0047 10.5131C16.6865 10.3529 16.4743 9.91812 16.0499 9.04851L13.8131 4.46485C13.0112 2.82162 12.6102 2 12 2C11.3898 2 10.9888 2.82162 10.1869 4.46486L7.95007 9.04852C7.5257 9.91812 7.31351 10.3529 6.99526 10.5131C6.81892 10.6018 6.62434 10.6328 6.43337 10.6027C6.08872 10.5482 5.77977 10.1965 5.16187 9.49307C3.96708 8.1329 3.36968 7.45282 2.89399 7.4946C2.63666 7.5172 2.39598 7.64823 2.21899 7.86207C1.8918 8.25739 1.9818 9.2137 2.16181 11.1263L2.391 13.5616C2.76865 17.5742 2.95748 19.5805 4.14009 20.7902C5.32271 22 7.09517 22 10.6401 22H13.3599C16.9048 22 18.6773 22 19.8599 20.7902C21.0425 19.5805 21.2313 17.5742 21.609 13.5616Z"
-        fill="#FFFFFF"/>
+    <svg class="crown-ico" viewBox="0 0 24 24" aria-hidden="true" xmlns="http://www.w3.org/2000/svg">
+      <path fill="#fff" d="M21.609 13.5616L21.8382 11.1263C22.0182 9.2137 22.1082 8.25739 21.781 7.86207C21.604 7.64823 21.3633 7.5172 21.106 7.4946C20.6303 7.45282 20.0329 8.1329 18.8381 9.49307C18.2202 10.1965 17.9113 10.5482 17.5666 10.6027C17.3757 10.6328 17.1811 10.6018 17.0047 10.5131C16.6865 10.3529 16.4743 9.91812 16.0499 9.04851L13.8131 4.46485C13.0112 2.82162 12.6102 2 12 2C11.3898 2 10.9888 2.82162 10.1869 4.46486L7.95007 9.04852C7.5257 9.91812 7.31351 10.3529 6.99526 10.5131C6.81892 10.6018 6.62434 10.6328 6.43337 10.6027C6.08872 10.5482 5.77977 10.1965 5.16187 9.49307C3.96708 8.1329 3.36968 7.45282 2.89399 7.4946C2.63666 7.5172 2.39598 7.64823 2.21899 7.86207C1.8918 8.25739 1.9818 9.2137 2.16181 11.1263L2.391 13.5616C2.76865 17.5742 2.95748 19.5805 4.14009 20.7902C5.32271 22 7.09517 22 10.6401 22H13.3599C16.9048 22 18.6773 22 19.8599 20.7902C21.0425 19.5805 21.2313 17.5742 21.609 13.5616Z"/>
     </svg>
   `;
 }
@@ -118,27 +150,20 @@ function buildProfileButton(left) {
   btn.setAttribute("aria-label", "Menu profil");
   btn.setAttribute("aria-expanded", "false");
 
-  // ✅ avatar + label (nom + couronne)
+  // ✅ status-dot reste sur l’avatar => wrapper .profile-badge
   btn.innerHTML = `
-    <div class="profile-circle">
-      <img id="profileImg" alt="Avatar" style="display:none;width:100%;height:100%;object-fit:cover;" />
-      <span id="profileInitial" style="font-weight:900;color:var(--tidoc);">T</span>
-    </div>
+    <span class="profile-badge">
+      <div class="profile-circle">
+        <img id="profileImg" alt="Avatar" style="display:none;width:100%;height:100%;object-fit:cover;" />
+        <span id="profileInitial" style="font-weight:900;color:var(--tidoc);">T</span>
+      </div>
+      <span class="status-dot"></span>
+    </span>
 
-    <span id="tidocUserLabel"
-      style="
-        margin-left:10px;
-        color:#fff;
-        font-weight:800;
-        font-size:13px;
-        max-width:140px;
-        white-space:nowrap;
-        overflow:hidden;
-        text-overflow:ellipsis;
-      "
-    >…</span>
-
-    <span class="status-dot"></span>
+    <span class="profile-name">
+      <span id="profileNameTop">Utilisateur</span>
+      <span id="profileCrownTop" style="display:none">${crownSvgWhite()}</span>
+    </span>
   `;
 
   const menu = document.createElement("div");
@@ -196,20 +221,22 @@ function buildProfileButton(left) {
   return { btn, menu };
 }
 
-async function applyAvatarToButton(user) {
-  // ✅ nom + couronne
-  const label = document.getElementById("tidocUserLabel");
-  if (label) {
-    const dn = (user?.displayName || "").trim();
-    const fallback = (user?.email || "").split("@")[0] || "Utilisateur";
-    const name = dn || fallback;
-
-    label.innerHTML = `${name}${isAdminUser(user) ? crownSvgWhite() : ""}`;
-  }
-
-  // ✅ avatar
+async function applyHeaderUser(user) {
+  // avatar
   const img = document.getElementById("profileImg");
   const initial = document.getElementById("profileInitial");
+  const nameEl = document.getElementById("profileNameTop");
+  const crownEl = document.getElementById("profileCrownTop");
+
+  if (nameEl) {
+    const pretty = await getPrettyName(user);
+    nameEl.textContent = pretty;
+  }
+
+  if (crownEl) {
+    crownEl.style.display = isAdminUser(user) ? "" : "none";
+  }
+
   if (!img || !initial) return;
 
   const url = await getAvatarUrl(user);
@@ -221,8 +248,7 @@ async function applyAvatarToButton(user) {
     img.removeAttribute("src");
     img.style.display = "none";
     initial.style.display = "block";
-    initial.textContent =
-      (user?.displayName || "Ti’Doc").trim().charAt(0).toUpperCase() || "T";
+    initial.textContent = (await getPrettyName(user)).trim().charAt(0).toUpperCase() || "T";
   }
 }
 
@@ -233,18 +259,16 @@ buildBell(right);
 
 onAuthStateChanged(auth, async (user) => {
   if (!user) {
-    if (!location.pathname.endsWith("login.html")) {
-      window.location.href = "./login.html";
-    }
+    if (!location.pathname.endsWith("login.html")) window.location.href = "./login.html";
     return;
   }
-  await applyAvatarToButton(user);
+  await applyHeaderUser(user);
 });
 
 // 🔁 quand avatars.js enregistre → MAJ direct du header
 window.addEventListener("tidoc:avatar", async (e) => {
   const url = e?.detail?.url || "";
-  if (url) localStorage.setItem(LS_KEY, url);
+  if (url) localStorage.setItem(LS_KEY_AVATAR, url);
 
   const img = document.getElementById("profileImg");
   const initial = document.getElementById("profileInitial");
@@ -253,7 +277,4 @@ window.addEventListener("tidoc:avatar", async (e) => {
     img.style.display = "block";
     initial.style.display = "none";
   }
-
-  // garde le nom + couronne OK
-  if (auth.currentUser) await applyAvatarToButton(auth.currentUser);
 });
