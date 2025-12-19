@@ -1,12 +1,22 @@
 // avatars.js (MODULE)
 import { auth, db } from "./auth.js";
-import { onAuthStateChanged, updateProfile } from "https://www.gstatic.com/firebasejs/10.12.4/firebase-auth.js";
-import { doc, getDoc, setDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.4/firebase-firestore.js";
+import {
+  onAuthStateChanged,
+  updateProfile
+} from "https://www.gstatic.com/firebasejs/10.12.4/firebase-auth.js";
+import {
+  doc,
+  getDoc,
+  setDoc,
+  serverTimestamp
+} from "https://www.gstatic.com/firebasejs/10.12.4/firebase-firestore.js";
 
-// ⚠️ Tes avatars sont dans /avatars/ et se nomment avatar-1.png ... avatar-10.png
-// Adapte le dossier si besoin (ex: "./avatars/avatar-1.png")
+// ✅ Tes avatars : /avatars/avatar-1.png ... avatar-10.png
 const AVATAR_PATH = "./avatars/";
 const AVATAR_COUNT = 10;
+
+// ✅ Cache local pour affichage immédiat dans le header
+const LS_KEY = "tidoc_avatar";
 
 const grid = document.getElementById("avatarGrid");
 const saveBtn = document.getElementById("saveAvatarBtn");
@@ -19,7 +29,14 @@ function show(t) {
   if (msg) msg.textContent = t || "";
 }
 
+function setActiveButton(url) {
+  grid.querySelectorAll(".avatar-item-small").forEach((el) => {
+    el.classList.toggle("active", el.getAttribute("data-url") === url);
+  });
+}
+
 function renderGrid() {
+  if (!grid) return;
   grid.innerHTML = "";
 
   for (let i = 1; i <= AVATAR_COUNT; i++) {
@@ -29,44 +46,47 @@ function renderGrid() {
     btn.type = "button";
     btn.className = "avatar-item-small";
     btn.setAttribute("data-url", url);
-    btn.style.border = "2px solid transparent";
 
     btn.innerHTML = `<img src="${url}" alt="Avatar ${i}">`;
 
-    // actif si déjà sélectionné
-    if (url === selectedUrl) btn.classList.add("active");
-
     btn.addEventListener("click", () => {
       selectedUrl = url;
+      setActiveButton(selectedUrl);
 
-      // active visuellement
-      grid.querySelectorAll(".avatar-item-small").forEach(el => el.classList.remove("active"));
-      btn.classList.add("active");
-
-      // bouton enregistrer activé
-      saveBtn.disabled = false;
+      // ✅ active le bouton seulement si changement
+      saveBtn.disabled = (selectedUrl === currentUrl);
       show("");
     });
 
     grid.appendChild(btn);
   }
+
+  // active visuel
+  setActiveButton(selectedUrl);
 }
 
 async function loadCurrentAvatar(user) {
+  // 1) photoURL
   currentUrl = user.photoURL || "";
 
-  // fallback Firestore
+  // 2) fallback Firestore users/{uid}.avatarUrl
   if (!currentUrl) {
     const snap = await getDoc(doc(db, "users", user.uid));
     if (snap.exists()) currentUrl = snap.data().avatarUrl || "";
   }
 
-  // si toujours rien -> on pré-sélectionne le 1 (mais sans enregistrer)
+  // 3) fallback localStorage
+  if (!currentUrl) {
+    currentUrl = localStorage.getItem(LS_KEY) || "";
+  }
+
+  // 4) si rien du tout : pré-sélectionne avatar-1 (sans enregistrer)
   selectedUrl = currentUrl || `${AVATAR_PATH}avatar-1.png`;
 
-  // bouton enregistrer seulement si changement
-  saveBtn.disabled = (selectedUrl === currentUrl);
   renderGrid();
+
+  // bouton activé seulement si changement
+  saveBtn.disabled = (selectedUrl === currentUrl);
 }
 
 async function saveAvatar(user) {
@@ -75,7 +95,6 @@ async function saveAvatar(user) {
     return;
   }
 
-  // si pas de changement : pas besoin
   if (selectedUrl === currentUrl) {
     show("Déjà sélectionné ✅");
     return;
@@ -84,19 +103,27 @@ async function saveAvatar(user) {
   saveBtn.disabled = true;
   show("Enregistrement…");
 
-  // 1) met à jour Auth (pour que le header le voit direct)
+  // ✅ 1) update Auth (photoURL)
   await updateProfile(user, { photoURL: selectedUrl });
 
-  // 2) stocke dans Firestore
-  await setDoc(doc(db, "users", user.uid), {
-    avatarUrl: selectedUrl,
-    updatedAt: serverTimestamp()
-  }, { merge: true });
+  // ✅ 2) update Firestore
+  await setDoc(
+    doc(db, "users", user.uid),
+    { avatarUrl: selectedUrl, updatedAt: serverTimestamp() },
+    { merge: true }
+  );
+
+  // ✅ 3) cache local + notif header (update immédiat)
+  localStorage.setItem(LS_KEY, selectedUrl);
+  window.dispatchEvent(new CustomEvent("tidoc:avatar", { detail: { url: selectedUrl } }));
+
+  // ✅ 4) refresh user en mémoire (utile)
+  await user.reload();
 
   currentUrl = selectedUrl;
   show("Avatar enregistré ✅");
 
-  // option : retour auto sur Profil
+  // (option) si tu veux revenir auto :
   // window.location.href = "./profile.html";
 }
 
@@ -106,9 +133,14 @@ onAuthStateChanged(auth, async (user) => {
     return;
   }
 
-  await loadCurrentAvatar(user);
+  try {
+    await loadCurrentAvatar(user);
+  } catch (e) {
+    console.log(e);
+    show("Erreur chargement: " + (e?.message || e));
+  }
 
-  saveBtn.addEventListener("click", async () => {
+  saveBtn?.addEventListener("click", async () => {
     try {
       await saveAvatar(user);
     } catch (e) {
