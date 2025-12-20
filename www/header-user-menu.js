@@ -164,7 +164,11 @@ function buildProfile(left){
   left.appendChild(wrap);
 }
 function buildBell(right){
-  right.querySelector("#tidocNotifBtn")?.remove();
+  right.querySelector("#tidocNotifWrap")?.remove();
+
+  const wrap = document.createElement("div");
+  wrap.id = "tidocNotifWrap";
+  wrap.style.position = "relative";
 
   const b = document.createElement("button");
   b.id = "tidocNotifBtn";
@@ -175,8 +179,47 @@ function buildBell(right){
       <path d="M12 22a2.5 2.5 0 0 0 2.45-2h-4.9A2.5 2.5 0 0 0 12 22Zm6-6V11a6 6 0 1 0-12 0v5l-2 2v1h16v-1l-2-2Z"></path>
     </svg>
   `;
-  b.addEventListener("click", ()=> location.href = "./notifications.html");
-  right.appendChild(b);
+
+  const menu = document.createElement("div");
+  menu.id = "tidocNotifMenu";
+  menu.className = "notif-menu";
+  menu.style.display = "none";
+  menu.innerHTML = `
+    <button class="menu-item" type="button" data-act="home">Home</button>
+    <div class="notif-empty">Aucune notification pour l’instant.</div>
+  `;
+
+  function openNotif(){ menu.style.display = "block"; }
+  function closeNotif(){ menu.style.display = "none"; }
+
+  b.addEventListener("click", (e)=>{
+    e.stopPropagation();
+    const open = menu.style.display === "block";
+    if (open) closeNotif();
+    else openNotif();
+  });
+
+  menu.addEventListener("click", (e)=>{
+    e.stopPropagation();
+    const act = e.target?.getAttribute?.("data-act");
+    if (act === "home") {
+      closeNotif();
+      location.href = "./index.html";
+    }
+  });
+
+  // ferme quand on clique ailleurs
+  if (!window.__TIDOC_NOTIF_BOUND__) {
+    window.__TIDOC_NOTIF_BOUND__ = true;
+    document.addEventListener("click", ()=>{
+      const m = document.getElementById("tidocNotifMenu");
+      if (m) m.style.display = "none";
+    });
+  }
+
+  wrap.appendChild(b);
+  wrap.appendChild(menu);
+  right.appendChild(wrap);
 }
 
 async function getPrettyName(user){
