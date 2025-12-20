@@ -9,9 +9,20 @@
   <link rel="manifest" href="/manifest.webmanifest" />
   <meta name="theme-color" content="#178CA8" />
 
+  <!-- (Optionnel) protège l’accès -->
+  <script type="module">
+    import { requireAuthOrRedirect } from "./auth.js";
+    requireAuthOrRedirect("./login.html");
+  </script>
+</head>
+
+<body>
+  <!-- Topbar -->
+  <script type="module" src="./header-user-menu.js?v=999"></script>
+
   <main class="page blog-page">
 
-    <!-- ✅ Bouton créer un post (tout le monde connecté) -->
+    <!-- ✅ Bouton créer un post -->
     <button class="create-post" id="createPostBtn" type="button">
       <span class="create-post-plus">＋</span>
       <span>Créer un post</span>
@@ -32,8 +43,8 @@
       </label>
 
       <div class="form-actions">
-        <button class="btn-primary" id="postSubmit" type="button">Publier</button>
         <button class="btn-outline" id="postCancel" type="button">Annuler</button>
+        <button class="btn-primary" id="postSubmit" type="button">Publier</button>
       </div>
 
       <div id="postMsg" style="margin-top:10px;font-size:13px;color:var(--muted)"></div>
