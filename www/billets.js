@@ -292,38 +292,36 @@ function renderResult({ qrText, packKey, holderName, ticketNumber } = {}) {
   const ws   = pack ? pack.workshopsAllowed : "—";
 
   boxEl.innerHTML = `
-    <section class="card" style="position:relative;">
-      
-      <!-- bouton supprimer (même style que posts) -->
-      <button
-        class="delete-btn"
-        id="deleteTicketInlineBtn"
-        type="button"
-        style="position:absolute; top:12px; right:12px;">
-        Supprimer
-      </button>
+  <div style="position:relative; display:flex; flex-direction:column; gap:12px;">
+    <!-- bouton supprimer (même style que posts) -->
+    <button
+      class="delete-btn"
+      id="deleteTicketInlineBtn"
+      type="button"
+      style="position:absolute; top:0; right:0;">
+      Supprimer
+    </button>
 
-      <div style="font-weight:900; color:var(--tidoc); font-size:15px; margin-bottom:8px;">
-        ✅ Billet importé
+    <div style="font-weight:900; color:var(--tidoc); font-size:15px; margin-bottom:8px;">
+      ✅ Billet importé
+    </div>
+
+    <div style="border:1px solid var(--line); border-radius:14px; padding:12px;">
+      <div style="font-weight:900; margin-bottom:8px;">QR Code</div>
+      <div style="display:flex; justify-content:center; padding:8px 0;">
+        <div id="qrRender" style="width:220px;height:220px;"></div>
       </div>
+    </div>
 
-            <div style="border:1px solid var(--line); border-radius:14px; padding:12px;">
-        <div style="font-weight:900; margin-bottom:8px;">QR Code</div>
-        <div style="display:flex; justify-content:center; padding:8px 0;">
-          <div id="qrRender" style="width:220px;height:220px;"></div>
-        </div>
-      </div>
-
-      <div style="border:1px solid var(--line); border-radius:14px; padding:12px;">
-        <div><b>Nom :</b> ${escapeHTML(holderName || "—")}</div>
-        <div><b>N° billet :</b> ${escapeHTML(ticketNumber || "—")}</div>
-        <div style="margin-top:8px;"><b>Pack :</b> ${escapeHTML(packLabel)}</div>
-        <div><b>Conférences :</b> ${conf}</div>
-        <div><b>Workshops :</b> ${ws}</div>
-      </div>
-
-    </section>
-  `;
+    <div style="border:1px solid var(--line); border-radius:14px; padding:12px;">
+      <div><b>Nom :</b> ${escapeHTML(holderName || "—")}</div>
+      <div><b>N° billet :</b> ${escapeHTML(ticketNumber || "—")}</div>
+      <div style="margin-top:8px;"><b>Pack :</b> ${escapeHTML(packLabel)}</div>
+      <div><b>Conférences :</b> ${conf}</div>
+      <div><b>Workshops :</b> ${ws}</div>
+    </div>
+  </div>
+`;
 
   const delBtn = document.getElementById("deleteTicketInlineBtn");
   delBtn?.addEventListener("click", deleteMyTicketAndUnclaim);
