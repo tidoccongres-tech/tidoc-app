@@ -109,143 +109,153 @@
     <div id="msg" class="small" style="margin-top:10px;"></div>
   </div>
 
-  <script type="module">
-    import { auth, db, signupEmail, loginEmail, resetPassword } from "./auth.js";
-    import { doc, getDoc } from "https://www.gstatic.com/firebasejs/10.12.4/firebase-firestore.js";
-    import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.4/firebase-auth.js";
+<script type="module">
+  import { auth, db, signupEmail, loginEmail, resetPassword } from "./auth.js";
+  import { doc, getDoc } from "https://www.gstatic.com/firebasejs/10.12.4/firebase-firestore.js";
+  import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.4/firebase-auth.js";
 
-    const LS_NAME = "tidoc_name";
-    const tabSignup = document.getElementById("tabSignup");
-    const tabLogin  = document.getElementById("tabLogin");
-    const signupPane = document.getElementById("signupPane");
-    const loginPane  = document.getElementById("loginPane");
-    const msg = document.getElementById("msg");
+  const LS_NAME = "tidoc_name";
 
-    function setTab(which){
-      const s = which === "signup";
-      tabSignup.classList.toggle("active", s);
-      tabLogin.classList.toggle("active", !s);
-      signupPane.style.display = s ? "" : "none";
-      loginPane.style.display = s ? "none" : "";
-      msg.textContent = "";
-    }
-    tabSignup.onclick = () => setTab("signup");
-    tabLogin.onclick  = () => setTab("login");
+  // ===== UI =====
+  const tabSignup   = document.getElementById("tabSignup");
+  const tabLogin    = document.getElementById("tabLogin");
+  const signupPane  = document.getElementById("signupPane");
+  const loginPane   = document.getElementById("loginPane");
+  const msg         = document.getElementById("msg");
 
-    onAuthStateChanged(auth, (u) => {
-      if (u) window.location.href = "./index.html";
-    });
+  const suName       = document.getElementById("suName");
+  const suNameStatus = document.getElementById("suNameStatus");
+  const btnSignup    = document.getElementById("btnSignup");
 
-    document.getElementById("btnSignup").onclick = async () => {
-  try{
-    msg.textContent = "Création du compte…";
+  // ===== Tabs =====
+  function setTab(which){
+    const s = which === "signup";
+    tabSignup.classList.toggle("active", s);
+    tabLogin.classList.toggle("active", !s);
+    signupPane.style.display = s ? "" : "none";
+    loginPane.style.display = s ? "none" : "";
+    msg.textContent = "";
+  }
+  tabSignup.onclick = () => setTab("signup");
+  tabLogin.onclick  = () => setTab("login");
 
-    const rawName = document.getElementById("suName").value.trim();
-    const displayName = rawName || "Utilisateur";
-    const email = document.getElementById("suEmail").value.trim();
-    const password = document.getElementById("suPass").value;
-    const suName = document.getElementById("suName");
-const suNameStatus = document.getElementById("suNameStatus");
-const btnSignup = document.getElementById("btnSignup");
+  // ===== Redirect si déjà connecté =====
+  onAuthStateChanged(auth, (u) => {
+    if (u) window.location.href = "./index.html";
+  });
 
-function normalizeUsername(v = "") {
-  return v
-    .trim()
-    .toLowerCase()
-    .normalize("NFD").replace(/[\u0300-\u036f]/g, "") // enlève accents
-    .replace(/[^a-z0-9._-]/g, ""); // garde seulement a-z 0-9 . _ -
-}
-
-// (optionnel) pseudos réservés
-const RESERVED = new Set(["admin", "moderateur", "mod", "support", "tidoc", "tidocteam"]);
-
-let nameCheckTimer = null;
-
-async function checkUsernameLive() {
-  const raw = suName.value || "";
-  const norm = normalizeUsername(raw);
-
-  // reset UI
-  if (!norm) {
-    suNameStatus.textContent = "";
-    btnSignup.disabled = false;
-    return;
+  // ===== Username unique (LIVE) =====
+  function normalizeUsername(v = "") {
+    return v
+      .trim()
+      .toLowerCase()
+      .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+      .replace(/[^a-z0-9._-]/g, "");
   }
 
-  // règles simples
-  if (norm.length < 3) {
-    suNameStatus.textContent = "❌ Pseudo trop court (min 3).";
-    btnSignup.disabled = true;
-    return;
-  }
-  if (RESERVED.has(norm)) {
-    suNameStatus.textContent = "❌ Ce pseudo est réservé.";
-    btnSignup.disabled = true;
-    return;
-  }
+  const RESERVED = new Set(["admin", "moderateur", "mod", "support", "tidoc", "tidocteam"]);
+  let nameCheckTimer = null;
 
-  suNameStatus.textContent = "⏳ Vérification…";
-  btnSignup.disabled = true;
+  async function checkUsernameLive() {
+    const raw = suName.value || "";
+    const norm = normalizeUsername(raw);
 
-  // Firestore: usernames/{norm}
-  try {
-    const snap = await getDoc(doc(db, "usernames", norm));
-    if (snap.exists()) {
-      suNameStatus.textContent = "❌ Pseudo déjà pris.";
-      btnSignup.disabled = true;
-    } else {
-      suNameStatus.textContent = "✅ Pseudo disponible.";
+    if (!norm) {
+      suNameStatus.textContent = "";
       btnSignup.disabled = false;
+      return { ok: true, norm: "" };
     }
-  } catch (e) {
-    console.log("checkUsernameLive error:", e);
-    suNameStatus.textContent = "⚠️ Impossible de vérifier (réseau).";
-    btnSignup.disabled = false; // ou true si tu préfères bloquer
+
+    if (norm.length < 3) {
+      suNameStatus.textContent = "❌ Pseudo trop court (min 3).";
+      btnSignup.disabled = true;
+      return { ok: false, norm };
+    }
+
+    if (RESERVED.has(norm)) {
+      suNameStatus.textContent = "❌ Ce pseudo est réservé.";
+      btnSignup.disabled = true;
+      return { ok: false, norm };
+    }
+
+    suNameStatus.textContent = "⏳ Vérification…";
+    btnSignup.disabled = true;
+
+    try {
+      const snap = await getDoc(doc(db, "usernames", norm));
+      if (snap.exists()) {
+        suNameStatus.textContent = "❌ Pseudo déjà pris.";
+        btnSignup.disabled = true;
+        return { ok: false, norm };
+      } else {
+        suNameStatus.textContent = "✅ Pseudo disponible.";
+        btnSignup.disabled = false;
+        return { ok: true, norm };
+      }
+    } catch (e) {
+      console.log("checkUsernameLive error:", e);
+      suNameStatus.textContent = "⚠️ Impossible de vérifier (réseau).";
+      btnSignup.disabled = false; // tu peux mettre true si tu veux bloquer sans vérif
+      return { ok: true, norm };
+    }
   }
-}
 
-// écoute en live avec petit debounce
-suName?.addEventListener("input", () => {
-  clearTimeout(nameCheckTimer);
-  nameCheckTimer = setTimeout(checkUsernameLive, 250);
-});
+  suName?.addEventListener("input", () => {
+    clearTimeout(nameCheckTimer);
+    nameCheckTimer = setTimeout(checkUsernameLive, 250);
+  });
 
-    await signupEmail({ email, password, displayName });
+  // ===== SIGNUP =====
+  btnSignup.onclick = async () => {
+    try {
+      msg.textContent = "Création du compte…";
 
-    // ✅ ICI LE IF (c’est exactement là)
-    if (displayName) {
+      // 1) check pseudo avant création
+      const { ok } = await checkUsernameLive();
+      if (!ok) return;
+
+      // 2) créer compte
+      const rawName = suName.value.trim();
+      const displayName = rawName || "Utilisateur";
+      const email = document.getElementById("suEmail").value.trim();
+      const password = document.getElementById("suPass").value;
+
+      await signupEmail({ email, password, displayName });
+
+      // 3) cache local (pour header)
       localStorage.setItem(LS_NAME, displayName);
+      window.dispatchEvent(new CustomEvent("tidoc:auth"));
+
+      window.location.href = "./index.html";
+    } catch (e) {
+      msg.textContent = "Erreur: " + (e?.message || e);
     }
-    window.dispatchEvent(new CustomEvent("tidoc:auth"));
+  };
 
-    window.location.href = "./index.html";
-  } catch(e){
-    msg.textContent = "Erreur: " + (e?.message || e);
-  }
-};
-
-    document.getElementById("btnLogin").onclick = async () => {
-      try{
-        msg.textContent = "Connexion…";
-        const email = document.getElementById("liEmail").value.trim();
-        const password = document.getElementById("liPass").value;
-        await loginEmail({ email, password });
-        window.location.href = "./index.html";
-      } catch(e){
-        msg.textContent = "Erreur: " + (e?.message || e);
-      }
-    };
-
-    document.getElementById("btnReset").onclick = async () => {
+  // ===== LOGIN =====
+  document.getElementById("btnLogin").onclick = async () => {
+    try {
+      msg.textContent = "Connexion…";
       const email = document.getElementById("liEmail").value.trim();
-      if(!email) { msg.textContent = "Mets ton email d’abord."; return; }
-      try{
-        await resetPassword(email);
-        msg.textContent = "Email de réinitialisation envoyé ✅";
-      } catch(e){
-        msg.textContent = "Erreur: " + (e?.message || e);
-      }
-    };
-  </script>
+      const password = document.getElementById("liPass").value;
+      await loginEmail({ email, password });
+      window.location.href = "./index.html";
+    } catch (e) {
+      msg.textContent = "Erreur: " + (e?.message || e);
+    }
+  };
+
+  // ===== RESET =====
+  document.getElementById("btnReset").onclick = async () => {
+    const email = document.getElementById("liEmail").value.trim();
+    if(!email) { msg.textContent = "Mets ton email d’abord."; return; }
+    try {
+      await resetPassword(email);
+      msg.textContent = "Email de réinitialisation envoyé ✅";
+    } catch (e) {
+      msg.textContent = "Erreur: " + (e?.message || e);
+    }
+  };
+</script>
 </body>
 </html>
