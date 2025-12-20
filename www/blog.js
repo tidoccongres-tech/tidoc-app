@@ -173,9 +173,8 @@ async function loadComments(postId, postData, containerEl) {
   <div class="comment-row">
     <div>
       <div class="comment-author">
-        ${escapeHTML(c.authorName || displayNameFrom(c.authorEmail || ""))}
-        ${isAdminEmail(c.authorEmail) ? CROWN_GRAY_SVG : ""}
-      </div>
+  ${escapeHTML(c.authorName || displayNameFrom(c.authorEmail || ""))}${isAdminEmail(c.authorEmail) ? `<span class="crown-inline">${CROWN_GRAY_SVG}</span>` : ""}
+</div>
       <div class="comment-text">${escapeHTML(c.text || "")}</div>
     </div>
   </div>
