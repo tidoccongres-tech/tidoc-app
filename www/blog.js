@@ -330,33 +330,8 @@ async function loadPosts() {
 
 // ===== Boot =====
 document.addEventListener("DOMContentLoaded", () => {
-
-  const safeCreate = async () => {
-    try {
-      await createPost();
-    } catch (err) {
-      console.error("createPost error:", err);
-      showMsg("Erreur: " + (err?.message || String(err)));
-      alert("Erreur Publier:\n\n" + (err?.message || String(err)));
-    }
-  };
-
-  const publishHandler = async (e) => {
-    // iPad/Safari: on bloque toute navigation/ghost click
-    e?.preventDefault?.();
-    e?.stopPropagation?.();
-    e?.stopImmediatePropagation?.();
-
-    // debug
-    console.log("PUBLISH handler fired ✅");
-
-    await safeCreate();
-    return false;
-  };
-
   createBtn?.addEventListener("click", (e) => {
     e.preventDefault();
-    e.stopPropagation();
     if (!requireLogin("écrire un post")) return;
     showForm(true);
     titleInput?.focus();
@@ -364,21 +339,29 @@ document.addEventListener("DOMContentLoaded", () => {
 
   cancelBtn?.addEventListener("click", (e) => {
     e.preventDefault();
-    e.stopPropagation();
     clearForm();
     showForm(false);
   });
 
-  // ✅ 3 events (iPad capricieux) + un fallback en capture
-  submitBtn?.addEventListener("touchend", publishHandler, { passive: false });
-  submitBtn?.addEventListener("pointerup", publishHandler);
-  submitBtn?.addEventListener("click", publishHandler);
+  submitBtn?.addEventListener("click", async (e) => {
+    e.preventDefault();
+    e.stopPropagation();
 
-  // ✅ fallback ultime : même si le bouton est recréé / listener sauté
-  document.addEventListener("click", (e) => {
-    const t = e.target;
-    if (t && t.id === "postSubmit") publishHandler(e);
-  }, true);
+    if (postInflight) return;          // ✅ anti double tap
+    postInflight = true;
+    submitBtn.disabled = true;
+
+    try {
+      await createPost();
+    } catch (err) {
+      console.error("createPost error:", err);
+      showMsg("Erreur: " + (err?.message || String(err)));
+      alert("Erreur Publier:\n\n" + (err?.message || String(err)));
+    } finally {
+      postInflight = false;
+      submitBtn.disabled = false;
+    }
+  });
 
   onAuthStateChanged(auth, () => loadPosts());
   loadPosts();
