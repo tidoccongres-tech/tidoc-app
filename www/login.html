@@ -135,17 +135,26 @@
     });
 
     document.getElementById("btnSignup").onclick = async () => {
-      try{
-        msg.textContent = "Création du compte…";
-        const displayName = document.getElementById("suName").value.trim();
-        const email = document.getElementById("suEmail").value.trim();
-        const password = document.getElementById("suPass").value;
-        await signupEmail({ email, password, displayName });
-        window.location.href = "./index.html";
-      } catch(e){
-        msg.textContent = "Erreur: " + (e?.message || e);
-      }
-    };
+  try{
+    msg.textContent = "Création du compte…";
+
+    const displayName = document.getElementById("suName").value.trim();
+    const email = document.getElementById("suEmail").value.trim();
+    const password = document.getElementById("suPass").value;
+
+    await signupEmail({ email, password, displayName });
+
+    // ✅ ICI LE IF (c’est exactement là)
+    if (displayName) {
+      localStorage.setItem(LS_NAME, displayName);
+    }
+    window.dispatchEvent(new CustomEvent("tidoc:auth"));
+
+    window.location.href = "./index.html";
+  } catch(e){
+    msg.textContent = "Erreur: " + (e?.message || e);
+  }
+};
 
     document.getElementById("btnLogin").onclick = async () => {
       try{
