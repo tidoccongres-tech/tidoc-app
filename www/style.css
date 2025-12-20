@@ -1021,3 +1021,44 @@ img, svg{
   top:0;
   z-index:1000;
 }
+
+/* ✅ Le header doit être au-dessus visuellement */
+.blog-topbar{
+  position: sticky;
+  top: 0;
+  z-index: 1000;
+}
+
+/* ✅ Le menu ne doit JAMAIS capter les clics quand il est fermé */
+.profile-menu{
+  display: none;
+  pointer-events: none;
+}
+
+/* ✅ Quand le menu est ouvert (selon ta classe), il redevient cliquable */
+.profile-menu.open,
+.profile-menu.show,
+.profile-menu[data-open="true"]{
+  display: block;
+  pointer-events: auto;
+}
+
+/* ✅ Le contenu reste cliquable */
+.page{
+  position: relative;
+  z-index: 1;
+}
+
+/* ✅ Evite qu’un wrapper invisible prenne toute la page */
+#headerUserMenuOverlay,
+.header-overlay,
+.menu-overlay{
+  display:none;
+  pointer-events:none;
+}
+#headerUserMenuOverlay.open,
+.header-overlay.open,
+.menu-overlay.open{
+  display:block;
+  pointer-events:auto;
+}
