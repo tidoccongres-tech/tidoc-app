@@ -31,6 +31,8 @@ const submitBtn  = document.getElementById("postSubmit");
 const cancelBtn  = document.getElementById("postCancel");
 const postMsg    = document.getElementById("postMsg");
 
+let postInflight = false;
+
 // ✅ iPad/Safari: empêche le submit HTML du form (qui peut bloquer le clic sur "Publier")
 form?.addEventListener("submit", (e) => e.preventDefault());
 
