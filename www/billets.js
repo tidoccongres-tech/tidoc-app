@@ -3,7 +3,7 @@
 import { firebaseConfig } from "./firebase-config.js";
 import { initializeApp, getApps, getApp } from "https://www.gstatic.com/firebasejs/10.12.4/firebase-app.js";
 import {
-  getFirestore, doc, getDoc, setDoc, runTransaction, serverTimestamp
+  getFirestore, doc, getDoc, setDoc, deleteDoc, runTransaction, serverTimestamp
 } from "https://www.gstatic.com/firebasejs/10.12.4/firebase-firestore.js";
 import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.4/firebase-auth.js";
 
@@ -13,6 +13,7 @@ const auth = getAuth(app);
 
 // UI
 const uploadBtn = document.getElementById("uploadTicketBtn");
+const deleteBtn = document.getElementById("deleteTicketBtn");
 const fileInput = document.getElementById("ticketFileInput");
 const statusEl  = document.getElementById("ticketStatus");
 const boxEl     = document.getElementById("ticketBox");
@@ -84,11 +85,9 @@ async function scanPdfForQR(file) {
 
 // ---------- PDF TEXT extraction (fiable pour Nom/Pack/N° billet) ----------
 async function extractMetaFromPdfText(pdf) {
-  // on lit la page 1 (le billet)
   const page = await pdf.getPage(1);
   const tc = await page.getTextContent();
   const text = (tc.items || []).map(it => (it.str || "").trim()).filter(Boolean).join("\n");
-
   return parseMetaFromText(text);
 }
 
@@ -116,7 +115,6 @@ async function loadImageToCanvas(fileOrBlob) {
 }
 
 function cropTopRight(canvas) {
-  // zone billet (haut droite) : nom + pack + numéro
   const w = canvas.width;
   const h = canvas.height;
 
@@ -180,7 +178,7 @@ function parseMetaFromText(raw = "") {
     }
   }
 
-  // fallback si OCR a collé tout sur une ligne
+  // fallback (si OCR colle tout)
   if (!holderName && idxPack >= 0) {
     const mSame = lines[idxPack].match(/^(.*?)\s+pack\s*(essentiel|standard|premium)/i);
     if (mSame) holderName = mSame[1].trim();
@@ -239,6 +237,48 @@ async function saveTicketToFirestore({ qrText, packKey, holderName, ticketNumber
     ticketNumber: ticketNumber || "",
     updatedAt: serverTimestamp()
   }, { merge: true });
+}
+
+// ✅ DELETE ticket + unclaim QR
+async function deleteMyTicketAndUnclaim() {
+  const u = auth.currentUser;
+  if (!u) { setStatus("🔒 Connecte-toi."); return; }
+
+  const ok = confirm(
+    "Supprimer ton billet ?\n\n" +
+    "Ça supprime aussi le verrou QR (si c’est bien ton compte) pour pouvoir l’importer ailleurs."
+  );
+  if (!ok) return;
+
+  setStatus("⏳ Suppression…");
+
+  const ticketRef = doc(db, "userTickets", u.uid);
+
+  try {
+    const snap = await getDoc(ticketRef);
+    const t = snap.exists() ? (snap.data() || {}) : {};
+    const qrHash = t.qrHash || "";
+
+    // supprime billet
+    await deleteDoc(ticketRef);
+
+    // supprime claim si c’est le même uid
+    if (qrHash) {
+      const claimRef = doc(db, "qrClaims", qrHash);
+      await runTransaction(db, async (tx) => {
+        const cs = await tx.get(claimRef);
+        if (!cs.exists()) return;
+        const c = cs.data() || {};
+        if (c.uid === u.uid) tx.delete(claimRef);
+      });
+    }
+
+    boxEl.textContent = "Aucun billet importé pour l’instant.";
+    setStatus("✅ Billet supprimé");
+  } catch (e) {
+    console.log("delete ticket error:", e);
+    setStatus("❌ " + (e?.message || String(e)));
+  }
 }
 
 // ---------- Render ----------
@@ -303,7 +343,6 @@ async function handleFile(file) {
       const { pdf, qrText: qr } = await scanPdfForQR(file);
       qrText = qr || "";
 
-      // ✅ texte du PDF (fiable)
       const meta = await extractMetaFromPdfText(pdf);
       holderName = meta.holderName || "";
       ticketNumber = meta.ticketNumber || "";
@@ -312,10 +351,8 @@ async function handleFile(file) {
     } else if (type.startsWith("image/")) {
       const canvas = await loadImageToCanvas(file);
 
-      // QR depuis image complète
       qrText = scanCanvasForQR(canvas);
 
-      // OCR crop zone top-right
       setStatus("⏳ Lecture du texte (nom/pack/numéro)…");
       const crop = cropTopRight(canvas);
       const ocrText = await ocrCanvas(crop);
@@ -379,5 +416,6 @@ fileInput?.addEventListener("change", async () => {
   await handleFile(file);
   fileInput.value = "";
 });
+deleteBtn?.addEventListener("click", deleteMyTicketAndUnclaim);
 
 onAuthStateChanged(auth, () => loadSavedTicket());
