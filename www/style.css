@@ -1036,3 +1036,5 @@ main, .page, .card{
 .post-author {
   font-weight: 600;
 }
+
+.crown-inline { display:inline-flex; }
