@@ -175,7 +175,7 @@ function buildBell(right){
       <path d="M12 22a2.5 2.5 0 0 0 2.45-2h-4.9A2.5 2.5 0 0 0 12 22Zm6-6V11a6 6 0 1 0-12 0v5l-2 2v1h16v-1l-2-2Z"></path>
     </svg>
   `;
-  b.addEventListener("click", ()=> alert("Notifications (bientôt 👀)"));
+  b.addEventListener("click", ()=> location.href = "./notifications.html");
   right.appendChild(b);
 }
 
