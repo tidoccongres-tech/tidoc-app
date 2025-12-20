@@ -1032,3 +1032,7 @@ main, .page, .card{
   display: none !important;
   pointer-events: none !important;
 }
+
+.post-author {
+  font-weight: 600;
+}
