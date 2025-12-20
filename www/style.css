@@ -1003,3 +1003,21 @@ img, svg{
   position: relative;
   z-index: 999999 !important;
 }
+
+/* 🔧 Empêche un overlay/menu invisible de bloquer les clics */
+.profile-menu{
+  display:none;            /* si le menu est “fermé”, il ne doit pas capter les taps */
+}
+
+/* Le contenu doit rester cliquable */
+.page{
+  position:relative;
+  z-index:1;
+}
+
+/* La topbar reste au-dessus visuellement, mais pas en mode “écran entier” */
+.blog-topbar{
+  position:sticky;
+  top:0;
+  z-index:1000;
+}
