@@ -258,9 +258,10 @@
   };
 
   document.getElementById("btnSignup").onclick = async () => {
-  try{
+  try {
     msg.textContent = "Création du compte…";
 
+    // 🔎 vérifie le pseudo AVANT de créer le compte
     await checkUsernameLive();
     if (btnSignup.disabled) return;
 
@@ -269,8 +270,9 @@
     const password = document.getElementById("suPass").value;
 
     await signupEmail({ email, password, displayName });
+
     window.location.href = "./index.html";
-  } catch(e){
+  } catch (e) {
     msg.textContent = "Erreur: " + (e?.message || e);
   }
 };
