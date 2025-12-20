@@ -220,13 +220,13 @@ btnSignup.onclick = async () => {
       return;
     }
 
-    // 📧 email valide
+    // 📧 email valide (format)
     const emailOk = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
     if (!emailOk) {
       msg.textContent = "❌ Adresse email invalide.";
       return;
     }
-    
+
     // 🔐 mdp mini
     if (password.length < 6) {
       msg.textContent = "❌ Mot de passe trop court (min 6 caractères).";
@@ -235,22 +235,10 @@ btnSignup.onclick = async () => {
 
     msg.textContent = "Création du compte…";
 
-    // 🔎 vérifie pseudo unique
+    // 🔎 vérifie pseudo unique (live)
     const { ok } = await checkUsernameLive();
     if (!ok) return;
 
-    } catch (e) {
-  const m = (e?.message || "").toLowerCase();
-
-  if (m.includes("email") && m.includes("already")) {
-    msg.textContent = "❌ Email déjà utilisé.";
-  } else if (m.includes("pseudo déjà pris")) {
-    msg.textContent = "❌ Pseudo déjà pris.";
-  } else {
-    msg.textContent = "Erreur: " + (e?.message || e);
-  }
-}
-    
     // ✅ création Firebase
     await signupEmail({ email, password, displayName });
 
@@ -259,48 +247,14 @@ btnSignup.onclick = async () => {
     window.dispatchEvent(new CustomEvent("tidoc:auth"));
 
     window.location.href = "./index.html";
-   btnSignup.onclick = async () => {
-  try {
-    msg.textContent = "";
-
-    const displayName = suName.value.trim();
-    const email = document.getElementById("suEmail").value.trim();
-    const password = document.getElementById("suPass").value;
-
-    if (!displayName || !email || !password) {
-      msg.textContent = "❌ Remplis pseudo, email et mot de passe.";
-      return;
-    }
-
-    const emailOk = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
-    if (!emailOk) {
-      msg.textContent = "❌ Adresse email invalide.";
-      return;
-    }
-
-    if (password.length < 6) {
-      msg.textContent = "❌ Mot de passe trop court (min 6 caractères).";
-      return;
-    }
-
-    msg.textContent = "Création du compte…";
-
-    const { ok } = await checkUsernameLive();
-    if (!ok) return;
-
-    await signupEmail({ email, password, displayName });
-
-    localStorage.setItem(LS_NAME, displayName);
-    window.dispatchEvent(new CustomEvent("tidoc:auth"));
-    window.location.href = "./index.html";
 
   } catch (e) {
     const code = (e?.code || "").toLowerCase();
     const m = (e?.message || "").toLowerCase();
 
-    if (code === "auth/email-already-in-use" || m.includes("email-already-in-use") || (m.includes("email") && m.includes("already"))) {
+    if (code === "auth/email-already-in-use" || m.includes("email") && m.includes("already")) {
       msg.textContent = "❌ Email déjà utilisé.";
-    } else if (m.includes("pseudo déjà pris")) {
+    } else if (m.includes("pseudo déjà pris") || m.includes("pseudo déjà")) {
       msg.textContent = "❌ Pseudo déjà pris.";
     } else {
       msg.textContent = "Erreur: " + (e?.message || e);
