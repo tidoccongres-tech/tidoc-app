@@ -30,12 +30,13 @@ const textInput  = document.getElementById("postText");
 const submitBtn  = document.getElementById("postSubmit");
 const cancelBtn  = document.getElementById("postCancel");
 const postMsg    = document.getElementById("postMsg");
-const commentInflight = new Set();
 
-let postInflight = false;
-
-// ✅ iPad/Safari: empêche le submit HTML du form (qui peut bloquer le clic sur "Publier")
+// ✅ iPad/Safari: empêche submit HTML si jamais un <form> existe
 form?.addEventListener("submit", (e) => e.preventDefault());
+
+// ===== Anti-doublons =====
+let postInflight = false;
+const commentInflight = new Set(); // postId en cours d'envoi
 
 // ===== Helpers =====
 function showMsg(t = "") { if (postMsg) postMsg.textContent = t; }
@@ -70,12 +71,10 @@ function fmtDate(ts) {
 function currentUserId() { return auth.currentUser?.uid || ""; }
 function currentUserEmail() { return (auth.currentUser?.email || "").toLowerCase(); }
 
-// ✅ admin = email exact (comme tes rules)
 function isAdminUser() {
   return currentUserEmail() === "tidoc.congres@gmail.com";
 }
 
-// ✅ joli nom affiché (évite “Utilisateur”)
 function displayNameFrom(email = "") {
   const e = (email || "").trim();
   if (!e) return "Utilisateur";
@@ -114,6 +113,7 @@ async function getLikesCount(postId) {
   const snap = await getDocs(collection(db, "posts", postId, "likes"));
   return snap.size;
 }
+
 async function isLikedByMe(postId) {
   const uid = currentUserId();
   if (!uid) return false;
@@ -121,6 +121,7 @@ async function isLikedByMe(postId) {
   const snap = await getDoc(likeRef);
   return snap.exists();
 }
+
 async function toggleLike(postId) {
   if (!requireLogin("liker ce post")) return;
 
@@ -134,7 +135,7 @@ async function toggleLike(postId) {
   await loadPosts();
 }
 
-// ===== Comments (lecture simple) =====
+// ===== Comments =====
 async function loadComments(postId, postData, containerEl) {
   containerEl.innerHTML = `<div style="opacity:.7;font-size:13px;">Chargement des commentaires…</div>`;
 
@@ -163,23 +164,33 @@ async function loadComments(postId, postData, containerEl) {
   });
 }
 
-async function addComment(postId, postData, inputEl, commentsWrap) {
+async function addComment(postId, postData, inputEl, commentsWrap, sendBtn) {
   if (!requireLogin("commenter")) return;
 
-  const txt = (inputEl.value || "").trim();
+  const txt = (inputEl?.value || "").trim();
   if (!txt) return;
 
-  const u = auth.currentUser;
-  await addDoc(collection(db, "posts", postId, "comments"), {
-    text: txt,
-    authorUid: u.uid,
-    authorEmail: u.email || "",
-    authorName: (u.displayName || "").trim() || displayNameFrom(u.email || ""),
-    createdAt: serverTimestamp()
-  });
+  // ✅ anti double envoi
+  if (commentInflight.has(postId)) return;
+  commentInflight.add(postId);
+  if (sendBtn) sendBtn.disabled = true;
 
-  inputEl.value = "";
-  await loadComments(postId, postData, commentsWrap);
+  try {
+    const u = auth.currentUser;
+    await addDoc(collection(db, "posts", postId, "comments"), {
+      text: txt,
+      authorUid: u.uid,
+      authorEmail: u.email || "",
+      authorName: (u.displayName || "").trim() || displayNameFrom(u.email || ""),
+      createdAt: serverTimestamp()
+    });
+
+    inputEl.value = "";
+    await loadComments(postId, postData, commentsWrap);
+  } finally {
+    commentInflight.delete(postId);
+    if (sendBtn) sendBtn.disabled = false;
+  }
 }
 
 // ===== Form =====
@@ -187,6 +198,7 @@ function showForm(show) {
   if (!form) return;
   form.style.display = show ? "" : "none";
 }
+
 function clearForm() {
   if (titleInput) titleInput.value = "";
   if (textInput) textInput.value = "";
@@ -212,7 +224,7 @@ async function createPost() {
     text,
     authorUid: u.uid,
     authorEmail: u.email || "",
-    authorName: myBestName(),     // ✅ vrai nom si dispo, sinon email prefix
+    authorName: myBestName(),
     createdAt: serverTimestamp()
   });
 
@@ -296,39 +308,50 @@ function renderPostCard(postId, p) {
     if (!open) await loadComments(postId, p, list);
   });
 
-  // add comment
-  async function addComment(postId, postData, inputEl, commentsWrap, sendBtn) {
-  if (!requireLogin("commenter")) return;
+  // add comment listeners
+  const uid = currentUserId();
+  const input = card.querySelector(`[data-cinput="${postId}"]`);
+  const sendBtn = card.querySelector(`[data-csend="${postId}"]`);
 
-  const txt = (inputEl.value || "").trim();
-  if (!txt) return;
-
-  if (commentInflight.has(postId)) return;  // ✅ anti double envoi
-  commentInflight.add(postId);
-  if (sendBtn) sendBtn.disabled = true;
-
-  try {
-    const u = auth.currentUser;
-    await addDoc(collection(db, "posts", postId, "comments"), {
-      text: txt,
-      authorUid: u.uid,
-      authorEmail: u.email || "",
-      authorName: (u.displayName || "").trim() || displayNameFrom(u.email || ""),
-      createdAt: serverTimestamp()
+  if (!uid) {
+    if (input) { input.disabled = true; input.placeholder = "Connecte-toi pour commenter."; }
+    if (sendBtn) sendBtn.disabled = true;
+  } else {
+    sendBtn?.addEventListener("click", () => addComment(postId, p, input, list, sendBtn));
+    input?.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        e.stopPropagation();
+        addComment(postId, p, input, list, sendBtn);
+      }
     });
-
-    inputEl.value = "";
-    await loadComments(postId, postData, commentsWrap);
-  } finally {
-    commentInflight.delete(postId);
-    if (sendBtn) sendBtn.disabled = false;
   }
+
+  return card;
+}
+
+async function loadPosts() {
+  if (!postsRoot) return;
+
+  postsRoot.innerHTML = `<section class="card"><p>Chargement…</p></section>`;
+
+  const qy = query(collection(db, "posts"), orderBy("createdAt", "desc"));
+  const snap = await getDocs(qy);
+
+  postsRoot.innerHTML = "";
+  if (snap.empty) {
+    postsRoot.innerHTML = `<section class="card"><p>Aucun post pour l’instant.</p></section>`;
+    return;
+  }
+
+  snap.forEach((d) => postsRoot.appendChild(renderPostCard(d.id, d.data())));
 }
 
 // ===== Boot =====
 document.addEventListener("DOMContentLoaded", () => {
   createBtn?.addEventListener("click", (e) => {
     e.preventDefault();
+    e.stopPropagation();
     if (!requireLogin("écrire un post")) return;
     showForm(true);
     titleInput?.focus();
@@ -336,6 +359,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
   cancelBtn?.addEventListener("click", (e) => {
     e.preventDefault();
+    e.stopPropagation();
     clearForm();
     showForm(false);
   });
@@ -344,9 +368,9 @@ document.addEventListener("DOMContentLoaded", () => {
     e.preventDefault();
     e.stopPropagation();
 
-    if (postInflight) return;          // ✅ anti double tap
+    if (postInflight) return;
     postInflight = true;
-    submitBtn.disabled = true;
+    if (submitBtn) submitBtn.disabled = true;
 
     try {
       await createPost();
@@ -356,7 +380,7 @@ document.addEventListener("DOMContentLoaded", () => {
       alert("Erreur Publier:\n\n" + (err?.message || String(err)));
     } finally {
       postInflight = false;
-      submitBtn.disabled = false;
+      if (submitBtn) submitBtn.disabled = false;
     }
   });
 
