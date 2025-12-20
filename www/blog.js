@@ -88,10 +88,15 @@ function bestAuthorName(p) {
 }
 
 function myBestName() {
+  const cached = (localStorage.getItem("tidoc_name") || "").trim();
+  if (cached) return cached;
+
   const u = auth.currentUser;
   if (!u) return "Utilisateur";
+
   const dn = (u.displayName || "").trim();
   if (dn) return dn;
+
   return displayNameFrom(u.email || "");
 }
 
