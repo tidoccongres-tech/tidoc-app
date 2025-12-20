@@ -1,7 +1,5 @@
 // billets.js — PDF + Photo → Scan QR → Affiche pack + quotas
-// Requiert dans billets.html :
-// - pdf.js (pdfjsLib global)
-// - jsQR (window.jsQR global)
+// Requiert : pdfjsLib (PDF.js legacy) + jsQR
 
 const uploadBtn = document.getElementById("uploadTicketBtn");
 const fileInput = document.getElementById("ticketFileInput");
@@ -45,6 +43,8 @@ function renderResult({ qrText, packKey } = {}) {
   const conf = pack ? pack.conferencesAllowed : "—";
   const ws   = pack ? pack.workshopsAllowed : "—";
 
+  if (!boxEl) return;
+
   boxEl.innerHTML = `
     <div style="display:flex; flex-direction:column; gap:10px;">
       <div style="font-weight:900; color:var(--tidoc); font-size:15px;">
@@ -81,7 +81,7 @@ function renderResult({ qrText, packKey } = {}) {
     </div>
   `;
 
-  // actions pack manuel
+  // pack manuel
   boxEl.querySelectorAll("[data-pack]").forEach((b) => {
     b.addEventListener("click", () => {
       const key = b.getAttribute("data-pack");
@@ -91,7 +91,7 @@ function renderResult({ qrText, packKey } = {}) {
   });
 }
 
-// ---------- QR scan helpers (jsQR) ----------
+// ---------- QR scan ----------
 function scanCanvasForQR(canvas) {
   try {
     const ctx = canvas.getContext("2d", { willReadFrequently: true });
@@ -103,7 +103,7 @@ function scanCanvasForQR(canvas) {
   }
 }
 
-async function loadImageToCanvas(fileOrBlob) {
+async function loadImageToCanvas(fileOrBlob, maxW = 1400) {
   const url = URL.createObjectURL(fileOrBlob);
   try {
     const img = new Image();
@@ -115,10 +115,8 @@ async function loadImageToCanvas(fileOrBlob) {
     });
 
     const canvas = document.createElement("canvas");
-    const ctx = canvas.getContext("2d");
+    const ctx = canvas.getContext("2d", { willReadFrequently: true });
 
-    // scale raisonnable (perf iPad)
-    const maxW = 1400;
     const scale = Math.min(1, maxW / img.width);
     canvas.width = Math.floor(img.width * scale);
     canvas.height = Math.floor(img.height * scale);
@@ -130,8 +128,8 @@ async function loadImageToCanvas(fileOrBlob) {
   }
 }
 
-// ---------- PDF scan helpers (pdf.js) ----------
-async function renderPdfPageToCanvas(pdf, pageNumber, scale = 1.6) {
+// ---------- PDF ----------
+async function renderPdfPageToCanvas(pdf, pageNumber, scale = 1.8) {
   const page = await pdf.getPage(pageNumber);
   const viewport = page.getViewport({ scale });
 
@@ -146,23 +144,22 @@ async function renderPdfPageToCanvas(pdf, pageNumber, scale = 1.6) {
 }
 
 async function scanPdfForQR(file) {
-  if (!window.pdfjsLib) throw new Error("pdfjsLib introuvable (PDF.js pas chargé).");
-  if (!window.jsQR) throw new Error("jsQR introuvable (lib QR pas chargée).");
+  if (!window.pdfjsLib) throw new Error("PDF.js non chargé (pdfjsLib absent).");
+  if (!window.jsQR) throw new Error("Scanner QR non chargé (jsQR absent).");
 
   const buf = await file.arrayBuffer();
   const pdf = await window.pdfjsLib.getDocument({ data: buf }).promise;
 
-  // on scanne les 2 premières pages (souvent 1 seule)
   const pagesToTry = Math.min(2, pdf.numPages);
 
   for (let i = 1; i <= pagesToTry; i++) {
-    // essai normal
-    let canvas = await renderPdfPageToCanvas(pdf, i, 1.6);
+    // normal
+    let canvas = await renderPdfPageToCanvas(pdf, i, 1.8);
     let qr = scanCanvasForQR(canvas);
     if (qr) return qr;
 
-    // essai zoom plus fort si QR petit
-    canvas = await renderPdfPageToCanvas(pdf, i, 2.2);
+    // zoom fort
+    canvas = await renderPdfPageToCanvas(pdf, i, 2.4);
     qr = scanCanvasForQR(canvas);
     if (qr) return qr;
   }
@@ -170,7 +167,31 @@ async function scanPdfForQR(file) {
   return "";
 }
 
-// ---------- Main flow ----------
+// ---------- iPad file type detection ----------
+function isProbablyPdf(file) {
+  const type = (file.type || "").toLowerCase();
+  const name = (file.name || "").toLowerCase();
+
+  if (type.includes("pdf")) return true;
+
+  // iOS renvoie parfois application/octet-stream
+  if (type.includes("octet-stream") && name.endsWith(".pdf")) return true;
+
+  // si pas de type mais extension .pdf
+  if (!type && name.endsWith(".pdf")) return true;
+
+  return false;
+}
+
+function isProbablyImage(file) {
+  const type = (file.type || "").toLowerCase();
+  if (type.startsWith("image/")) return true;
+
+  const name = (file.name || "").toLowerCase();
+  return [".jpg", ".jpeg", ".png", ".webp", ".heic"].some(ext => name.endsWith(ext));
+}
+
+// ---------- Main ----------
 async function handleFile(file) {
   if (!file) return;
 
@@ -180,67 +201,47 @@ async function handleFile(file) {
   }
 
   setStatus("⏳ Analyse du billet…");
-  boxEl.textContent = "Analyse en cours…";
-
-  const type = (file.type || "").toLowerCase();
+  if (boxEl) boxEl.textContent = "Analyse en cours…";
 
   try {
     let qrText = "";
 
-    if (type.includes("pdf")) {
-      // PDF
+    if (isProbablyPdf(file)) {
       if (!window.pdfjsLib) {
-        throw new Error("PDF.js non chargé. Vérifie les balises <script> dans billets.html.");
+        throw new Error("PDF.js non chargé. Vérifie billets.html (scripts PDF.js legacy).");
       }
       qrText = await scanPdfForQR(file);
 
-    } else if (type.startsWith("image/")) {
-      // Image
-      const canvas = await loadImageToCanvas(file);
+    } else if (isProbablyImage(file)) {
+      const canvas = await loadImageToCanvas(file, 1600);
       qrText = scanCanvasForQR(canvas);
 
-      // petit fallback : essayer en redimension plus grand si besoin
+      // fallback sans réduction
       if (!qrText) {
-        // on tente sans réduire
-        const url = URL.createObjectURL(file);
-        try {
-          const img = new Image();
-          await new Promise((res, rej) => {
-            img.onload = res;
-            img.onerror = rej;
-            img.src = url;
-          });
-          const c2 = document.createElement("canvas");
-          c2.width = img.width;
-          c2.height = img.height;
-          c2.getContext("2d").drawImage(img, 0, 0);
-          qrText = scanCanvasForQR(c2);
-        } finally {
-          URL.revokeObjectURL(url);
-        }
+        const canvas2 = await loadImageToCanvas(file, 99999);
+        qrText = scanCanvasForQR(canvas2);
       }
 
     } else {
       setStatus("❌ Format non supporté. Choisis un PDF ou une photo.");
-      boxEl.textContent = "Format non supporté.";
+      if (boxEl) boxEl.textContent = "Format non supporté.";
       return;
     }
 
     if (!qrText) {
       setStatus("❌ QR introuvable. Essaie une photo plus nette / zoomée sur le QR.");
-      boxEl.textContent = "QR introuvable.";
+      if (boxEl) boxEl.textContent = "QR introuvable.";
       return;
     }
 
     const packKey = detectPackFromText(qrText);
-
     setStatus(packKey ? `✅ QR détecté + Pack : ${PACKS[packKey].label}` : "✅ QR détecté (pack à confirmer)");
     renderResult({ qrText, packKey });
 
   } catch (e) {
     console.log("ticket read error:", e);
     setStatus("❌ Erreur dans la lecture du billet : " + (e?.message || e));
-    boxEl.textContent = "Erreur lecture billet.";
+    if (boxEl) boxEl.textContent = "Erreur lecture billet.";
   }
 }
 
@@ -250,10 +251,8 @@ uploadBtn?.addEventListener("click", () => fileInput?.click());
 fileInput?.addEventListener("change", async () => {
   const file = fileInput.files?.[0];
   await handleFile(file);
-  // reset pour permettre re-uploader le même fichier
-  fileInput.value = "";
+  fileInput.value = ""; // reset pour ré-uploader le même fichier
 });
 
-// état initial
+// init
 setStatus("");
-if (boxEl) boxEl.textContent = "Aucun billet importé pour l’instant.";
