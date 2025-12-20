@@ -30,6 +30,7 @@ const textInput  = document.getElementById("postText");
 const submitBtn  = document.getElementById("postSubmit");
 const cancelBtn  = document.getElementById("postCancel");
 const postMsg    = document.getElementById("postMsg");
+const commentInflight = new Set();
 
 let postInflight = false;
 
@@ -296,38 +297,32 @@ function renderPostCard(postId, p) {
   });
 
   // add comment
-  const uid = currentUserId();
-  const input = card.querySelector(`[data-cinput="${postId}"]`);
-  const sendBtn = card.querySelector(`[data-csend="${postId}"]`);
+  async function addComment(postId, postData, inputEl, commentsWrap, sendBtn) {
+  if (!requireLogin("commenter")) return;
 
-  if (!uid) {
-    if (input) { input.disabled = true; input.placeholder = "Connecte-toi pour commenter."; }
-    if (sendBtn) sendBtn.disabled = true;
-  } else {
-    sendBtn?.addEventListener("click", () => addComment(postId, p, input, list));
-    input?.addEventListener("keydown", (e) => {
-      if (e.key === "Enter") addComment(postId, p, input, list);
+  const txt = (inputEl.value || "").trim();
+  if (!txt) return;
+
+  if (commentInflight.has(postId)) return;  // ✅ anti double envoi
+  commentInflight.add(postId);
+  if (sendBtn) sendBtn.disabled = true;
+
+  try {
+    const u = auth.currentUser;
+    await addDoc(collection(db, "posts", postId, "comments"), {
+      text: txt,
+      authorUid: u.uid,
+      authorEmail: u.email || "",
+      authorName: (u.displayName || "").trim() || displayNameFrom(u.email || ""),
+      createdAt: serverTimestamp()
     });
+
+    inputEl.value = "";
+    await loadComments(postId, postData, commentsWrap);
+  } finally {
+    commentInflight.delete(postId);
+    if (sendBtn) sendBtn.disabled = false;
   }
-
-  return card;
-}
-
-async function loadPosts() {
-  if (!postsRoot) return;
-
-  postsRoot.innerHTML = `<section class="card"><p>Chargement…</p></section>`;
-
-  const qy = query(collection(db, "posts"), orderBy("createdAt", "desc"));
-  const snap = await getDocs(qy);
-
-  postsRoot.innerHTML = "";
-  if (snap.empty) {
-    postsRoot.innerHTML = `<section class="card"><p>Aucun post pour l’instant.</p></section>`;
-    return;
-  }
-
-  snap.forEach((d) => postsRoot.appendChild(renderPostCard(d.id, d.data())));
 }
 
 // ===== Boot =====
