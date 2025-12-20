@@ -1,10 +1,17 @@
-// billets.js — PDF + Photo → Scan QR → Affiche pack + quotas
-// Requiert : pdfjsLib (PDF.js legacy) + jsQR
+// billets.js — PDF + Photo → Scan QR → Lit pack (PDF texte ou OCR image) → Affiche QR en image + quotas
+// Requiert dans billets.html :
+// - pdf.js (window.pdfjsLib)
+// - jsQR (window.jsQR)
+// - tesseract.js (window.Tesseract)
 
 const uploadBtn = document.getElementById("uploadTicketBtn");
 const fileInput = document.getElementById("ticketFileInput");
 const statusEl  = document.getElementById("ticketStatus");
 const boxEl     = document.getElementById("ticketBox");
+
+const openHelloAssoBtn = document.getElementById("openHelloAssoBtn");
+const HELLOASSO_URL = "https://www.helloasso.com/associations/ti-doc/evenements/ti-doc-2026";
+if (openHelloAssoBtn) openHelloAssoBtn.href = HELLOASSO_URL;
 
 // Quotas (modifiable plus tard)
 const PACKS = {
@@ -26,35 +33,43 @@ function escapeHTML(s = "") {
     .replaceAll("'", "&#039;");
 }
 
-function detectPackFromText(qrText = "") {
-  const t = (qrText || "").toLowerCase();
+function normalize(s = "") {
+  return String(s).toLowerCase().normalize("NFD").replace(/\p{Diacritic}/gu, "");
+}
+
+function detectPackFromAnyText(txt = "") {
+  const t = normalize(txt);
+  // supporte “Pack Essentiel”, “pack: standard”, etc.
   if (t.includes("essentiel")) return "essentiel";
   if (t.includes("standard"))  return "standard";
   if (t.includes("premium"))   return "premium";
   return "";
 }
 
-function renderResult({ qrText, packKey } = {}) {
+function renderResult({ qrText, packKey, qrDataUrl } = {}) {
   const pack = packKey ? PACKS[packKey] : null;
 
-  const qrSafe = escapeHTML(qrText || "");
   const packLabel = pack ? pack.label : "Non détecté";
-
   const conf = pack ? pack.conferencesAllowed : "—";
   const ws   = pack ? pack.workshopsAllowed : "—";
 
-  if (!boxEl) return;
-
   boxEl.innerHTML = `
-    <div style="display:flex; flex-direction:column; gap:10px;">
+    <div style="display:flex; flex-direction:column; gap:12px;">
       <div style="font-weight:900; color:var(--tidoc); font-size:15px;">
         ✅ Billet importé
       </div>
 
       <div style="border:1px solid var(--line); border-radius:14px; padding:12px;">
-        <div style="font-weight:900; margin-bottom:6px;">QR détecté</div>
-        <div style="font-size:12px; opacity:.75; overflow-wrap:anywhere;">
-          ${qrSafe ? qrSafe : "—"}
+        <div style="font-weight:900; margin-bottom:10px;">QR code</div>
+        ${
+          qrDataUrl
+            ? `<div style="display:flex; justify-content:center;">
+                 <img src="${qrDataUrl}" alt="QR code" style="width:180px; height:180px; object-fit:contain; border-radius:12px; border:1px solid var(--line); background:#fff;">
+               </div>`
+            : `<div style="opacity:.7; font-size:13px;">(aperçu QR non disponible)</div>`
+        }
+        <div style="margin-top:10px; font-size:12px; opacity:.7; overflow-wrap:anywhere;">
+          ${escapeHTML(qrText || "")}
         </div>
       </div>
 
@@ -64,46 +79,62 @@ function renderResult({ qrText, packKey } = {}) {
         <div><b>Workshops :</b> ${escapeHTML(String(ws))}</div>
       </div>
 
-      ${!pack ? `
-        <div style="border:1px dashed rgba(0,0,0,.18); border-radius:14px; padding:12px;">
-          <div style="font-weight:900; margin-bottom:8px;">Pack non détecté</div>
-          <div style="font-size:13px; opacity:.8; margin-bottom:10px;">
-            Le QR HelloAsso ne contient pas toujours le nom du pack.
-            Choisis ton pack pour afficher les quotas :
-          </div>
-          <div style="display:flex; gap:8px; flex-wrap:wrap;">
-            <button class="btn-outline" type="button" data-pack="essentiel">Essentiel</button>
-            <button class="btn-outline" type="button" data-pack="standard">Standard</button>
-            <button class="btn-outline" type="button" data-pack="premium">Premium</button>
-          </div>
-        </div>
-      ` : ``}
+      ${
+        !pack
+          ? `<div style="border:1px dashed rgba(0,0,0,.18); border-radius:14px; padding:12px;">
+               <div style="font-weight:900; margin-bottom:8px;">Pack non détecté automatiquement</div>
+               <div style="font-size:13px; opacity:.85;">
+                 Astuce : importe idéalement le <b>PDF HelloAsso</b> (plus fiable qu’une capture).
+               </div>
+             </div>`
+          : ``
+      }
     </div>
   `;
-
-  // pack manuel
-  boxEl.querySelectorAll("[data-pack]").forEach((b) => {
-    b.addEventListener("click", () => {
-      const key = b.getAttribute("data-pack");
-      renderResult({ qrText, packKey: key });
-      setStatus(`✅ Pack sélectionné : ${PACKS[key].label}`);
-    });
-  });
 }
 
-// ---------- QR scan ----------
+// ---------- QR scan helpers (jsQR) ----------
+function qrBoundingBox(loc) {
+  if (!loc) return null;
+  const xs = [loc.topLeftCorner.x, loc.topRightCorner.x, loc.bottomRightCorner.x, loc.bottomLeftCorner.x];
+  const ys = [loc.topLeftCorner.y, loc.topRightCorner.y, loc.bottomRightCorner.y, loc.bottomLeftCorner.y];
+  const minX = Math.min(...xs), maxX = Math.max(...xs);
+  const minY = Math.min(...ys), maxY = Math.max(...ys);
+  return { x:minX, y:minY, w:(maxX-minX), h:(maxY-minY) };
+}
+
+function cropCanvasToDataUrl(canvas, rect, pad = 18) {
+  if (!rect) return "";
+  const x = Math.max(0, Math.floor(rect.x - pad));
+  const y = Math.max(0, Math.floor(rect.y - pad));
+  const w = Math.min(canvas.width - x, Math.floor(rect.w + pad*2));
+  const h = Math.min(canvas.height - y, Math.floor(rect.h + pad*2));
+  if (w <= 0 || h <= 0) return "";
+
+  const out = document.createElement("canvas");
+  out.width = w;
+  out.height = h;
+  out.getContext("2d").drawImage(canvas, x, y, w, h, 0, 0, w, h);
+  return out.toDataURL("image/png");
+}
+
 function scanCanvasForQR(canvas) {
   try {
     const ctx = canvas.getContext("2d", { willReadFrequently: true });
     const img = ctx.getImageData(0, 0, canvas.width, canvas.height);
     const code = window.jsQR(img.data, img.width, img.height);
-    return code?.data || "";
+    if (!code?.data) return { qrText:"", qrDataUrl:"", location:null };
+
+    const rect = qrBoundingBox(code.location);
+    const qrDataUrl = cropCanvasToDataUrl(canvas, rect, 14);
+
+    return { qrText: code.data, qrDataUrl, location: code.location };
   } catch {
-    return "";
+    return { qrText:"", qrDataUrl:"", location:null };
   }
 }
 
-async function loadImageToCanvas(fileOrBlob, maxW = 1400) {
+async function loadImageToCanvas(fileOrBlob, { maxW = 1600 } = {}) {
   const url = URL.createObjectURL(fileOrBlob);
   try {
     const img = new Image();
@@ -115,8 +146,9 @@ async function loadImageToCanvas(fileOrBlob, maxW = 1400) {
     });
 
     const canvas = document.createElement("canvas");
-    const ctx = canvas.getContext("2d", { willReadFrequently: true });
+    const ctx = canvas.getContext("2d");
 
+    // scale raisonnable (perf iPad)
     const scale = Math.min(1, maxW / img.width);
     canvas.width = Math.floor(img.width * scale);
     canvas.height = Math.floor(img.height * scale);
@@ -128,7 +160,7 @@ async function loadImageToCanvas(fileOrBlob, maxW = 1400) {
   }
 }
 
-// ---------- PDF ----------
+// ---------- PDF helpers ----------
 async function renderPdfPageToCanvas(pdf, pageNumber, scale = 1.8) {
   const page = await pdf.getPage(pageNumber);
   const viewport = page.getViewport({ scale });
@@ -143,55 +175,79 @@ async function renderPdfPageToCanvas(pdf, pageNumber, scale = 1.8) {
   return canvas;
 }
 
-async function scanPdfForQR(file) {
-  if (!window.pdfjsLib) throw new Error("PDF.js non chargé (pdfjsLib absent).");
-  if (!window.jsQR) throw new Error("Scanner QR non chargé (jsQR absent).");
+async function extractPdfText(pdf, pageNumber) {
+  const page = await pdf.getPage(pageNumber);
+  const tc = await page.getTextContent();
+  const parts = (tc.items || []).map(it => it.str).filter(Boolean);
+  return parts.join(" ");
+}
 
+async function scanPdf(file) {
+  if (!window.pdfjsLib) throw new Error("PDF.js non chargé.");
   const buf = await file.arrayBuffer();
   const pdf = await window.pdfjsLib.getDocument({ data: buf }).promise;
 
+  // on tente 1-2 pages
   const pagesToTry = Math.min(2, pdf.numPages);
 
-  for (let i = 1; i <= pagesToTry; i++) {
-    // normal
-    let canvas = await renderPdfPageToCanvas(pdf, i, 1.8);
-    let qr = scanCanvasForQR(canvas);
-    if (qr) return qr;
+  let best = { qrText:"", qrDataUrl:"", packKey:"" };
 
-    // zoom fort
-    canvas = await renderPdfPageToCanvas(pdf, i, 2.4);
-    qr = scanCanvasForQR(canvas);
-    if (qr) return qr;
+  for (let i = 1; i <= pagesToTry; i++) {
+    // 1) texte → pack
+    const txt = await extractPdfText(pdf, i);
+    const packKeyFromText = detectPackFromAnyText(txt);
+
+    // 2) rendu → QR
+    let canvas = await renderPdfPageToCanvas(pdf, i, 1.8);
+    let qrRes = scanCanvasForQR(canvas);
+
+    if (!qrRes.qrText) {
+      canvas = await renderPdfPageToCanvas(pdf, i, 2.4);
+      qrRes = scanCanvasForQR(canvas);
+    }
+
+    if (qrRes.qrText) {
+      best = {
+        qrText: qrRes.qrText,
+        qrDataUrl: qrRes.qrDataUrl,
+        packKey: packKeyFromText || detectPackFromAnyText(qrRes.qrText),
+      };
+      return best; // PDF : si QR trouvé, on sort
+    }
+
+    // si pas de QR sur cette page, on garde au moins le pack si trouvé
+    if (packKeyFromText && !best.packKey) best.packKey = packKeyFromText;
   }
 
-  return "";
+  return best;
 }
 
-// ---------- iPad file type detection ----------
-function isProbablyPdf(file) {
-  const type = (file.type || "").toLowerCase();
-  const name = (file.name || "").toLowerCase();
+// ---------- OCR image (pour lire “Pack Essentiel” sur une capture) ----------
+async function ocrPackFromImageCanvas(canvas) {
+  if (!window.Tesseract) return "";
 
-  if (type.includes("pdf")) return true;
+  // On crop la zone “haut-droite sous le nom” (comme ton billet)
+  // Ajustable si besoin : ici ~40% à droite, et ~35% en haut
+  const w = canvas.width, h = canvas.height;
+  const cropX = Math.floor(w * 0.50);
+  const cropY = Math.floor(h * 0.12);
+  const cropW = Math.floor(w * 0.40);
+  const cropH = Math.floor(h * 0.26);
 
-  // iOS renvoie parfois application/octet-stream
-  if (type.includes("octet-stream") && name.endsWith(".pdf")) return true;
+  const roi = document.createElement("canvas");
+  roi.width = cropW;
+  roi.height = cropH;
+  roi.getContext("2d").drawImage(canvas, cropX, cropY, cropW, cropH, 0, 0, cropW, cropH);
 
-  // si pas de type mais extension .pdf
-  if (!type && name.endsWith(".pdf")) return true;
+  // OCR (fr+eng, mais on garde simple)
+  const { data } = await window.Tesseract.recognize(roi, "fra+eng", {
+    logger: () => {} // silence
+  });
 
-  return false;
+  return data?.text || "";
 }
 
-function isProbablyImage(file) {
-  const type = (file.type || "").toLowerCase();
-  if (type.startsWith("image/")) return true;
-
-  const name = (file.name || "").toLowerCase();
-  return [".jpg", ".jpeg", ".png", ".webp", ".heic"].some(ext => name.endsWith(ext));
-}
-
-// ---------- Main ----------
+// ---------- Main flow ----------
 async function handleFile(file) {
   if (!file) return;
 
@@ -201,47 +257,65 @@ async function handleFile(file) {
   }
 
   setStatus("⏳ Analyse du billet…");
-  if (boxEl) boxEl.textContent = "Analyse en cours…";
+  boxEl.textContent = "Analyse en cours…";
+
+  const type = (file.type || "").toLowerCase();
 
   try {
     let qrText = "";
+    let qrDataUrl = "";
+    let packKey = "";
 
-    if (isProbablyPdf(file)) {
-      if (!window.pdfjsLib) {
-        throw new Error("PDF.js non chargé. Vérifie billets.html (scripts PDF.js legacy).");
-      }
-      qrText = await scanPdfForQR(file);
+    if (type.includes("pdf")) {
+      // PDF → QR + pack via texte PDF
+      const res = await scanPdf(file);
+      qrText = res.qrText || "";
+      qrDataUrl = res.qrDataUrl || "";
+      packKey = res.packKey || "";
 
-    } else if (isProbablyImage(file)) {
-      const canvas = await loadImageToCanvas(file, 1600);
-      qrText = scanCanvasForQR(canvas);
-
-      // fallback sans réduction
       if (!qrText) {
-        const canvas2 = await loadImageToCanvas(file, 99999);
-        qrText = scanCanvasForQR(canvas2);
+        setStatus("❌ QR introuvable dans le PDF. Essaie une capture zoomée du QR.");
+        boxEl.textContent = "QR introuvable.";
+        return;
+      }
+
+    } else if (type.startsWith("image/")) {
+      // Image → QR via jsQR, pack via OCR
+      const canvas = await loadImageToCanvas(file, { maxW: 1800 });
+      const qrRes = scanCanvasForQR(canvas);
+
+      qrText = qrRes.qrText || "";
+      qrDataUrl = qrRes.qrDataUrl || "";
+
+      if (!qrText) {
+        setStatus("❌ QR introuvable. Essaie une photo plus nette / zoomée sur le QR.");
+        boxEl.textContent = "QR introuvable.";
+        return;
+      }
+
+      // 1) pack depuis QR (rare)
+      packKey = detectPackFromAnyText(qrText);
+
+      // 2) pack via OCR zone du pack (ton cas)
+      if (!packKey) {
+        setStatus("⏳ QR OK. Lecture du pack…");
+        const ocrText = await ocrPackFromImageCanvas(canvas);
+        packKey = detectPackFromAnyText(ocrText);
       }
 
     } else {
       setStatus("❌ Format non supporté. Choisis un PDF ou une photo.");
-      if (boxEl) boxEl.textContent = "Format non supporté.";
+      boxEl.textContent = "Format non supporté.";
       return;
     }
 
-    if (!qrText) {
-      setStatus("❌ QR introuvable. Essaie une photo plus nette / zoomée sur le QR.");
-      if (boxEl) boxEl.textContent = "QR introuvable.";
-      return;
-    }
-
-    const packKey = detectPackFromText(qrText);
-    setStatus(packKey ? `✅ QR détecté + Pack : ${PACKS[packKey].label}` : "✅ QR détecté (pack à confirmer)");
-    renderResult({ qrText, packKey });
+    setStatus(packKey ? `✅ QR + Pack : ${PACKS[packKey].label}` : "✅ QR détecté (pack non trouvé automatiquement)");
+    renderResult({ qrText, packKey, qrDataUrl });
 
   } catch (e) {
     console.log("ticket read error:", e);
-    setStatus("❌ Erreur dans la lecture du billet : " + (e?.message || e));
-    if (boxEl) boxEl.textContent = "Erreur lecture billet.";
+    setStatus("❌ Erreur : " + (e?.message || e));
+    boxEl.textContent = "Erreur lecture billet.";
   }
 }
 
@@ -251,8 +325,9 @@ uploadBtn?.addEventListener("click", () => fileInput?.click());
 fileInput?.addEventListener("change", async () => {
   const file = fileInput.files?.[0];
   await handleFile(file);
-  fileInput.value = ""; // reset pour ré-uploader le même fichier
+  fileInput.value = ""; // re-uploader le même fichier possible
 });
 
-// init
+// état initial
 setStatus("");
+if (boxEl) boxEl.textContent = "Aucun billet importé pour l’instant.";
