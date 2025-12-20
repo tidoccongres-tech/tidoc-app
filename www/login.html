@@ -256,26 +256,6 @@
       msg.textContent = "Erreur: " + (e?.message || e);
     }
   };
-
-  document.getElementById("btnSignup").onclick = async () => {
-  try {
-    msg.textContent = "Création du compte…";
-
-    // 🔎 vérifie le pseudo AVANT de créer le compte
-    await checkUsernameLive();
-    if (btnSignup.disabled) return;
-
-    const displayName = document.getElementById("suName").value.trim();
-    const email = document.getElementById("suEmail").value.trim();
-    const password = document.getElementById("suPass").value;
-
-    await signupEmail({ email, password, displayName });
-
-    window.location.href = "./index.html";
-  } catch (e) {
-    msg.textContent = "Erreur: " + (e?.message || e);
-  }
-};
   
 </script>
 </body>
