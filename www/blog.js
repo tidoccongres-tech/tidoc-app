@@ -172,13 +172,16 @@ async function loadComments(postId, postData, containerEl) {
     const row = document.createElement("div");
     row.className = "comment";
     row.innerHTML = `
-      <div class="comment-row">
-        <div>
-          <div class="comment-author">${escapeHTML(c.authorName || displayNameFrom(c.authorEmail || ""))}</div>
-          <div class="comment-text">${escapeHTML(c.text || "")}</div>
-        </div>
+  <div class="comment-row">
+    <div>
+      <div class="comment-author">
+        ${escapeHTML(c.authorName || displayNameFrom(c.authorEmail || ""))}
+        ${isAdminEmail(c.authorEmail) ? CROWN_GRAY_SVG : ""}
       </div>
-    `;
+      <div class="comment-text">${escapeHTML(c.text || "")}</div>
+    </div>
+  </div>
+`;
     containerEl.appendChild(row);
   });
 }
