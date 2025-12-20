@@ -336,21 +336,24 @@ document.addEventListener("DOMContentLoaded", () => {
     titleInput?.focus();
   });
 
-  cancelBtn?.addEventListener("click", () => {
+  cancelBtn?.addEventListener("click", (e) => {
+    e.preventDefault();
     clearForm();
     showForm(false);
   });
 
+  // 🔥 FIX iPad / Safari : double écoute pointer + click
   submitBtn?.addEventListener("pointerup", (e) => {
-  e.preventDefault();
-  e.stopPropagation();
-  createPost();
-});
-submitBtn?.addEventListener("click", (e) => {
-  e.preventDefault();
-  e.stopPropagation();
-  createPost();
-});
+    e.preventDefault();
+    e.stopPropagation();
+    createPost();
+  });
+
+  submitBtn?.addEventListener("click", (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    createPost();
+  });
 
   onAuthStateChanged(auth, () => loadPosts());
   loadPosts();
