@@ -258,56 +258,6 @@ async function getPrettyName(user){
   return "Utilisateur";
 }
 
-  // ferme quand on clique ailleurs
-  if (!window.__TIDOC_NOTIF_BOUND__) {
-    window.__TIDOC_NOTIF_BOUND__ = true;
-    document.addEventListener("click", ()=>{
-      const m = document.getElementById("tidocNotifMenu");
-      if (m) m.style.display = "none";
-    });
-  }
-
-  wrap.appendChild(b);
-  wrap.appendChild(menu);
-  right.appendChild(wrap);
-}
-
-async function getPrettyName(user){
-  if (!user) return "Utilisateur";
-
-  // ✅ 1) Firestore en priorité (source de vérité)
-  if (db){
-    try{
-      const snap = await getDoc(doc(db, "users", user.uid));
-      if (snap.exists()){
-        const d = snap.data() || {};
-        const n = (d.displayName || d.username || d.name || "").trim();
-        if (n){
-          localStorage.setItem(LS_NAME, n);
-          return n;
-        }
-      }
-    }catch(_){}
-  }
-
-  // ✅ 2) Cache localStorage
-  const cached = (localStorage.getItem(LS_NAME) || "").trim();
-  if (cached) return cached;
-
-  // ✅ 3) Firebase Auth displayName
-  const dn = (user.displayName || "").trim();
-  if (dn) {
-    localStorage.setItem(LS_NAME, dn);
-    return dn;
-  }
-
-  // ✅ 4) Fallback email
-  const email = (user.email || "").trim();
-  if (email.includes("@")) return email.split("@")[0];
-
-  return "Utilisateur";
-}
-
 async function getAvatarUrl(user){
   if (!user) return "";
 
