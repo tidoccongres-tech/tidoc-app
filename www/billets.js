@@ -114,35 +114,69 @@ function parseFromOcr(ocrTextRaw = "") {
   const raw = String(ocrTextRaw || "");
   const text = normalizeSpaces(raw);
 
-  // Pack: "Pack Essentiel"
+  function parseFromOcr(ocrTextRaw = "") {
+  const raw = String(ocrTextRaw || "");
+  const lines = raw
+    .split(/\r?\n/)
+    .map(l => l.replace(/\s+/g, " ").trim())
+    .filter(Boolean);
+
+  const full = lines.join(" ");
+
+  // PACK
   let packKey = "";
-  const mp = text.match(/pack\s*(essentiel|standard|premium)/i);
-  if (mp) {
-    const v = mp[1].toLowerCase();
-    if (v.startsWith("ess")) packKey = "essentiel";
-    else if (v.startsWith("sta")) packKey = "standard";
-    else if (v.startsWith("pre")) packKey = "premium";
+  let packLineIndex = -1;
+
+  for (let i = 0; i < lines.length; i++) {
+    const m = lines[i].match(/pack\s*(essentiel|standard|premium)/i);
+    if (m) {
+      packLineIndex = i;
+      const v = m[1].toLowerCase();
+      if (v.startsWith("ess")) packKey = "essentiel";
+      else if (v.startsWith("sta")) packKey = "standard";
+      else if (v.startsWith("pre")) packKey = "premium";
+      break;
+    }
   }
 
-  // N° billet: "N° de billet : 163160874"
+  // N° BILLET
   let ticketNumber = "";
-  const mn = text.match(/n[°o]\s*de\s*billet\s*[:\-]?\s*([0-9]{5,})/i);
+  const mn = full.match(/n[°o]\s*de\s*billet\s*[:\-]?\s*([0-9]{5,})/i);
   if (mn) ticketNumber = mn[1];
 
-  // Nom: souvent la ligne AVANT "Pack ..."
-  // Exemple: "Aurore bouquet Pack Essentiel"
+  // NOM = ligne au-dessus du "Pack ..."
   let holderName = "";
-  if (mp) {
-    const idx = text.toLowerCase().indexOf(mp[0].toLowerCase());
-    if (idx > 2) {
-      const before = normalizeSpaces(text.slice(0, idx));
-      const parts = before.split(" ");
-      // on récupère les 2-4 derniers mots avant "Pack" (nom prénom)
-      const cand = parts.slice(-4).join(" ").trim();
-      if (cand && !cand.toLowerCase().includes("ti'doc") && !cand.toLowerCase().includes("helloasso")) {
-        holderName = cand;
+  if (packLineIndex > 0) {
+    // on remonte jusqu’à trouver une ligne “propre”
+    for (let j = packLineIndex - 1; j >= 0; j--) {
+      const candidate = lines[j]
+        .replace(/^ti'?doc\s*2026/i, "")
+        .replace(/^par\s+ti'?doc/i, "")
+        .trim();
+
+      // filtres anti-bruit
+      const bad =
+        !candidate ||
+        candidate.length < 3 ||
+        /helloasso/i.test(candidate) ||
+        /contact/i.test(candidate) ||
+        /achete/i.test(candidate) ||
+        /acheteur/i.test(candidate) ||
+        /n[°o]\s*de\s*billet/i.test(candidate) ||
+        /pack\s*/i.test(candidate);
+
+      if (!bad) {
+        holderName = candidate;
+        break;
       }
     }
+  }
+
+  // fallback (au cas où OCR met "Nom Pack Essentiel" sur la même ligne)
+  if (!holderName && packLineIndex >= 0) {
+    const line = lines[packLineIndex];
+    const mSame = line.match(/^(.*?)\s+pack\s*(essentiel|standard|premium)/i);
+    if (mSame) holderName = mSame[1].trim();
   }
 
   return { packKey, ticketNumber, holderName, ocrText: raw };
