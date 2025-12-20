@@ -323,8 +323,8 @@ function renderResult({ qrText, packKey, holderName, ticketNumber } = {}) {
   </div>
 `;
 
-  const delBtn = document.getElementById("deleteTicketInlineBtn");
-  delBtn?.addEventListener("click", deleteMyTicketAndUnclaim);
+  const delBtn = boxEl.querySelector("#deleteTicketInlineBtn");
+  delBtn?.addEventListener("click", deleteMyTicketAndUnclaim); 
   
   // QR code affichable si qrcodejs chargé
   const host = boxEl.querySelector("#qrRender");
