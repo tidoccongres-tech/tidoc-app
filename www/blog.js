@@ -270,8 +270,13 @@ function renderPostCard(postId, p) {
     <div class="post-head">
       <div>
         <div class="post-title">${escapeHTML(p.title || "")}</div>
-        <div class="post-sub">${escapeHTML(bestAuthorName(p))} • ${fmtDate(p.createdAt)}</div>
-      </div>
+        <div class="post-sub">
+  <span class="post-author">
+    ${escapeHTML(bestAuthorName(p))}
+    ${isAdminEmail(p.authorEmail) ? CROWN_GRAY_SVG : ""}
+  </span>
+  • ${fmtDate(p.createdAt)}
+</div>
       ${delOk ? `<button class="delete-btn" type="button" data-del="${postId}">Supprimer</button>` : ""}
     </div>
 
