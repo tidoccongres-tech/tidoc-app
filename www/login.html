@@ -226,7 +226,7 @@ btnSignup.onclick = async () => {
       msg.textContent = "❌ Adresse email invalide.";
       return;
     }
-
+    
     // 🔐 mdp mini
     if (password.length < 6) {
       msg.textContent = "❌ Mot de passe trop court (min 6 caractères).";
@@ -239,6 +239,18 @@ btnSignup.onclick = async () => {
     const { ok } = await checkUsernameLive();
     if (!ok) return;
 
+    } catch (e) {
+  const m = (e?.message || "").toLowerCase();
+
+  if (m.includes("email") && m.includes("already")) {
+    msg.textContent = "❌ Email déjà utilisé.";
+  } else if (m.includes("pseudo déjà pris")) {
+    msg.textContent = "❌ Pseudo déjà pris.";
+  } else {
+    msg.textContent = "Erreur: " + (e?.message || e);
+  }
+}
+    
     // ✅ création Firebase
     await signupEmail({ email, password, displayName });
 
