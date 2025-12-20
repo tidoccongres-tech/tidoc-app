@@ -991,25 +991,18 @@ img, svg{
 }
 
 /* =========================
-   HARD FIX iPad taps (BÉTON)
+   HARD FIX iPad taps (FINAL)
    À COLLER TOUT EN BAS
    ========================= */
 
-/* 0) Assure que le contenu est au-dessus et cliquable */
+/* Le contenu doit rester cliquable */
 main, .page, .card{
   position: relative;
   z-index: 1;
   pointer-events: auto !important;
 }
 
-/* 1) Force les éléments interactifs à rester cliquables */
-button, a, input, textarea, select, label{
-  pointer-events: auto !important;
-  -webkit-user-select: none;
-  user-select: none;
-}
-
-/* 2) La topbar et la tabbar doivent rester cliquables */
+/* La topbar et la tabbar doivent rester cliquables */
 .blog-topbar{
   pointer-events: auto !important;
   z-index: 10000 !important;
@@ -1019,29 +1012,23 @@ button, a, input, textarea, select, label{
   z-index: 10000 !important;
 }
 
-/* 3) Le menu profil NE DOIT PAS bloquer quand il est fermé */
+/* Le menu profil ne doit PAS bloquer quand il est fermé */
 .profile-menu{
   display: none !important;
   pointer-events: none !important;
 }
 
-/* 4) Quand on l’ouvre, il redevient cliquable */
-.profile-menu[data-open="true"]{
+/* ✅ OUVERTURE via la classe .open (comme ton JS) */
+.profile-menu.open{
   display: block !important;
   pointer-events: auto !important;
   z-index: 10001 !important;
 }
 
-/* 5) Sécurité: si un overlay existe, il ne doit pas couvrir toute la page */
+/* Sécurité : overlays invisibles interdits */
 #headerUserMenuOverlay,
 .header-overlay,
 .menu-overlay{
   display: none !important;
   pointer-events: none !important;
-}
-#headerUserMenuOverlay[data-open="true"],
-.header-overlay[data-open="true"],
-.menu-overlay[data-open="true"]{
-  display: block !important;
-  pointer-events: auto !important;
 }
