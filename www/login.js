@@ -8,6 +8,7 @@ const passwordInput = document.getElementById("password");
 const nameInput = document.getElementById("name"); // uniquement pour inscription
 const submitBtn = document.getElementById("submitBtn");
 const msg = document.getElementById("loginMsg");
+const LS_NAME = "tidoc_name";
 
 // ====== MODE ======
 // true = inscription / false = connexion
@@ -19,6 +20,8 @@ function showMsg(t = "") {
 }
 
 // ====== TOGGLE LOGIN / SIGNUP ======
+localStorage.setItem(LS_NAME, displayName);
+window.dispatchEvent(new CustomEvent("tidoc:auth"));
 document.getElementById("toggleMode")?.addEventListener("click", () => {
   isSignup = !isSignup;
 
@@ -52,6 +55,9 @@ form?.addEventListener("submit", async (e) => {
     } else {
       await loginEmail({ email, password });
     }
+
+    // optionnel : au moins forcer le header à recharger au prochain écran
+   window.dispatchEvent(new CustomEvent("tidoc:auth"));
 
     window.location.href = "./index.html";
   } catch (e) {
