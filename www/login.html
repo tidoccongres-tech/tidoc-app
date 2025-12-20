@@ -110,7 +110,8 @@
   </div>
 
   <script type="module">
-    import { auth, signupEmail, loginEmail, resetPassword } from "./auth.js";
+    import { auth, db, signupEmail, loginEmail, resetPassword } from "./auth.js";
+    import { doc, getDoc } from "https://www.gstatic.com/firebasejs/10.12.4/firebase-firestore.js";
     import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.4/firebase-auth.js";
 
     const LS_NAME = "tidoc_name";
@@ -143,6 +144,71 @@
     const displayName = rawName || "Utilisateur";
     const email = document.getElementById("suEmail").value.trim();
     const password = document.getElementById("suPass").value;
+    const suName = document.getElementById("suName");
+const suNameStatus = document.getElementById("suNameStatus");
+const btnSignup = document.getElementById("btnSignup");
+
+function normalizeUsername(v = "") {
+  return v
+    .trim()
+    .toLowerCase()
+    .normalize("NFD").replace(/[\u0300-\u036f]/g, "") // enlève accents
+    .replace(/[^a-z0-9._-]/g, ""); // garde seulement a-z 0-9 . _ -
+}
+
+// (optionnel) pseudos réservés
+const RESERVED = new Set(["admin", "moderateur", "mod", "support", "tidoc", "tidocteam"]);
+
+let nameCheckTimer = null;
+
+async function checkUsernameLive() {
+  const raw = suName.value || "";
+  const norm = normalizeUsername(raw);
+
+  // reset UI
+  if (!norm) {
+    suNameStatus.textContent = "";
+    btnSignup.disabled = false;
+    return;
+  }
+
+  // règles simples
+  if (norm.length < 3) {
+    suNameStatus.textContent = "❌ Pseudo trop court (min 3).";
+    btnSignup.disabled = true;
+    return;
+  }
+  if (RESERVED.has(norm)) {
+    suNameStatus.textContent = "❌ Ce pseudo est réservé.";
+    btnSignup.disabled = true;
+    return;
+  }
+
+  suNameStatus.textContent = "⏳ Vérification…";
+  btnSignup.disabled = true;
+
+  // Firestore: usernames/{norm}
+  try {
+    const snap = await getDoc(doc(db, "usernames", norm));
+    if (snap.exists()) {
+      suNameStatus.textContent = "❌ Pseudo déjà pris.";
+      btnSignup.disabled = true;
+    } else {
+      suNameStatus.textContent = "✅ Pseudo disponible.";
+      btnSignup.disabled = false;
+    }
+  } catch (e) {
+    console.log("checkUsernameLive error:", e);
+    suNameStatus.textContent = "⚠️ Impossible de vérifier (réseau).";
+    btnSignup.disabled = false; // ou true si tu préfères bloquer
+  }
+}
+
+// écoute en live avec petit debounce
+suName?.addEventListener("input", () => {
+  clearTimeout(nameCheckTimer);
+  nameCheckTimer = setTimeout(checkUsernameLive, 250);
+});
 
     await signupEmail({ email, password, displayName });
 
