@@ -97,14 +97,14 @@
   <!-- Tabbar (la tienne inchangée) -->
   <!-- ... garde ton <nav class="tabbar"> ... </nav> -->
 
-  <!-- ✅ PDF.js -->
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.2.67/pdf.min.js"></script>
-  <script>
-    if (window.pdfjsLib) {
-      pdfjsLib.GlobalWorkerOptions.workerSrc =
-        "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.2.67/pdf.worker.min.js";
-    }
-  </script>
+  <!-- ✅ PDF.js (LEGACY = pdfjsLib global) -->
+<script src="https://unpkg.com/pdfjs-dist@3.11.174/legacy/build/pdf.min.js"></script>
+<script>
+  if (window.pdfjsLib) {
+    pdfjsLib.GlobalWorkerOptions.workerSrc =
+      "https://unpkg.com/pdfjs-dist@3.11.174/legacy/build/pdf.worker.min.js";
+  }
+</script>
 
   <!-- ✅ Scanner QR -->
   <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
