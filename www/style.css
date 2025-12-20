@@ -1037,4 +1037,5 @@ main, .page, .card{
   font-weight: 600;
 }
 
-.crown-inline { display:inline-flex; }
+.post-sub { display:block; }
+.crown-inline { display:inline-flex; margin-left:4px; }
