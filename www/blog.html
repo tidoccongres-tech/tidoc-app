@@ -5,11 +5,11 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Ti'Doc — Forum</title>
 
-  <link rel="stylesheet" href="style.css?v=10" />
+  <link rel="stylesheet" href="style.css?v=11" />
   <link rel="manifest" href="/manifest.webmanifest" />
   <meta name="theme-color" content="#178CA8" />
 
-  <!-- (Optionnel) protège l’accès -->
+  <!-- protège l’accès -->
   <script type="module">
     import { requireAuthOrRedirect } from "./auth.js";
     requireAuthOrRedirect("./login.html");
@@ -17,8 +17,8 @@
 </head>
 
 <body>
-  <!-- Topbar -->
-  <script type="module" src="./header-user-menu.js?v=999"></script>
+  <!-- Topbar (⚠️ UNE SEULE FOIS) -->
+  <script type="module" src="./header-user-menu.js?v=1000"></script>
 
   <main class="page blog-page">
 
@@ -28,7 +28,7 @@
       <span>Créer un post</span>
     </button>
 
-    <!-- ✅ Formulaire (caché au départ) -->
+    <!-- ✅ Formulaire -->
     <section class="card post-form" id="postForm" style="display:none; margin-top:12px;">
       <h2 style="margin:0 0 10px;color:var(--tidoc)">Nouveau post</h2>
 
@@ -98,10 +98,8 @@
   </a>
 </nav>
   
-  <!-- ✅ Un seul JS forum -->
-  <script type="module" src="./blog.js?v=10"></script>
-  <script src="pwa.js"></script>
-  <script type="module" src="./header-user-menu.js?v=999"></script>
-  <script type="module" src="./auth.js"></script>
+   <!-- ✅ Un seul JS forum -->
+  <script type="module" src="./blog.js?v=11"></script>
+  <script src="./pwa.js"></script>
 </body>
 </html>
