@@ -101,5 +101,33 @@
    <!-- ✅ Un seul JS forum -->
   <script type="module" src="./blog.js?v=11"></script>
   <script src="./pwa.js"></script>
+
+<script>
+  // DEBUG: montre l'élément qui reçoit le tap (si un overlay bouffe les clics)
+  (function(){
+    function pick(e){
+      const x = (e.touches && e.touches[0]) ? e.touches[0].clientX : e.clientX;
+      const y = (e.touches && e.touches[0]) ? e.touches[0].clientY : e.clientY;
+      const el = document.elementFromPoint(x, y);
+      if (!el) return;
+
+      // outline visible
+      el.__oldOutline = el.style.outline;
+      el.style.outline = "3px solid red";
+
+      console.log("TAP ->", el, "id=", el.id, "class=", el.className);
+
+      // retire l'outline après 700ms
+      setTimeout(()=>{ try{ el.style.outline = el.__oldOutline || ""; }catch(_){} }, 700);
+    }
+
+    document.addEventListener("touchstart", pick, true);
+    document.addEventListener("pointerdown", pick, true);
+    document.addEventListener("click", pick, true);
+  })();
+</script>
+  
 </body>
 </html>
+
+
