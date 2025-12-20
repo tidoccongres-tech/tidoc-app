@@ -341,7 +341,16 @@ document.addEventListener("DOMContentLoaded", () => {
     showForm(false);
   });
 
-  submitBtn?.addEventListener("click", () => createPost());
+  submitBtn?.addEventListener("pointerup", (e) => {
+  e.preventDefault();
+  e.stopPropagation();
+  createPost();
+});
+submitBtn?.addEventListener("click", (e) => {
+  e.preventDefault();
+  e.stopPropagation();
+  createPost();
+});
 
   onAuthStateChanged(auth, () => loadPosts());
   loadPosts();
