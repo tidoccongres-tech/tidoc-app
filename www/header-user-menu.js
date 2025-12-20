@@ -294,4 +294,10 @@ async function applyHeaderUser(user){
       initial.style.display = "none";
     }
   });
+    // ✅ Quand auth.js met à jour window.TIDOC_AUTH, on refresh le header (pseudo + couronne + avatar)
+  window.addEventListener("tidoc:auth", async (e) => {
+    const user = auth.currentUser;
+    if (!user) return;
+    await applyHeaderUser(user);
+  });
 })();
