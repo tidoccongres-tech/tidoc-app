@@ -1043,3 +1043,34 @@ main, .page, .card{
 .notif-menu{position:absolute;top:58px;right:12px;background:#fff;border-radius:12px;z-index:10000;
  box-shadow:0 10px 30px rgba(0,0,0,.15);overflow:hidden;min-width:220px}
 .notif-empty{padding:12px 14px;font-size:13px;opacity:.7}
+
+/* badge rouge sur la cloche */
+.notif-wrap{position:relative;display:inline-flex}
+.notif-dot{
+  position:absolute;
+  top:6px; right:6px;
+  width:10px; height:10px;
+  border-radius:50%;
+  background:#ff3b30;            /* rouge iPhone */
+  border:2px solid #178CA8;      /* bord bleu topbar */
+  display:none;
+}
+.notif-dot.on{display:block}
+
+/* push-up (toast) */
+.notif-toast{
+  position:fixed;
+  top:10px; left:50%;
+  transform:translateX(-50%);
+  width:min(420px,92vw);
+  background:#fff;
+  border:1px solid rgba(0,0,0,.08);
+  border-radius:14px;
+  box-shadow:0 10px 30px rgba(0,0,0,.18);
+  padding:12px 14px;
+  z-index:20000;
+  display:none;
+}
+.notif-toast.on{display:block}
+.notif-toast-title{font-weight:900;font-size:13px;margin:0 0 2px}
+.notif-toast-text{font-size:13px;opacity:.8;margin:0}
