@@ -185,7 +185,13 @@ async function extractPdfText(pdf, pageNumber) {
 async function scanPdf(file) {
   if (!window.pdfjsLib) throw new Error("PDF.js non chargé.");
   const buf = await file.arrayBuffer();
-  const pdf = await window.pdfjsLib.getDocument({ data: buf }).promise;
+  let pdf;
+try {
+  pdf = await window.pdfjsLib.getDocument({ data: buf }).promise;
+} catch (e) {
+  // ✅ fallback iOS/Safari si le worker CDN est bloqué
+  pdf = await window.pdfjsLib.getDocument({ data: buf, disableWorker: true }).promise;
+}
 
   // on tente 1-2 pages
   const pagesToTry = Math.min(2, pdf.numPages);
