@@ -161,6 +161,13 @@ export function requireAuthOrRedirect(redirectTo = "./login.html") {
   });
 }
 
+export async function loginEmail({ email, password } = {}) {
+  if (!email || !password) throw new Error("Email + mot de passe requis.");
+  const cred = await signInWithEmailAndPassword(auth, email, password);
+  await ensureUserDoc(cred.user);
+  return cred.user;
+}
+
 export function normalizeUsername(name = "") {
   return name
     .trim()
