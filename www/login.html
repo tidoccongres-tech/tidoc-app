@@ -206,32 +206,52 @@
   });
 
   // ===== SIGNUP =====
-  btnSignup.onclick = async () => {
-    try {
-      msg.textContent = "Création du compte…";
+btnSignup.onclick = async () => {
+  try {
+    msg.textContent = "";
 
-      // 1) check pseudo avant création
-      const { ok } = await checkUsernameLive();
-      if (!ok) return;
+    const displayName = suName.value.trim();
+    const email = document.getElementById("suEmail").value.trim();
+    const password = document.getElementById("suPass").value;
 
-      // 2) créer compte
-      const rawName = suName.value.trim();
-      const displayName = rawName || "Utilisateur";
-      const email = document.getElementById("suEmail").value.trim();
-      const password = document.getElementById("suPass").value;
-
-      await signupEmail({ email, password, displayName });
-
-      // 3) cache local (pour header)
-      localStorage.setItem(LS_NAME, displayName);
-      window.dispatchEvent(new CustomEvent("tidoc:auth"));
-
-      window.location.href = "./index.html";
-    } catch (e) {
-      msg.textContent = "Erreur: " + (e?.message || e);
+    // 🔒 champs obligatoires
+    if (!displayName || !email || !password) {
+      msg.textContent = "❌ Remplis pseudo, email et mot de passe.";
+      return;
     }
-  };
 
+    // 📧 email valide
+    const emailOk = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+    if (!emailOk) {
+      msg.textContent = "❌ Adresse email invalide.";
+      return;
+    }
+
+    // 🔐 mdp mini
+    if (password.length < 6) {
+      msg.textContent = "❌ Mot de passe trop court (min 6 caractères).";
+      return;
+    }
+
+    msg.textContent = "Création du compte…";
+
+    // 🔎 vérifie pseudo unique
+    const { ok } = await checkUsernameLive();
+    if (!ok) return;
+
+    // ✅ création Firebase
+    await signupEmail({ email, password, displayName });
+
+    // cache pour le header
+    localStorage.setItem(LS_NAME, displayName);
+    window.dispatchEvent(new CustomEvent("tidoc:auth"));
+
+    window.location.href = "./index.html";
+  } catch (e) {
+    msg.textContent = "Erreur: " + (e?.message || e);
+  }
+};
+  
   // ===== LOGIN =====
   document.getElementById("btnLogin").onclick = async () => {
     try {
