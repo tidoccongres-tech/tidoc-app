@@ -164,8 +164,15 @@ function buildProfile(left){
   left.appendChild(wrap);
 }
 function buildBell(right){
-  right.querySelector("#tidocNotifWrap")?.remove();
 
+  // ❌ NE PAS afficher la cloche sur la page notifications
+  if (location.pathname.endsWith("notifications.html")) {
+    right.querySelector("#tidocNotifWrap")?.remove();
+    return;
+  }
+
+  right.querySelector("#tidocNotifWrap")?.remove();
+  
   const wrap = document.createElement("div");
   wrap.id = "tidocNotifWrap";
   wrap.style.position = "relative";
