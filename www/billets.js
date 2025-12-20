@@ -1,369 +1,283 @@
-// billets.js — récupération billet HelloAsso (Netlify Function)
+// billets.js (MODULE) — Upload PDF/Image -> decode QR + extract pack -> display
+import { requireAuthOrRedirect } from "./auth.js";
+requireAuthOrRedirect("./login.html");
 
-import { firebaseConfig } from "./firebase-config.js";
-import { initializeApp, getApps, getApp } from
-  "https://www.gstatic.com/firebasejs/10.12.4/firebase-app.js";
+// ====== CDN libs (ESM) ======
+// QR decoder (image/canvas)
+import { BrowserQRCodeReader } from "https://esm.run/@zxing/browser@0.1.5";
 
-import {
-  getFirestore,
-  doc,
-  setDoc,
-  getDoc
-} from "https://www.gstatic.com/firebasejs/10.12.4/firebase-firestore.js";
+// PDF reader (text + render to canvas)
+import * as pdfjsLib from "https://esm.run/pdfjs-dist@4.4.168";
+pdfjsLib.GlobalWorkerOptions.workerSrc =
+  "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.4.168/pdf.worker.min.js";
 
-import {
-  getAuth,
-  onAuthStateChanged
-} from "https://www.gstatic.com/firebasejs/10.12.4/firebase-auth.js";
+// ===== UI =====
+const uploadBtn = document.getElementById("uploadTicketBtn");
+const fileInput = document.getElementById("ticketFileInput");
+const ticketStatus = document.getElementById("ticketStatus");
+const ticketBox = document.getElementById("ticketBox");
 
-/* ================= INIT ================= */
+// ===== LocalStorage =====
+const LS_KEY = "tidoc_ticket_v1";
 
-const app = getApps().length ? getApp() : initializeApp(firebaseConfig);
-const db = getFirestore(app);
-const auth = getAuth(app);
+// ===== Pack rules (à ajuster à TES packs réels) =====
+// Si tu connais exactement les quotas par pack : mets-les ici.
+const PACKS = [
+  { name: "Essentiel", conferencesAllowed: 0, workshopsAllowed: 0 },
+  { name: "Standard",  conferencesAllowed: 999, workshopsAllowed: 1 },
+  { name: "Premium",   conferencesAllowed: 999, workshopsAllowed: 999 },
+];
 
-/* ================= UI ================= */
-
-const syncTicketBtn = document.getElementById("syncTicketBtn");
-const ticketStatus  = document.getElementById("ticketStatus");
-const ticketBox     = document.getElementById("ticketBox");
-
-/* ================= HELPERS ================= */
-
+// Helpers
 function show(msg = "") {
   if (ticketStatus) ticketStatus.textContent = msg;
 }
 
-function renderTicket(ticket) {
+function findPackInText(text) {
+  const t = (text || "").toLowerCase();
+
+  // cherche les mots des packs
+  for (const p of PACKS) {
+    if (t.includes(p.name.toLowerCase())) return p.name;
+  }
+
+  // fallback heuristique (si HelloAsso écrit autrement)
+  if (t.includes("premium")) return "Premium";
+  if (t.includes("standard")) return "Standard";
+  if (t.includes("essentiel") || t.includes("essentielle")) return "Essentiel";
+
+  return "";
+}
+
+function packInfo(packName) {
+  const p = PACKS.find(x => x.name.toLowerCase() === (packName || "").toLowerCase());
+  if (!p) return { conferencesAllowed: 0, workshopsAllowed: 0 };
+  return {
+    conferencesAllowed: p.conferencesAllowed,
+    workshopsAllowed: p.workshopsAllowed
+  };
+}
+
+function renderTicket(data) {
   if (!ticketBox) return;
 
-  if (!ticket) {
-    ticketBox.textContent = "Aucun billet détecté.";
-    return;
-  }
-
-  ticketBox.innerHTML = `
-    <div style="display:flex;flex-direction:column;gap:6px;">
-      <div><b>Pack :</b> ${ticket.ticketType}</div>
-      <div><b>Conférences :</b> ${ticket.conferencesAllowed}</div>
-      <div><b>Workshops :</b> ${ticket.workshopsAllowed}</div>
-      ${ticket.helloassoOrderId
-        ? `<div style="font-size:12px;opacity:.7;">Commande : ${ticket.helloassoOrderId}</div>`
-        : ""}
-    </div>
-  `;
-}
-
-/* ================= FIRESTORE ================= */
-
-async function loadExistingTicket() {
-  const user = auth.currentUser;
-  if (!user) return;
-
-  const snap = await getDoc(doc(db, "userTickets", user.uid));
-  if (snap.exists()) {
-    const data = snap.data();
-    show(`✅ Pack détecté : ${data.ticketType}`);
-    renderTicket(data);
-  } else {
-    show("Aucun billet pour l’instant.");
-    renderTicket(null);
-  }
-}
-
-/* ================= SYNC HELLOASSO ================= */
-
-async function syncTicket() {
-  const user = auth.currentUser;
-  if (!user) {
-    alert("Tu dois être connectée.");
-    return;
-  }
-
-  syncTicketBtn.disabled = true;
-  show("⏳ Vérification de ton billet…");
-
-  try {
-    const res = await fetch(
-      "/.netlify/functions/helloasso-ticket",
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          email: user.email.toLowerCase(),
-          uid: user.uid
-        })
-      }
-    );
-
-    if (!res.ok) {
-      const txt = await res.text();
-      throw new Error(`${res.status} — ${txt}`);
-    }
-
-    const data = await res.json();
-
-    if (!data.ticketType) {
-      show("❌ Aucun billet trouvé pour cet email.");
-      renderTicket(null);
-      return;
-    }
-
-    const payload = {
-      ticketType: data.ticketType,
-      workshopsAllowed: Number(data.workshopsAllowed ?? 0),
-      conferencesAllowed: Number(data.conferencesAllowed ?? 0),
-      helloassoOrderId: data.helloassoOrderId || "",
-      helloassoPayerEmail: data.email || user.email,
-      updatedAt: Date.now()
-    };
-
-    await setDoc(
-      doc(db, "userTickets", user.uid),
-      payload,
-      { merge: true }
-    );
-
-    show(`✅ Pack détecté : ${payload.ticketType}`);
-    renderTicket(payload);
-
-  } catch (err) {
-    console.error("Billet error:", err);
-    show("❌ Impossible de récupérer le billet.");
-  } finally {
-    syncTicketBtn.disabled = false;
-  }
-}
-
-/* ================= EVENTS ================= */
-
-syncTicketBtn?.addEventListener("click", syncTicket);
-
-onAuthStateChanged(auth, () => {
-  loadExistingTicket();
-});// billets.js (MODULE) — robuste + debug Netlify Function
-import { firebaseConfig } from "./firebase-config.js";
-import { initializeApp, getApps, getApp } from "https://www.gstatic.com/firebasejs/10.12.4/firebase-app.js";
-
-import {
-  getFirestore,
-  doc,
-  setDoc,
-  getDoc
-} from "https://www.gstatic.com/firebasejs/10.12.4/firebase-firestore.js";
-
-import {
-  getAuth,
-  onAuthStateChanged
-} from "https://www.gstatic.com/firebasejs/10.12.4/firebase-auth.js";
-
-// ✅ évite double init
-const app = getApps().length ? getApp() : initializeApp(firebaseConfig);
-const db = getFirestore(app);
-const auth = getAuth(app);
-
-// UI
-const openHelloAssoBtn = document.getElementById("openHelloAssoBtn");
-const syncTicketBtn = document.getElementById("syncTicketBtn");
-const ticketStatus = document.getElementById("ticketStatus");
-const ticketBox = document.getElementById("ticketBox");
-
-// 🔗 lien HelloAsso (page billetterie)
-const HELLOASSO_PUBLIC_URL =
-  "https://www.helloasso.com/associations/ti-doc/evenements/ti-doc-2026";
-
-if (openHelloAssoBtn) {
-  openHelloAssoBtn.href = HELLOASSO_PUBLIC_URL;
-  openHelloAssoBtn.target = "_blank";
-  openHelloAssoBtn.rel = "noopener noreferrer";
-}
-
-// --- helpers UI
-function requireLogin(actionText = "faire cette action") {
-  if (!auth.currentUser) {
-    alert(
-      "Connexion requise 🔒\n\n" +
-      `Pour ${actionText}, connecte-toi d'abord.`
-    );
-    return false;
-  }
-  return true;
-}
-
-function show(msg) {
-  if (ticketStatus) ticketStatus.textContent = msg || "";
-}
-
-function renderTicketBox(t) {
-  if (!ticketBox) return;
-
-  if (!t) {
+  if (!data) {
     ticketBox.textContent = "Aucun billet pour l’instant.";
     return;
   }
 
+  const packName = data.packName || "Inconnu";
+  const { conferencesAllowed, workshopsAllowed } = packInfo(packName);
+
   ticketBox.innerHTML = `
-    <div style="display:flex; flex-direction:column; gap:8px;">
-      <div><b>Pack :</b> ${t.ticketType || "?"}</div>
-      <div><b>Conférences :</b> ${Number(t.conferencesAllowed ?? 0)}</div>
-      <div><b>Workshops :</b> ${Number(t.workshopsAllowed ?? 0)}</div>
-      ${t.helloassoOrderId ? `<div style="opacity:.7; font-size:12px;">Commande: ${t.helloassoOrderId}</div>` : ""}
-      ${t.helloassoPayerEmail ? `<div style="opacity:.7; font-size:12px;">Email: ${t.helloassoPayerEmail}</div>` : ""}
+    <div style="display:flex; flex-direction:column; gap:10px;">
+      <div style="display:flex; gap:14px; align-items:flex-start; flex-wrap:wrap;">
+        <div style="border:1px solid rgba(0,0,0,.08); border-radius:12px; padding:10px; background:#fff;">
+          <div style="font-weight:900; color:var(--tidoc); margin-bottom:8px;">QR Code</div>
+          <img src="${data.qrDataUrl || ""}" alt="QR" style="width:160px; height:160px; object-fit:contain; display:block;">
+        </div>
+
+        <div style="flex:1; min-width:180px;">
+          <div style="font-weight:900; color:var(--tidoc); font-size:16px; margin-bottom:6px;">
+            Pack : ${escapeHtml(packName)}
+          </div>
+
+          <div style="font-size:13px; color:var(--muted); font-weight:800;">
+            Conférences autorisées : ${Number(conferencesAllowed)}
+          </div>
+          <div style="font-size:13px; color:var(--muted); font-weight:800; margin-top:4px;">
+            Workshops autorisés : ${Number(workshopsAllowed)}
+          </div>
+
+          <div style="margin-top:10px; font-size:12px; opacity:.7; word-break:break-word;">
+            <b>QR contenu :</b> ${escapeHtml(data.qrText || "")}
+          </div>
+        </div>
+      </div>
     </div>
   `;
 }
 
-async function loadExistingTicket() {
-  const u = auth.currentUser;
-  if (!u) {
-    show("Connecte-toi pour afficher ton billet.");
-    renderTicketBox(null);
-    return;
-  }
+function escapeHtml(s = "") {
+  return String(s)
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#039;");
+}
 
+// ====== QR decode from Image ======
+async function decodeQrFromImageFile(file) {
+  const reader = new BrowserQRCodeReader();
+  const imgUrl = URL.createObjectURL(file);
+
+  const img = new Image();
+  img.crossOrigin = "anonymous";
+  img.src = imgUrl;
+
+  await new Promise((resolve, reject) => {
+    img.onload = resolve;
+    img.onerror = reject;
+  });
+
+  // canvas
+  const canvas = document.createElement("canvas");
+  canvas.width = img.naturalWidth || img.width;
+  canvas.height = img.naturalHeight || img.height;
+
+  const ctx = canvas.getContext("2d");
+  ctx.drawImage(img, 0, 0);
+
+  // QR
+  const result = await reader.decodeFromCanvas(canvas);
+  URL.revokeObjectURL(imgUrl);
+
+  // dataURL pour affichage
+  const qrDataUrl = canvasToQrPreview(canvas);
+
+  return { qrText: result?.getText?.() || "", qrDataUrl };
+}
+
+// petit helper : on ne veut pas afficher l’image entière, juste un carré lisible
+function canvasToQrPreview(canvas) {
   try {
-    const ref = doc(db, "userTickets", u.uid);
-    const snap = await getDoc(ref);
-
-    if (snap.exists()) {
-      const t = snap.data();
-      show(`✅ Pack détecté : ${t.ticketType || "?"}`);
-      renderTicketBox(t);
-    } else {
-      show("Aucun billet détecté pour l’instant.");
-      renderTicketBox(null);
-    }
-  } catch (e) {
-    console.log("loadExistingTicket error:", e);
-    show("❌ Erreur Firestore (voir console).");
-    renderTicketBox(null);
+    // On exporte l’image entière : souvent ok car billet capture contient QR bien visible.
+    // Si tu veux, on pourra recadrer plus tard.
+    return canvas.toDataURL("image/png");
+  } catch {
+    return "";
   }
 }
 
-// --- fetch robuste : essaye plusieurs endpoints + gère HTML/JSON
-async function postJsonWithFallback(urls, bodyObj) {
-  let lastError = null;
+// ====== PDF: extract text + render pages to canvas to find QR ======
+async function pdfToText(pdf) {
+  let full = "";
+  const maxPages = Math.min(pdf.numPages, 2); // souvent le billet est page 1
+  for (let i = 1; i <= maxPages; i++) {
+    const page = await pdf.getPage(i);
+    const content = await page.getTextContent();
+    const strings = content.items.map(it => it.str).filter(Boolean);
+    full += "\n" + strings.join(" ");
+  }
+  return full;
+}
 
-  for (const url of urls) {
+async function renderPdfPageToCanvas(pdf, pageNumber, scale = 2) {
+  const page = await pdf.getPage(pageNumber);
+  const viewport = page.getViewport({ scale });
+
+  const canvas = document.createElement("canvas");
+  const ctx = canvas.getContext("2d");
+
+  canvas.width = Math.floor(viewport.width);
+  canvas.height = Math.floor(viewport.height);
+
+  await page.render({ canvasContext: ctx, viewport }).promise;
+  return canvas;
+}
+
+async function decodeQrFromPdfFile(file) {
+  const reader = new BrowserQRCodeReader();
+  const buf = await file.arrayBuffer();
+  const pdf = await pdfjsLib.getDocument({ data: buf }).promise;
+
+  // 1) texte -> pack
+  const text = await pdfToText(pdf);
+  const packName = findPackInText(text);
+
+  // 2) QR -> on rend les 2 premières pages et on tente un decode
+  let qrText = "";
+  let qrDataUrl = "";
+
+  const pagesToTry = Math.min(pdf.numPages, 2);
+
+  for (let p = 1; p <= pagesToTry; p++) {
+    const canvas = await renderPdfPageToCanvas(pdf, p, 2);
     try {
-      const res = await fetch(url, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(bodyObj),
-      });
+      const res = await reader.decodeFromCanvas(canvas);
+      qrText = res?.getText?.() || "";
+      qrDataUrl = canvas.toDataURL("image/png");
+      break;
+    } catch {
+      // pas de QR détecté sur cette page -> continue
+    }
+  }
 
-      const contentType = (res.headers.get("content-type") || "").toLowerCase();
-      const raw = await res.text().catch(() => "");
+  return { qrText, qrDataUrl, packName };
+}
 
-      if (!res.ok) {
-        lastError = {
-          url,
-          status: res.status,
-          text: raw.slice(0, 300),
-          contentType
-        };
-        continue;
-      }
+// ====== Main handler ======
+async function handleFile(file) {
+  if (!file) return;
 
-      // si JSON → parse
-      if (contentType.includes("application/json")) {
-        const data = JSON.parse(raw || "{}");
-        return { ok: true, url, data };
-      }
+  show("Analyse du billet…");
 
-      // sinon on tente quand même un parse JSON
-      try {
-        const data = JSON.parse(raw);
-        return { ok: true, url, data };
-      } catch {
-        lastError = {
-          url,
-          status: res.status,
-          text: "Réponse non JSON (ex: HTML): " + raw.slice(0, 300),
-          contentType
-        };
-        continue;
-      }
+  const type = (file.type || "").toLowerCase();
 
+  // IMAGE
+  if (type.startsWith("image/")) {
+    try {
+      const { qrText, qrDataUrl } = await decodeQrFromImageFile(file);
+
+      // pack inconnu sur image (sans OCR), on laisse vide
+      const data = { qrText, qrDataUrl, packName: "" };
+
+      localStorage.setItem(LS_KEY, JSON.stringify(data));
+      renderTicket(data);
+
+      show(qrText ? "✅ Billet analysé." : "⚠️ QR non détecté (essaie une capture plus nette).");
+      return;
     } catch (e) {
-      lastError = {
-        url,
-        status: "NETWORK",
-        text: String(e?.message || e),
-        contentType: ""
-      };
+      console.log(e);
+      show("❌ Impossible de lire le QR sur l’image. Essaie une capture plus nette.");
+      return;
     }
   }
 
-  return { ok: false, error: lastError };
+  // PDF
+  if (type === "application/pdf" || file.name.toLowerCase().endsWith(".pdf")) {
+    try {
+      const { qrText, qrDataUrl, packName } = await decodeQrFromPdfFile(file);
+
+      const data = { qrText, qrDataUrl, packName };
+
+      localStorage.setItem(LS_KEY, JSON.stringify(data));
+      renderTicket(data);
+
+      if (!qrText) show("⚠️ PDF lu mais QR non détecté. Essaie une capture image du QR.");
+      else if (!packName) show("✅ QR détecté. ⚠️ Pack non trouvé dans le PDF (on peut améliorer la détection).");
+      else show("✅ Billet analysé (QR + pack).");
+      return;
+    } catch (e) {
+      console.log(e);
+      show("❌ Impossible de lire le PDF. Essaie une capture d’écran (image) du billet.");
+      return;
+    }
+  }
+
+  show("❌ Format non supporté. Choisis un PDF ou une image.");
 }
 
-async function syncTicket() {
-  if (!requireLogin("récupérer ton billet")) return;
-
-  const u = auth.currentUser;
-
-  if (syncTicketBtn) syncTicketBtn.disabled = true;
-  show("⏳ Vérification de ton billet…");
-
+// ====== Boot ======
+function loadSaved() {
   try {
-    // ✅ Routes à tester :
-    // 1) Netlify functions direct
-    // 2) /api/... seulement si tu as mis la redirection dans netlify.toml
-    const endpoints = [
-      "/.netlify/functions/helloasso-ticket",
-      "/api/helloasso-ticket"
-    ];
-
-    const { ok, data, url, error } = await postJsonWithFallback(endpoints, {
-      email: (u.email || "").toLowerCase(),
-      uid: u.uid
-    });
-
-    if (!ok) {
-      console.log("helloasso-ticket error:", error);
-      show(
-        `❌ Impossible de récupérer le billet.\n` +
-        `(${error?.status || "?"}) sur ${error?.url || "?"}\n` +
-        `${(error?.text || "").slice(0, 180)}`
-      );
-      renderTicketBox(null);
-      return;
-    }
-
-    console.log("helloasso-ticket OK from:", url, data);
-
-    if (!data?.ticketType) {
-      show("❌ Aucun billet trouvé pour cet email sur HelloAsso.");
-      renderTicketBox(null);
-      return;
-    }
-
-    const payload = {
-      ticketType: data.ticketType || "",
-      workshopsAllowed: Number(data.workshopsAllowed ?? 0),
-      conferencesAllowed: Number(data.conferencesAllowed ?? 0),
-      helloassoOrderId: data.helloassoOrderId || "",
-      helloassoPayerEmail: (data.email || u.email || "").toLowerCase(),
-      updatedAt: Date.now()
-    };
-
-    await setDoc(doc(db, "userTickets", u.uid), payload, { merge: true });
-
-    show(`✅ Pack détecté : ${payload.ticketType}`);
-    renderTicketBox(payload);
-
-  } catch (e) {
-    console.log("syncTicket error:", e);
-    show("❌ Erreur réseau/JS (voir console).");
-  } finally {
-    if (syncTicketBtn) syncTicketBtn.disabled = false;
+    const raw = localStorage.getItem(LS_KEY);
+    if (!raw) return renderTicket(null);
+    const data = JSON.parse(raw);
+    renderTicket(data);
+  } catch {
+    renderTicket(null);
   }
 }
 
-syncTicketBtn?.addEventListener("click", syncTicket);
+uploadBtn?.addEventListener("click", () => fileInput?.click());
 
-// ✅ écoute auth
-onAuthStateChanged(auth, () => {
-  loadExistingTicket();
+fileInput?.addEventListener("change", async (e) => {
+  const file = e.target.files?.[0];
+  // reset pour pouvoir re-uploader le même fichier
+  e.target.value = "";
+  await handleFile(file);
 });
+
+loadSaved();
