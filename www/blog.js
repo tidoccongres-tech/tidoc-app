@@ -266,18 +266,23 @@ function renderPostCard(postId, p) {
   const card = document.createElement("section");
   card.className = "card post-card";
 
+  const author = escapeHTML(bestAuthorName(p));
+  const isAdmin = isAdminEmail(p.authorEmail);
+
   card.innerHTML = `
     <div class="post-head">
       <div>
         <div class="post-title">${escapeHTML(p.title || "")}</div>
-        <div class="post-sub" style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
-  <span style="display:inline-flex;align-items:center;color:inherit;">
-    ${escapeHTML(bestAuthorName(p))}
-    ${isAdminEmail(p.authorEmail) ? CROWN_GRAY_SVG : ""}
-  </span>
-  <span>•</span>
-  <span>${fmtDate(p.createdAt)}</span>
-</div>
+
+        <div class="post-sub">
+          <span class="post-author">
+            ${author}
+            ${isAdmin ? `<span class="crown-inline">${CROWN_GRAY_SVG}</span>` : ""}
+          </span>
+          • ${fmtDate(p.createdAt)}
+        </div>
+      </div>
+
       ${delOk ? `<button class="delete-btn" type="button" data-del="${postId}">Supprimer</button>` : ""}
     </div>
 
@@ -304,12 +309,10 @@ function renderPostCard(postId, p) {
     </div>
   `;
 
-  // delete
   if (delOk) {
     card.querySelector(`[data-del="${postId}"]`)?.addEventListener("click", () => deletePost(postId));
   }
 
-  // like
   card.querySelector(`[data-like="${postId}"]`)?.addEventListener("click", () => toggleLike(postId));
 
   (async () => {
@@ -322,7 +325,6 @@ function renderPostCard(postId, p) {
     if (btn) btn.classList.toggle("liked", liked);
   })();
 
-  // comments toggle
   const wrap = card.querySelector(`[data-commentswrap="${postId}"]`);
   const list = card.querySelector(`[data-commentslist="${postId}"]`);
   const toggleBtn = card.querySelector(`[data-togglecomments="${postId}"]`);
@@ -333,7 +335,6 @@ function renderPostCard(postId, p) {
     if (!open) await loadComments(postId, p, list);
   });
 
-  // add comment listeners
   const uid = currentUserId();
   const input = card.querySelector(`[data-cinput="${postId}"]`);
   const sendBtn = card.querySelector(`[data-csend="${postId}"]`);
