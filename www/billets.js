@@ -1,4 +1,4 @@
-// billets.js (MODULE) — Upload PDF/Photo → Scan QR → Lock QR → Save userTickets → Display
+// billets.js (MODULE) — Upload PDF/Photo → Scan QR → OCR (Nom/Pack/N°) → Lock QR → Save userTickets → Display
 import { firebaseConfig } from "./firebase-config.js";
 import { initializeApp, getApps, getApp } from "https://www.gstatic.com/firebasejs/10.12.4/firebase-app.js";
 import {
@@ -40,18 +40,8 @@ function escapeHTML(s = "") {
     .replaceAll("'", "&#039;");
 }
 
-// Pack détecté uniquement si le QR le contient vraiment
-function detectPackFromText(qrText = "") {
-  const t = (qrText || "").toLowerCase();
-  if (t.includes("essentiel")) return "essentiel";
-  if (t.includes("standard"))  return "standard";
-  if (t.includes("premium"))   return "premium";
-  return "";
-}
-
-// Meta (nom / numéro) : pas dispo sans OCR / API → on laisse vide pour l’instant
-function extractTicketMeta(qrText = "") {
-  return { holderName: "", ticketNumber: "" };
+function normalizeSpaces(s="") {
+  return String(s).replace(/\s+/g, " ").trim();
 }
 
 // ---------- QR scan (jsQR) ----------
@@ -76,7 +66,7 @@ async function loadImageToCanvas(fileOrBlob) {
     const canvas = document.createElement("canvas");
     const ctx = canvas.getContext("2d");
 
-    const maxW = 1400; // perf iPad
+    const maxW = 1600; // perf iPad
     const scale = Math.min(1, maxW / img.width);
     canvas.width = Math.floor(img.width * scale);
     canvas.height = Math.floor(img.height * scale);
@@ -88,8 +78,8 @@ async function loadImageToCanvas(fileOrBlob) {
   }
 }
 
-// ---------- PDF scan (pdf.js) ----------
-async function renderPdfPageToCanvas(pdf, pageNumber, scale = 1.6) {
+// ---------- PDF (pdf.js) ----------
+async function renderPdfPageToCanvas(pdf, pageNumber, scale = 1.7) {
   const page = await pdf.getPage(pageNumber);
   const viewport = page.getViewport({ scale });
 
@@ -103,31 +93,59 @@ async function renderPdfPageToCanvas(pdf, pageNumber, scale = 1.6) {
   return canvas;
 }
 
-async function scanPdfForQR(file) {
+async function loadPdf(file) {
   if (!window.pdfjsLib) throw new Error("PDF.js non chargé.");
-  if (!window.jsQR) throw new Error("jsQR non chargé.");
-
   const buf = await file.arrayBuffer();
-
-  let pdf;
   try {
-    pdf = await window.pdfjsLib.getDocument({ data: buf }).promise;
+    return await window.pdfjsLib.getDocument({ data: buf }).promise;
   } catch {
-    pdf = await window.pdfjsLib.getDocument({ data: buf, disableWorker: true }).promise;
+    return await window.pdfjsLib.getDocument({ data: buf, disableWorker: true }).promise;
+  }
+}
+
+// ---------- OCR (Tesseract) ----------
+async function ocrCanvas(canvas) {
+  if (!window.Tesseract) throw new Error("Tesseract.js non chargé.");
+  const { data } = await window.Tesseract.recognize(canvas, "fra", { logger: () => {} });
+  return data?.text || "";
+}
+
+function parseFromOcr(ocrTextRaw = "") {
+  const raw = String(ocrTextRaw || "");
+  const text = normalizeSpaces(raw);
+
+  // Pack: "Pack Essentiel"
+  let packKey = "";
+  const mp = text.match(/pack\s*(essentiel|standard|premium)/i);
+  if (mp) {
+    const v = mp[1].toLowerCase();
+    if (v.startsWith("ess")) packKey = "essentiel";
+    else if (v.startsWith("sta")) packKey = "standard";
+    else if (v.startsWith("pre")) packKey = "premium";
   }
 
-  const pagesToTry = Math.min(2, pdf.numPages);
+  // N° billet: "N° de billet : 163160874"
+  let ticketNumber = "";
+  const mn = text.match(/n[°o]\s*de\s*billet\s*[:\-]?\s*([0-9]{5,})/i);
+  if (mn) ticketNumber = mn[1];
 
-  for (let i = 1; i <= pagesToTry; i++) {
-    let canvas = await renderPdfPageToCanvas(pdf, i, 1.6);
-    let qr = scanCanvasForQR(canvas);
-    if (qr) return qr;
-
-    canvas = await renderPdfPageToCanvas(pdf, i, 2.2);
-    qr = scanCanvasForQR(canvas);
-    if (qr) return qr;
+  // Nom: souvent la ligne AVANT "Pack ..."
+  // Exemple: "Aurore bouquet Pack Essentiel"
+  let holderName = "";
+  if (mp) {
+    const idx = text.toLowerCase().indexOf(mp[0].toLowerCase());
+    if (idx > 2) {
+      const before = normalizeSpaces(text.slice(0, idx));
+      const parts = before.split(" ");
+      // on récupère les 2-4 derniers mots avant "Pack" (nom prénom)
+      const cand = parts.slice(-4).join(" ").trim();
+      if (cand && !cand.toLowerCase().includes("ti'doc") && !cand.toLowerCase().includes("helloasso")) {
+        holderName = cand;
+      }
+    }
   }
-  return "";
+
+  return { packKey, ticketNumber, holderName, ocrText: raw };
 }
 
 // ---------- SHA256 ----------
@@ -178,8 +196,7 @@ async function saveTicketToFirestore({ qrText, packKey, holderName, ticketNumber
   const payload = {
     qrText,
     qrHash,
-    // packKey: uniquement si détecté dans le QR (sinon "")
-    packKey: packKey || "",
+    packKey,                       // ✅ obligatoire (anti-triche côté UI)
     holderName: holderName || "",
     ticketNumber: ticketNumber || "",
     updatedAt: serverTimestamp()
@@ -192,7 +209,7 @@ async function saveTicketToFirestore({ qrText, packKey, holderName, ticketNumber
 function renderResult({ qrText, packKey, holderName, ticketNumber } = {}) {
   const pack = packKey ? PACKS[packKey] : null;
 
-  const packLabel = pack ? pack.label : "Non vérifié";
+  const packLabel = pack ? pack.label : "—";
   const conf = pack ? pack.conferencesAllowed : "—";
   const ws   = pack ? pack.workshopsAllowed : "—";
 
@@ -210,7 +227,7 @@ function renderResult({ qrText, packKey, holderName, ticketNumber } = {}) {
 
       <div style="border:1px solid var(--line); border-radius:14px; padding:12px;">
         <div><b>Nom :</b> ${escapeHTML(holderName || "—")}</div>
-        <div><b>N° billet :</b> ${escapeHTML(ticketNumber || "—")}</div>
+        <div><b>N° de billet :</b> ${escapeHTML(ticketNumber || "—")}</div>
         <div style="margin-top:8px;"><b>Pack :</b> ${escapeHTML(packLabel)}</div>
         <div><b>Conférences :</b> ${escapeHTML(String(conf))}</div>
         <div><b>Workshops :</b> ${escapeHTML(String(ws))}</div>
@@ -218,14 +235,13 @@ function renderResult({ qrText, packKey, holderName, ticketNumber } = {}) {
     </div>
   `;
 
-  // ✅ Génère un vrai QR (qrcodejs)
   const qrHost = boxEl.querySelector("#qrRender");
   if (qrHost && window.QRCode && qrText) {
     qrHost.innerHTML = "";
     new window.QRCode(qrHost, { text: qrText, width: 220, height: 220 });
   } else if (qrHost) {
     qrHost.innerHTML = `<div style="opacity:.7;font-size:12px;text-align:center;padding:20px;">
-      QRCodeJS non chargé (ajoute la lib qrcodejs).
+      QRCodeJS non chargé (ajoute qrcodejs).
     </div>`;
   }
 }
@@ -238,7 +254,6 @@ async function handleFile(file) {
     setStatus("🔒 Connecte-toi d’abord.");
     return;
   }
-
   if (!window.jsQR) {
     setStatus("❌ Scanner QR non chargé (jsQR).");
     return;
@@ -251,34 +266,43 @@ async function handleFile(file) {
 
   try {
     let qrText = "";
+    let canvasForOcr = null;
 
     if (type.includes("pdf")) {
-      qrText = await scanPdfForQR(file);
+      const pdf = await loadPdf(file);
+      // page 1 suffit sur HelloAsso
+      const canvas = await renderPdfPageToCanvas(pdf, 1, 1.7);
+      qrText = scanCanvasForQR(canvas);
+      canvasForOcr = canvas;
+
     } else if (type.startsWith("image/")) {
       const canvas = await loadImageToCanvas(file);
       qrText = scanCanvasForQR(canvas);
+      canvasForOcr = canvas;
+
     } else {
       throw new Error("Format non supporté. Choisis un PDF ou une photo.");
     }
 
-    if (!qrText) {
-      throw new Error("QR introuvable. Essaie une photo plus nette / zoomée sur le QR.");
-    }
+    if (!qrText) throw new Error("QR introuvable. Zoome sur le QR / photo plus nette.");
 
     // lock QR
     setStatus("⏳ Vérification du billet…");
     await claimQrOrThrow(qrText);
 
-    // pack seulement si inclus dans le QR
-    const packKey = detectPackFromText(qrText);
+    // OCR
+    setStatus("⏳ Lecture des infos (nom, pack, n°)…");
+    const ocrText = await ocrCanvas(canvasForOcr);
+    const { packKey, holderName, ticketNumber } = parseFromOcr(ocrText);
 
-    // meta placeholders (future OCR possible)
-    const { holderName, ticketNumber } = extractTicketMeta(qrText);
+    // ✅ pack obligatoire => pas de confirmation => pas de triche “simple”
+    if (!packKey) {
+      throw new Error("Pack illisible. Essaie le PDF (pas une capture floue) ou zoom sur la zone 'Pack'.");
+    }
 
-    // save
     await saveTicketToFirestore({ qrText, packKey, holderName, ticketNumber });
 
-    setStatus(packKey ? `✅ Billet enregistré (Pack: ${PACKS[packKey].label})` : "✅ Billet enregistré (Pack non vérifié)");
+    setStatus(`✅ Billet enregistré (${PACKS[packKey].label})`);
     renderResult({ qrText, packKey, holderName, ticketNumber });
 
   } catch (e) {
@@ -316,7 +340,6 @@ async function loadSavedTicket() {
 
 // UI events
 uploadBtn?.addEventListener("click", () => fileInput?.click());
-
 fileInput?.addEventListener("change", async () => {
   const file = fileInput.files?.[0];
   await handleFile(file);
