@@ -106,6 +106,10 @@ function canDeletePost(p) {
   return isAdminUser() || (p.authorUid && p.authorUid === uid);
 }
 
+function isAdminEmail(email = "") {
+  return email.toLowerCase() === "tidoc.congres@gmail.com";
+}
+
 // ===== LIKE SVG =====
 const HEART_SVG = `
 <svg viewBox="0 0 16 16" class="heart-icon" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
