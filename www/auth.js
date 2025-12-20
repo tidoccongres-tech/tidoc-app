@@ -57,12 +57,22 @@ export async function ensureUserDoc(user, { displayName, avatarUrl } = {}) {
   const snap = await getDoc(ref);
 
   // ✅ si doc existe : complète si manque avatarUrl / displayName
-  if (snap.exists()) {
+    if (snap.exists()) {
     const data = snap.data() || {};
-
     const patch = {};
+
+    // avatar: si manquant, ou si on fournit avatarUrl
     if (!data.avatarUrl) patch.avatarUrl = avatarUrl || pickRandomAvatar();
-    if (!data.displayName) patch.displayName = (displayName || user.displayName || "Utilisateur").trim();
+    else if (avatarUrl && avatarUrl !== data.avatarUrl) patch.avatarUrl = avatarUrl;
+
+    // displayName:
+    // - si manquant -> set
+    // - si on fournit displayName -> force update
+    // - sinon si auth.displayName existe et différent -> update (utile si tu changes le nom)
+    const wantedName = (displayName || user.displayName || "Utilisateur").trim();
+    if (!data.displayName) patch.displayName = wantedName;
+    else if (displayName && wantedName !== data.displayName) patch.displayName = wantedName;
+    else if (!displayName && user.displayName && user.displayName.trim() !== data.displayName) patch.displayName = user.displayName.trim();
 
     if (Object.keys(patch).length) {
       patch.updatedAt = serverTimestamp();
@@ -169,8 +179,14 @@ onAuthStateChanged(auth, async (user) => {
   window.dispatchEvent(new CustomEvent("tidoc:auth", { detail: base }));
 
   // ✅ complète avec Firestore (avatar/role/nom)
-  try {
+    try {
     const profile = await ensureUserDoc(user);
+
+    try {
+      if (profile?.displayName) localStorage.setItem("tidoc_name", profile.displayName);
+      if (profile?.avatarUrl) localStorage.setItem("tidoc_avatar", profile.avatarUrl);
+    } catch (_) {}
+
     window.TIDOC_AUTH = { ...base, profile };
     window.dispatchEvent(new CustomEvent("tidoc:auth", { detail: window.TIDOC_AUTH }));
   } catch (e) {
