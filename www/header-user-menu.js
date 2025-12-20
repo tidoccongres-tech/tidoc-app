@@ -78,9 +78,20 @@ function crownSVG(){
   `;
 }
 
+function openMenu(menu) {
+  menu.classList.add("open");
+}
+
+function closeMenu(menu) {
+  menu.classList.remove("open");
+}
+
 function buildProfile(left){
-  left.querySelector("#tidocProfileBtn")?.remove();
-  left.querySelector("#tidocProfileMenu")?.remove();
+  left.querySelector("#tidocProfileWrap")?.remove(); // ✅ wrap unique
+
+  const wrap = document.createElement("div");
+  wrap.id = "tidocProfileWrap";
+  wrap.className = "profile-wrap";
 
   const btn = document.createElement("button");
   btn.id = "tidocProfileBtn";
@@ -104,31 +115,54 @@ function buildProfile(left){
   const menu = document.createElement("div");
   menu.id = "tidocProfileMenu";
   menu.className = "profile-menu";
-  menu.style.display = "none";
   menu.innerHTML = `
     <button class="menu-item" type="button" data-act="settings">Paramètres</button>
     <button class="menu-item" type="button" data-act="logout">Se déconnecter</button>
   `;
 
+  // ✅ état initial : fermé (et non-cliquable)
+  closeMenu(menu);
+
+  // ✅ toggle
   btn.addEventListener("click", (e)=>{
     e.stopPropagation();
-    menu.style.display = (menu.style.display === "block") ? "none" : "block";
+    const isOpen = menu.classList.contains("open");
+    if (isOpen) closeMenu(menu);
+    else openMenu(menu);
   });
 
+  // ✅ évite que cliquer dans le menu ferme tout avant l’action
   menu.addEventListener("click", async (e)=>{
+    e.stopPropagation();
+
     const act = e.target?.getAttribute?.("data-act");
-    if (act === "settings") location.href = "./settings.html";
+    if (act === "settings") {
+      closeMenu(menu);
+      location.href = "./settings.html";
+      return;
+    }
     if (act === "logout"){
+      closeMenu(menu);
       try{ await logout(); }catch(_){}
       location.href = "./login.html";
+      return;
     }
   });
 
-  document.addEventListener("click", ()=> menu.style.display = "none");
+  // ✅ UN SEUL listener global (pas empilé)
+  if (!window.__TIDOC_MENU_BOUND__) {
+    window.__TIDOC_MENU_BOUND__ = true;
+    document.addEventListener("click", ()=>{
+      const m = document.getElementById("tidocProfileMenu");
+      if (m) closeMenu(m);
+    });
+  }
 
-  left.append(btn, menu);
+  // ✅ on ancre menu AU bouton (wrap)
+  wrap.appendChild(btn);
+  wrap.appendChild(menu);
+  left.appendChild(wrap);
 }
-
 function buildBell(right){
   right.querySelector("#tidocNotifBtn")?.remove();
 
