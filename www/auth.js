@@ -118,24 +118,29 @@ export async function getUserProfile(uid) {
 export async function signupEmail({ email, password, displayName } = {}) {
   if (!email || !password) throw new Error("Email + mot de passe requis.");
 
+  const name = (displayName || "").trim();
+  if (!name) throw new Error("Pseudo requis.");
+
   const cred = await createUserWithEmailAndPassword(auth, email, password);
 
-  const name = (displayName || "Utilisateur").trim();
-  await updateProfile(cred.user, { displayName: name });
+  // 1) Réserve le pseudo (unique)
+  const claimed = await claimUsername(cred.user, name);
 
-  // ✅ doc Firestore + avatar aléatoire
-  await ensureUserDoc(cred.user, { displayName: name, avatarUrl: pickRandomAvatar() });
+  // 2) Met à jour auth profile
+  await updateProfile(cred.user, { displayName: claimed.original });
 
-  return cred.user;
-}
+  // 3) Crée/maj doc user avec le displayName + usernameNormalized
+  await ensureUserDoc(cred.user, {
+    displayName: claimed.original,
+    avatarUrl: pickRandomAvatar()
+  });
 
-export async function loginEmail({ email, password } = {}) {
-  if (!email || !password) throw new Error("Email + mot de passe requis.");
-
-  const cred = await signInWithEmailAndPassword(auth, email, password);
-
-  // ✅ s’assure qu’on a un doc (et un avatar)
-  await ensureUserDoc(cred.user);
+  // 4) Stocke aussi le normalized dans users/{uid} (optionnel mais utile)
+  await setDoc(doc(db, "users", cred.user.uid), {
+    username: claimed.original,
+    usernameNormalized: claimed.normalized,
+    updatedAt: serverTimestamp()
+  }, { merge: true });
 
   return cred.user;
 }
@@ -154,6 +159,40 @@ export function requireAuthOrRedirect(redirectTo = "./login.html") {
   onAuthStateChanged(auth, (u) => {
     if (!u) window.location.href = redirectTo;
   });
+}
+
+export function normalizeUsername(name = "") {
+  return name
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, "")       // enlève espaces
+    .replace(/[^a-z0-9._-]/g, ""); // garde simple
+}
+
+export async function claimUsername(user, displayNameRaw) {
+  const original = (displayNameRaw || "").trim();
+  if (!original) throw new Error("Pseudo requis.");
+
+  const normalized = normalizeUsername(original);
+  if (!normalized || normalized.length < 3) {
+    throw new Error("Pseudo invalide (min 3 caractères, lettres/chiffres/._-).");
+  }
+
+  const ref = doc(db, "usernames", normalized);
+
+  await runTransaction(db, async (tx) => {
+    const snap = await tx.get(ref);
+    if (snap.exists()) {
+      throw new Error("Pseudo déjà pris 😕");
+    }
+    tx.set(ref, {
+      uid: user.uid,
+      original,
+      createdAt: serverTimestamp()
+    });
+  });
+
+  return { original, normalized };
 }
 
 // =====================
