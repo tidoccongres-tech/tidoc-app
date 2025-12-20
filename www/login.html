@@ -138,7 +138,8 @@
   try{
     msg.textContent = "Création du compte…";
 
-    const displayName = document.getElementById("suName").value.trim();
+    const rawName = document.getElementById("suName").value.trim();
+    const displayName = rawName || "Utilisateur";
     const email = document.getElementById("suEmail").value.trim();
     const password = document.getElementById("suPass").value;
 
