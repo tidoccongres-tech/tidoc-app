@@ -989,3 +989,17 @@ img, svg{
   font-size:14px;
   line-height:1;
 }
+
+/* DEBUG iPad: éviter qu’un overlay bloque les clics */
+.blog-topbar,
+.profile-menu,
+.page-top-actions{
+  pointer-events: none !important;
+}
+
+#syncTicketBtn,
+#openHelloAssoBtn{
+  pointer-events: auto !important;
+  position: relative;
+  z-index: 999999 !important;
+}
