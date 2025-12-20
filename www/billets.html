@@ -7,13 +7,12 @@
   <link rel="stylesheet" href="style.css?v=204">
 </head>
 
-<body>
+<script type="module">
+  import { requireAuthOrRedirect } from "./auth.js";
+  requireAuthOrRedirect("./login.html");
+</script>
 
-  <!-- ✅ Auth guard (dans le body = plus stable sur iPad) -->
-  <script type="module">
-    import { requireAuthOrRedirect } from "./auth.js";
-    requireAuthOrRedirect("./login.html");
-  </script>
+<body>
 
 <!-- Menu du bas -->
   <nav class="tabbar">
@@ -56,15 +55,14 @@
 </nav>
   
   <!-- Topbar -->
-  <script type="module" src="./header-user-menu.js?v=999"></script>
+  <script type="module" src="./header-user-menu.js"></script>
 
   <main class="page blog-page">
-
     <section class="card" id="ticketsCard">
       <h2 style="margin:0 0 6px; color:var(--tidoc);">Mon billet</h2>
 
       <p style="margin:0 0 12px; color:var(--muted); font-size:13px;">
-        Télécharge ton billet HelloAsso (PDF ou capture). L’app extrait le QR + le pack.
+        Importe ton billet (PDF HelloAsso ou capture). L’app extrait le QR + détecte le pack.
       </p>
 
       <a class="btn-outline"
@@ -94,23 +92,29 @@
     <section class="card" style="margin-top:12px;">
       <div id="ticketBox">Aucun billet importé pour l’instant.</div>
     </section>
-
   </main>
 
-  <!-- ✅ PDF.js (LEGACY = compatible Safari/iPad) -->
-  <script src="https://unpkg.com/pdfjs-dist@3.11.174/legacy/build/pdf.min.js"></script>
+  <!-- Tabbar (la tienne inchangée) -->
+  <!-- ... garde ton <nav class="tabbar"> ... </nav> -->
+
+  <!-- ✅ PDF.js -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.2.67/pdf.min.js"></script>
   <script>
-    window.pdfjsLib.GlobalWorkerOptions.workerSrc =
-      "https://unpkg.com/pdfjs-dist@3.11.174/legacy/build/pdf.worker.min.js";
+    if (window.pdfjsLib) {
+      pdfjsLib.GlobalWorkerOptions.workerSrc =
+        "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.2.67/pdf.worker.min.js";
+    }
   </script>
 
-  <!-- ✅ jsQR -->
+  <!-- ✅ Scanner QR -->
   <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
 
-  <!-- ✅ Ton script -->
-  <script src="./billets.js?v=204"></script>
+  <!-- ✅ OCR (pour lire “Pack Essentiel/Standard/Premium” sur une capture) -->
+  <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
 
-  <script src="pwa.js?v=2"></script>
+  <!-- Ton script -->
+  <script src="billets.js?v=204"></script>
 
+  <script src="pwa.js"></script>
 </body>
 </html>
