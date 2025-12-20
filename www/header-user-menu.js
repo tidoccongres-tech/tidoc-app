@@ -182,16 +182,13 @@ function buildBell(right){
 async function getPrettyName(user){
   if (!user) return "Utilisateur";
 
-  const cached = localStorage.getItem(LS_NAME);
-  if (cached) return cached;
-
-  // Firestore (si db dispo)
+  // ✅ 1) Firestore en priorité (source de vérité)
   if (db){
     try{
       const snap = await getDoc(doc(db, "users", user.uid));
       if (snap.exists()){
         const d = snap.data() || {};
-        const n = (d.username || d.name || d.displayName || "").trim();
+        const n = (d.displayName || d.username || d.name || "").trim();
         if (n){
           localStorage.setItem(LS_NAME, n);
           return n;
@@ -200,14 +197,21 @@ async function getPrettyName(user){
     }catch(_){}
   }
 
+  // ✅ 2) Cache localStorage
+  const cached = (localStorage.getItem(LS_NAME) || "").trim();
+  if (cached) return cached;
+
+  // ✅ 3) Firebase Auth displayName
   const dn = (user.displayName || "").trim();
-  if (dn){
+  if (dn) {
     localStorage.setItem(LS_NAME, dn);
     return dn;
   }
 
+  // ✅ 4) Fallback email
   const email = (user.email || "").trim();
   if (email.includes("@")) return email.split("@")[0];
+
   return "Utilisateur";
 }
 
