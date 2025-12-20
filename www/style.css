@@ -991,55 +991,57 @@ img, svg{
 }
 
 /* =========================
-   PATCH iPad clics (SAFE)
-   À coller TOUT EN BAS du style.css
+   HARD FIX iPad taps (BÉTON)
+   À COLLER TOUT EN BAS
    ========================= */
 
-/* 1) La topbar doit rester cliquable */
-.blog-topbar{
-  pointer-events: auto !important;
-  position: sticky;
-  top: 0;
-  z-index: 10000;
-}
-
-/* 2) Le bouton profil et la cloche doivent rester cliquables */
-.profile-btn,
-.icon-btn{
-  pointer-events: auto !important;
-}
-
-/* 3) Le menu profil ne doit JAMAIS bloquer quand il est fermé */
-.profile-menu{
-  display: none;
-  pointer-events: none;
-}
-
-/* 4) Quand il est ouvert, il redevient cliquable */
-.profile-menu.open,
-.profile-menu.show,
-.profile-menu[data-open="true"]{
-  display: block;
-  pointer-events: auto;
-}
-
-/* 5) Le contenu reste cliquable */
-.page{
+/* 0) Assure que le contenu est au-dessus et cliquable */
+main, .page, .card{
   position: relative;
   z-index: 1;
-  pointer-events: auto;
+  pointer-events: auto !important;
 }
 
-/* 6) Évite les overlays invisibles qui bouffent les taps */
+/* 1) Force les éléments interactifs à rester cliquables */
+button, a, input, textarea, select, label{
+  pointer-events: auto !important;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+/* 2) La topbar et la tabbar doivent rester cliquables */
+.blog-topbar{
+  pointer-events: auto !important;
+  z-index: 10000 !important;
+}
+.tabbar{
+  pointer-events: auto !important;
+  z-index: 10000 !important;
+}
+
+/* 3) Le menu profil NE DOIT PAS bloquer quand il est fermé */
+.profile-menu{
+  display: none !important;
+  pointer-events: none !important;
+}
+
+/* 4) Quand on l’ouvre, il redevient cliquable */
+.profile-menu[data-open="true"]{
+  display: block !important;
+  pointer-events: auto !important;
+  z-index: 10001 !important;
+}
+
+/* 5) Sécurité: si un overlay existe, il ne doit pas couvrir toute la page */
 #headerUserMenuOverlay,
 .header-overlay,
 .menu-overlay{
   display: none !important;
   pointer-events: none !important;
 }
-#headerUserMenuOverlay.open,
-.header-overlay.open,
-.menu-overlay.open{
+#headerUserMenuOverlay[data-open="true"],
+.header-overlay[data-open="true"],
+.menu-overlay[data-open="true"]{
   display: block !important;
   pointer-events: auto !important;
 }
