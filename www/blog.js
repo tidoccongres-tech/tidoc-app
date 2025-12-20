@@ -118,12 +118,10 @@ const HEART_SVG = `
 `;
 
 const CROWN_GRAY_SVG = `
-<svg viewBox="0 0 24 24"
-     width="14"
-     height="14"
-     style="margin-left:4px;vertical-align:-2px;fill:currentColor;"
-     aria-hidden="true">
-  <path d="M21.6 13.56 21.8 11.1c.18-1.9.27-2.85-.06-3.24-.17-.21-.41-.34-.67-.36-.48-.04-1.08.64-2.27 2-0.62.7-.93 1.05-1.28 1.1-.19.03-.38 0-.56-.09-.32-.16-.53-.6-.95-1.47L13.8 4.46C13 2.82 12.6 2 12 2s-1 .82-1.8 2.46L8 9.05c-.42.87-.63 1.31-.95 1.47-.18.09-.37.12-.56.09-.35-.05-.66-.4-1.28-1.1-1.2-1.36-1.8-2.04-2.27-2-.26.02-.5.15-.67.36-.33.39-.24 1.34-.06 3.24l.2 2.46c.38 4 .57 6 1.75 7.2C5.32 22 7.1 22 10.64 22h2.72c3.55 0 5.33 0 6.5-1.2 1.18-1.2 1.37-3.2 1.75-7.24Z"/>
+<svg viewBox="0 0 24 24" width="14" height="14"
+     style="display:inline-block;margin-left:4px;vertical-align:-2px;fill:currentColor;"
+     xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+  <path d="M21.609 13.5616 ... Z"/>
 </svg>
 `;
 
@@ -274,11 +272,7 @@ function renderPostCard(postId, p) {
       <div>
         <div class="post-title">${escapeHTML(p.title || "")}</div>
         <div class="post-sub">
-  <span class="post-author">
-    ${escapeHTML(bestAuthorName(p))}
-    ${isAdminEmail(p.authorEmail) ? CROWN_GRAY_SVG : ""}
-  </span>
-  • ${fmtDate(p.createdAt)}
+  ${escapeHTML(bestAuthorName(p))}${isAdminEmail(p.authorEmail) ? `<span class="crown-inline">${CROWN_GRAY_SVG}</span>` : ""} • ${fmtDate(p.createdAt)}
 </div>
       ${delOk ? `<button class="delete-btn" type="button" data-del="${postId}">Supprimer</button>` : ""}
     </div>
