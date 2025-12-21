@@ -40,7 +40,20 @@ const commentInflight = new Set(); // postId en cours d'envoi
 
 // ===== Helpers =====
 
+function showMsg(t = "") {
+  if (postMsg) postMsg.textContent = t;
+}
 
+function requireLogin(actionText = "faire ça") {
+  if (!auth.currentUser) {
+    alert(
+      "Connexion requise 🔒\n\n" +
+      "Pour " + actionText + ", connecte-toi."
+    );
+    return false;
+  }
+  return true;
+}
 
 const nameCache = new Map();
 
