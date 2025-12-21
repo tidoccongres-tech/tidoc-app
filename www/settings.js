@@ -19,7 +19,21 @@ function setPassMsg(t=""){ if (passMsg) passMsg.textContent = t; }
 onAuthStateChanged(auth, async (user) => {
   if (!user) { window.location.href = "./login.html"; return; }
 
-  nameEl.textContent = user.displayName || "Utilisateur";
+    // ✅ Firestore en priorité pour le pseudo
+  let prettyName = (user.displayName || "").trim();
+
+  try {
+    const snap = await getDoc(doc(db, "users", user.uid));
+    if (snap.exists()) {
+      const d = snap.data() || {};
+      const n = (d.displayName || d.username || "").trim();
+      if (n) prettyName = n;
+    }
+  } catch (e) {
+    console.log("Firestore name fallback error:", e);
+  }
+
+  nameEl.textContent = prettyName || "Utilisateur";
   emailEl.textContent = user.email || "";
 
   let avatarUrl = user.photoURL || "";
