@@ -307,16 +307,21 @@ onAuthStateChanged(auth, (u) => {
 
   // ===== LOGIN =====
   document.getElementById("btnLogin").onclick = async () => {
+  authRedirectLock = true;
     try {
       msg.textContent = "Connexion…";
       const email = document.getElementById("liEmail").value.trim();
       const password = document.getElementById("liPass").value;
       await loginEmail({ email, password });
-      window.location.href = "./index.html";
-    } catch (e) {
-      msg.textContent = "Erreur: " + (e?.message || e);
-    }
-  };
+      
+      // localStorage.setItem(LS_NAME, auth.currentUser?.displayName || "");
+
+    window.location.href = "./index.html";
+  } catch (e) {
+    authRedirectLock = false;
+    msg.textContent = "Erreur: " + (e?.message || e);
+  }
+};
 
   // ===== RESET =====
   document.getElementById("btnReset").onclick = async () => {
