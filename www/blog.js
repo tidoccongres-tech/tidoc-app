@@ -135,19 +135,6 @@ function isAdminEmail(email = "") {
   return email.toLowerCase() === "tidoc.congres@gmail.com";
 }
 
-async function createNotif(toUid, payload){
-  if (!toUid) return;
-  try{
-    await addDoc(collection(db, "notifications", toUid, "items"), {
-      ...payload,
-      read: false,
-      createdAt: serverTimestamp()
-    });
-  } catch (e) {
-    console.log("createNotif error:", e);
-  }
-}
-
 async function getPostData(postId){
   const snap = await getDoc(doc(db, "posts", postId));
   return snap.exists() ? (snap.data() || null) : null;
