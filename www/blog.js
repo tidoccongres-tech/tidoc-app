@@ -299,11 +299,11 @@ async function addComment(postId, postData, inputEl, commentsWrap, sendBtn) {
     const p = postData || await getPostData(postId);
     const toUid = p?.authorUid || "";
     if (toUid && toUid !== u.uid) {
-      await createNotif(toUid, {
-        type: "comment",
-        text: `${myBestName()} a commenté ton post`,
-        postId,
-        fromUid: u.uid
+      await createNotif({
+         toUid,
+         type: "comment",
+         text: `${myBestName()} a commenté ton post`,
+         postId
       });
     }
 
