@@ -61,6 +61,10 @@ async function loadNotifs(){
 
   const snap = await getDocs(qy);
 
+  // ✅ Auto-mark read (quand on ouvre la page, tout devient lu)
+  const unreadDocs = snap.docs.filter(d => (d.data()?.read === false));
+  await Promise.all(unreadDocs.map(d => markRead(d.id)));
+  
   if (snap.empty){
     root.innerHTML = `<section class="card"><p>Aucune notification.</p></section>`;
     return;
