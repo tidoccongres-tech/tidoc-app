@@ -219,6 +219,22 @@ async function broadcastNewsletter(payload){
   await Promise.all(promises);
 }
 
+import { isAdminUser } from "./auth.js"; // ✅ ajoute ça à ton import auth
+
+const adminTools = document.getElementById("adminTools");
+const btnAddNewsletter = document.getElementById("btnAddNewsletter");
+
+onAuthStateChanged(auth, (u)=> {
+  if (!u) return;
+
+  const admin = isAdminUser(u);
+  if (adminTools) adminTools.style.display = admin ? "" : "none";
+
+  if (admin && btnAddNewsletter) {
+    btnAddNewsletter.onclick = openNewsletterModal;
+  }
+});
+
 /* =========================
    BOOT
 ========================= */
