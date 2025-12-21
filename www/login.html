@@ -183,9 +183,15 @@
   tabLogin.onclick  = () => setTab("login");
 
   // ===== Redirect si déjà connecté =====
-  onAuthStateChanged(auth, (u) => {
-    if (u) window.location.href = "./index.html";
-  });
+  let authRedirectLock = false;
+
+onAuthStateChanged(auth, (u) => {
+  // ✅ si on est en train de faire un signup/login, on ne redirige PAS
+  if (authRedirectLock) return;
+
+  // ✅ sinon, si déjà connecté -> home
+  if (u) window.location.href = "./index.html";
+});
 
   // ===== Username unique (LIVE) =====
   function normalizeUsername(v = "") {
