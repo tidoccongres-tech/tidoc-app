@@ -291,23 +291,36 @@ function bindNotificationsLive(uid){
     limit(20)
   );
 
+  let didInit = false;              // ✅ skip 1er snapshot
+  const toasted = new Set();        // ✅ évite double toast même si rebind
+
   __unsubNotifs = onSnapshot(qy, (snap) => {
     const unread = snap.docs.some(d => (d.data()?.read === false));
     const d = dot();
     if (d) d.style.display = unread ? "block" : "none";
 
-    // toast : seulement si on reçoit un nouveau doc unread
+    // ✅ 1er snapshot = pas de toast (sinon spam)
+    if (!didInit) {
+      didInit = true;
+      // on mémorise ce qui existe déjà pour ne pas toaster après un rebind
+      snap.docs.forEach(x => toasted.add(x.id));
+      return;
+    }
+
+    // toast : seulement pour les NOUVEAUX docs unread
     snap.docChanges().forEach((ch) => {
       if (ch.type !== "added") return;
+
       const data = ch.doc.data() || {};
       if (data.read !== false) return;
 
       const id = ch.doc.id;
-      if (__lastToastId === id) return;
-      __lastToastId = id;
+      if (toasted.has(id)) return;
+      toasted.add(id);
 
       // évite toast sur la page notifications
       if (location.pathname.endsWith("notifications.html")) return;
+
       showToast(data);
     });
   });
