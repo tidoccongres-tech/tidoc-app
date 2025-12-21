@@ -208,7 +208,68 @@ function renderEventCard(id, e) {
 
   return card;
 }
+async function registerToEvent(eventId){
+  const uid = auth.currentUser?.uid;
+  if (!uid) { location.href="./login.html"; return; }
 
+  // droits
+  const rights = await getMyRights();
+  if (!rights.ok){
+    // pas de billet -> billets.html
+    if (rights.reason === "noticket" || rights.reason === "badpack") {
+      alert("Tu dois importer ton billet pour t’inscrire.");
+      location.href = "./billets.html";
+      return;
+    }
+    alert("Connexion requise.");
+    return;
+  }
+
+  const evRef = doc(db, "events", eventId);
+  const regRef = doc(db, "events", eventId, "registrations", uid);
+  const usageRef = doc(db, "userUsage", uid);
+
+  await runTransaction(db, async (tx) => {
+    const evSnap = await tx.get(evRef);
+    if (!evSnap.exists()) throw new Error("Évènement introuvable.");
+
+    const ev = evSnap.data() || {};
+    const cap = Number(ev.capacity || 0);
+    const booked = Number(ev.bookedCount || 0);
+
+    // déjà inscrit ?
+    const regSnap = await tx.get(regRef);
+    if (regSnap.exists()) throw new Error("Tu es déjà inscrit(e).");
+
+    // places
+    if (cap > 0 && booked >= cap) throw new Error("Plus de places disponibles.");
+
+    // quota selon type
+    const type = (ev.type || "").toLowerCase();
+    const uSnap = await tx.get(usageRef);
+    const usage = uSnap.exists() ? (uSnap.data() || {}) : {};
+    const wsUsed = Number(usage.workshopUsed || 0);
+    const confUsed = Number(usage.conferenceUsed || 0);
+
+    const wsAllowed = PACKS[rights.packKey].workshopsAllowed;
+    const confAllowed = PACKS[rights.packKey].conferencesAllowed;
+
+    if (type.includes("workshop")) {
+      if (wsUsed >= wsAllowed) throw new Error("Tu n’as plus de workshop disponible.");
+      tx.set(usageRef, { workshopUsed: wsUsed + 1 }, { merge:true });
+    } else if (type.includes("conf")) {
+      if (confUsed >= confAllowed) throw new Error("Tu n’as plus de conférence disponible.");
+      tx.set(usageRef, { conferenceUsed: confUsed + 1 }, { merge:true });
+    } else {
+      // si “Autre” : choisis une règle (ici on bloque)
+      throw new Error("Type d’évènement non éligible à l’inscription.");
+    }
+
+    // crée inscription + incrémente compteur
+    tx.set(regRef, { uid, createdAt: serverTimestamp() });
+    tx.set(evRef, { bookedCount: booked + 1 }, { merge:true });
+  });
+}
 async function loadEvents() {
   if (!eventsList) return;
 
@@ -229,6 +290,8 @@ async function loadEvents() {
     if (card) eventsList.appendChild(card);
   });
 }
+
+
 
 // boot
 document.addEventListener("DOMContentLoaded", () => {
