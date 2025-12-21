@@ -133,6 +133,24 @@ function isAdminEmail(email = "") {
   return email.toLowerCase() === "tidoc.congres@gmail.com";
 }
 
+async function createNotif(toUid, payload){
+  if (!toUid) return;
+  try{
+    await addDoc(collection(db, "notifications", toUid, "items"), {
+      ...payload,
+      read: false,
+      createdAt: serverTimestamp()
+    });
+  } catch (e) {
+    console.log("createNotif error:", e);
+  }
+}
+
+async function getPostData(postId){
+  const snap = await getDoc(doc(db, "posts", postId));
+  return snap.exists() ? (snap.data() || null) : null;
+}
+
 // ===== LIKE SVG =====
 const HEART_SVG = `
 <svg viewBox="0 0 16 16" class="heart-icon" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
@@ -169,8 +187,24 @@ async function toggleLike(postId) {
   const likeRef = doc(db, "posts", postId, "likes", uid);
   const snap = await getDoc(likeRef);
 
-  if (snap.exists()) await deleteDoc(likeRef);
-  else await setDoc(likeRef, { createdAt: serverTimestamp() });
+  if (snap.exists()) {
+    await deleteDoc(likeRef);
+  } else {
+    await setDoc(likeRef, { createdAt: serverTimestamp() });
+
+    // ✅ notif au propriétaire du post (si pas soi-même)
+    const p = await getPostData(postId);
+    const toUid = p?.authorUid || "";
+    if (toUid && toUid !== uid) {
+      const who = myBestName();
+      await createNotif(toUid, {
+        type: "like",
+        text: `${who} a liké ton post`,
+        postId,
+        fromUid: uid
+      });
+    }
+  }
 
   await loadPosts();
 }
@@ -189,26 +223,26 @@ async function loadComments(postId, postData, containerEl) {
 
   containerEl.innerHTML = "";
 
-for (const d of snap.docs) {
-  const c = d.data();
+  for (const d of snap.docs) {
+    const c = d.data();
 
-  const fallbackName = (c.authorName || "").trim() || displayNameFrom(c.authorEmail || "");
-  const prettyName = await getNameByUid(c.authorUid, fallbackName);
+    const fallbackName = (c.authorName || "").trim() || displayNameFrom(c.authorEmail || "");
+    const prettyName = await getNameByUid(c.authorUid, fallbackName);
 
-  const row = document.createElement("div");
-  row.className = "comment";
-  row.innerHTML = `
-    <div class="comment-row">
-      <div>
-        <div class="comment-author">
-          ${escapeHTML(prettyName)}${isAdminEmail(c.authorEmail) ? `<span class="crown-inline">${CROWN_GRAY_SVG}</span>` : ""}
+    const row = document.createElement("div");
+    row.className = "comment";
+    row.innerHTML = `
+      <div class="comment-row">
+        <div>
+          <div class="comment-author">
+            ${escapeHTML(prettyName)}${isAdminEmail(c.authorEmail) ? `<span class="crown-inline">${CROWN_GRAY_SVG}</span>` : ""}
+          </div>
+          <div class="comment-text">${escapeHTML(c.text || "")}</div>
         </div>
-        <div class="comment-text">${escapeHTML(c.text || "")}</div>
       </div>
-    </div>
-  `;
-
-  containerEl.appendChild(row);
+    `;
+    containerEl.appendChild(row);
+  }
 }
 
 async function addComment(postId, postData, inputEl, commentsWrap, sendBtn) {
@@ -217,20 +251,32 @@ async function addComment(postId, postData, inputEl, commentsWrap, sendBtn) {
   const txt = (inputEl?.value || "").trim();
   if (!txt) return;
 
-  // ✅ anti double envoi
   if (commentInflight.has(postId)) return;
   commentInflight.add(postId);
   if (sendBtn) sendBtn.disabled = true;
 
   try {
     const u = auth.currentUser;
+
     await addDoc(collection(db, "posts", postId, "comments"), {
       text: txt,
       authorUid: u.uid,
       authorEmail: u.email || "",
-      authorName: (u.displayName || "").trim() || displayNameFrom(u.email || ""),
+      authorName: myBestName(),
       createdAt: serverTimestamp()
     });
+
+    // ✅ notif au propriétaire du post (si pas soi-même)
+    const p = postData || await getPostData(postId);
+    const toUid = p?.authorUid || "";
+    if (toUid && toUid !== u.uid) {
+      await createNotif(toUid, {
+        type: "comment",
+        text: `${myBestName()} a commenté ton post`,
+        postId,
+        fromUid: u.uid
+      });
+    }
 
     inputEl.value = "";
     await loadComments(postId, postData, commentsWrap);
