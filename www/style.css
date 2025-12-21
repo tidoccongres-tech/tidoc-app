@@ -1074,3 +1074,38 @@ main, .page, .card{
 .notif-toast.on{display:block}
 .notif-toast-title{font-weight:900;font-size:13px;margin:0 0 2px}
 .notif-toast-text{font-size:13px;opacity:.8;margin:0}
+
+.pw-wrap{
+  position:relative;
+  width:100%;
+}
+
+.pw-wrap input{
+  width:100%;
+  padding-right:46px; /* place pour l’œil */
+}
+
+.pw-toggle{
+  position:absolute;
+  right:10px;
+  top:50%;
+  transform:translateY(-50%);
+  width:34px;
+  height:34px;
+  border:none;
+  background:transparent;
+  cursor:pointer;
+  opacity:.75;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+}
+
+.pw-toggle:hover{ opacity:1; }
+
+.pw-toggle svg{
+  width:20px;
+  height:20px;
+  fill:#178CA8; /* couleur Ti’Doc */
+  display:block;
+}
