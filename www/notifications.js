@@ -344,6 +344,10 @@ onAuthStateChanged(auth, (u)=>{
   loadNotifs();
 
   const admin = isAdminUser(u);
-  adminTools.style.display = admin ? "" : "none";
-  if (admin) btnAddNewsletter.onclick = openNewsletterModal;
+
+  // ✅ bouton newsletter en haut (style create-post)
+  if (btnAddNewsletter) {
+    btnAddNewsletter.style.display = admin ? "" : "none";
+    if (admin) btnAddNewsletter.onclick = openNewsletterModal;
+  }
 });
