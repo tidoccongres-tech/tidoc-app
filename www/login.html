@@ -256,7 +256,7 @@ onAuthStateChanged(auth, (u) => {
 
   // ===== SIGNUP =====
   btnSignup.onclick = async () => {
-  authRedirectLock = false;
+  authRedirectLock = true;
     try {
       msg.textContent = "";
 
@@ -266,25 +266,31 @@ onAuthStateChanged(auth, (u) => {
 
       if (!displayName || !email || !password) {
         msg.textContent = "❌ Remplis pseudo, email et mot de passe.";
+        authRedirectLock = false;
         return;
       }
 
       const emailOk = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
       if (!emailOk) {
         msg.textContent = "❌ Adresse email invalide.";
+        authRedirectLock = false;
         return;
       }
 
       if (password.length < 6) {
         msg.textContent = "❌ Mot de passe trop court (min 6 caractères).";
+        authRedirectLock = false;
         return;
       }
 
       msg.textContent = "Création du compte…";
 
       const { ok } = await checkUsernameLive();
-      if (!ok) return;
-
+      if (!ok) {
+        authRedirectLock = false;
+        return;
+      }
+      
       await signupEmail({ email, password, displayName });
 
       localStorage.setItem(LS_NAME, displayName);
@@ -292,6 +298,7 @@ onAuthStateChanged(auth, (u) => {
 
       window.location.href = "./index.html";
     } catch (e) {
+      authRedirectLock = false;
       const code = (e?.code || "").toLowerCase();
       const m = (e?.message || "").toLowerCase();
 
