@@ -3,41 +3,62 @@ import { auth, db, changePasswordWithReauth } from "./auth.js";
 import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.4/firebase-auth.js";
 import { doc, getDoc } from "https://www.gstatic.com/firebasejs/10.12.4/firebase-firestore.js";
 
+// ===== Profil UI =====
 const avatarBox = document.getElementById("currentAvatar");
 const nameEl = document.getElementById("profileName");
 const emailEl = document.getElementById("profileEmail");
 const changeAvatarBtn = document.getElementById("changeAvatarBtn");
 
-const msg = document.getElementById("pwdMsg");
-const oldP = document.getElementById("oldPass");
-const newP = document.getElementById("newPass");
-const newP2 = document.getElementById("newPass2");
+// ===== Password UI =====
+const pwdMsg = document.getElementById("pwdMsg");
+const oldPass = document.getElementById("oldPass");
+const newPass = document.getElementById("newPass");
+const newPass2 = document.getElementById("newPass2");
+const btnChangePwd = document.getElementById("btnChangePwd");
 
-document.getElementById("btnChangePwd").onclick = async () => {
-  msg.textContent = "";
+function setPwdMsg(t = "") {
+  if (pwdMsg) pwdMsg.textContent = t;
+}
 
-  if (newP.value !== newP2.value) {
-    msg.textContent = "❌ Les deux nouveaux mots de passe ne correspondent pas.";
-    return;
-  }
+// ===== Change password =====
+btnChangePwd?.addEventListener("click", async () => {
+  setPwdMsg("");
+
+  const o = (oldPass?.value || "").trim();
+  const n1 = (newPass?.value || "").trim();
+  const n2 = (newPass2?.value || "").trim();
+
+  if (!o || !n1 || !n2) { setPwdMsg("❌ Remplis tous les champs."); return; }
+  if (n1 !== n2) { setPwdMsg("❌ Les nouveaux mots de passe ne correspondent pas."); return; }
+  if (n1.length < 6) { setPwdMsg("❌ Nouveau mot de passe trop court (min 6)."); return; }
 
   try {
-    msg.textContent = "Modification…";
-    await changePasswordWithReauth(oldP.value, newP.value); // ta fonction auth.js
-    msg.textContent = "✅ Mot de passe modifié.";
-    oldP.value = newP.value = newP2.value = "";
+    setPwdMsg("Modification…");
+    btnChangePwd.disabled = true;
+
+    await changePasswordWithReauth(o, n1);
+
+    oldPass.value = "";
+    newPass.value = "";
+    newPass2.value = "";
+    setPwdMsg("✅ Mot de passe modifié.");
   } catch (e) {
-    msg.textContent = "❌ " + (e?.message || e);
+    const code = e?.code || "";
+    if (code === "auth/wrong-password") setPwdMsg("❌ Ancien mot de passe incorrect.");
+    else if (code === "auth/too-many-requests") setPwdMsg("⏳ Trop de tentatives, réessaie plus tard.");
+    else setPwdMsg("Erreur: " + (e?.message || e));
+    console.log("change password error:", e);
+  } finally {
+    btnChangePwd.disabled = false;
   }
-};
+});
 
-function setPassMsg(t=""){ if (passMsg) passMsg.textContent = t; }
-
+// ===== Load profile =====
 onAuthStateChanged(auth, async (user) => {
   if (!user) { window.location.href = "./login.html"; return; }
 
-    // ✅ Firestore en priorité pour le pseudo
-  let prettyName = (user.displayName || "").trim();
+  // ✅ pseudo Firestore en priorité
+  let prettyName = (user.displayName || "").trim() || "Utilisateur";
 
   try {
     const snap = await getDoc(doc(db, "users", user.uid));
@@ -50,57 +71,29 @@ onAuthStateChanged(auth, async (user) => {
     console.log("Firestore name fallback error:", e);
   }
 
-  nameEl.textContent = prettyName || "Utilisateur";
-  emailEl.textContent = user.email || "";
+  if (nameEl) nameEl.textContent = prettyName;
+  if (emailEl) emailEl.textContent = user.email || "";
 
+  // ✅ avatar
   let avatarUrl = user.photoURL || "";
+
   if (!avatarUrl) {
     try {
       const snap = await getDoc(doc(db, "users", user.uid));
-      if (snap.exists()) avatarUrl = snap.data().avatarUrl || "";
+      if (snap.exists()) avatarUrl = snap.data()?.avatarUrl || "";
     } catch (e) {
       console.error("Erreur récupération avatar Firestore", e);
     }
   }
 
-  avatarBox.innerHTML = avatarUrl
-    ? `<img src="${avatarUrl}" alt="Avatar utilisateur">`
-    : `<div style="width:100%;height:100%;border-radius:50%;background:#e9f7fb;"></div>`;
+  if (avatarBox) {
+    avatarBox.innerHTML = avatarUrl
+      ? `<img src="${avatarUrl}" alt="Avatar utilisateur">`
+      : `<div style="width:100%;height:100%;border-radius:50%;background:#e9f7fb;"></div>`;
+  }
 });
 
+// ===== Avatar page =====
 changeAvatarBtn?.addEventListener("click", () => {
   window.location.href = "./avatars.html";
-});
-
-// ✅ changer mot de passe
-changePassBtn?.addEventListener("click", async () => {
-  try {
-    setPassMsg("");
-
-    const o = oldPass?.value || "";
-    const n1 = newPass1?.value || "";
-    const n2 = newPass2?.value || "";
-
-    if (!o || !n1 || !n2) { setPassMsg("❌ Remplis tous les champs."); return; }
-    if (n1 !== n2) { setPassMsg("❌ Les nouveaux mots de passe ne correspondent pas."); return; }
-    if (n1.length < 6) { setPassMsg("❌ Nouveau mot de passe trop court (min 6)."); return; }
-
-    setPassMsg("Mise à jour…");
-    changePassBtn.disabled = true;
-
-    await changePasswordWithReauth(o, n1);
-
-    oldPass.value = "";
-    newPass1.value = "";
-    newPass2.value = "";
-    setPassMsg("✅ Mot de passe modifié.");
-  } catch (e) {
-    const code = e?.code || "";
-    if (code === "auth/wrong-password") setPassMsg("❌ Ancien mot de passe incorrect.");
-    else if (code === "auth/too-many-requests") setPassMsg("⏳ Trop de tentatives, réessaie plus tard.");
-    else setPassMsg("Erreur: " + (e?.message || e));
-    console.log("change password error:", e);
-  } finally {
-    changePassBtn.disabled = false;
-  }
 });
