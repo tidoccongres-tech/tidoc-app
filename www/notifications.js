@@ -38,6 +38,12 @@ async function markRead(notifId){
   await updateDoc(doc(db, "notifications", uid, "items", notifId), { read: true });
 }
 
+async function deleteNotif(notifId){
+  const uid = auth.currentUser?.uid;
+  if (!uid) return;
+  await deleteDoc(doc(db, "notifications", uid, "items", notifId));
+}
+
 // =========================
 // LOAD NOTIFS
 // =========================
@@ -62,34 +68,65 @@ async function loadNotifs(){
 
   root.innerHTML = "";
 
+  const admin = isAdminUser(auth.currentUser);
+
   snap.forEach((d)=>{
     const n = d.data() || {};
     const card = document.createElement("section");
     card.className = "card";
     card.style.opacity = n.read ? "0.7" : "1";
+    card.style.position = "relative";
+    card.style.cursor = "pointer";
+
+    // ✅ supprimer seulement les newsletters et seulement admin
+    const canDeleteNewsletter = admin && (n.type === "newsletter");
 
     card.innerHTML = `
+      ${canDeleteNewsletter ? `
+        <button
+          type="button"
+          data-del="${d.id}"
+          class="link"
+          style="position:absolute;top:12px;right:12px;font-size:13px;"
+        >
+          Supprimer
+        </button>
+      ` : ""}
+
       <div>
         <strong>${escapeHTML(n.title || "Notification")}</strong>
         ${n.text ? `<div style="margin-top:4px">${escapeHTML(n.text)}</div>` : ""}
         ${n.imageUrl ? `<img src="${n.imageUrl}" style="margin-top:10px;width:100%;border-radius:12px">` : ""}
-        ${n.linkUrl ? `
-          <a href="${n.linkUrl}" target="_blank" class="btn-primary" style="margin-top:10px;display:inline-block">
+        ${(n.linkUrl && n.linkLabel) ? `
+          <a href="${n.linkUrl}" target="_blank" class="btn-primary"
+             style="margin-top:10px;display:inline-block;text-decoration:none">
             ${escapeHTML(n.linkLabel)}
           </a>` : ""}
       </div>
     `;
 
-    card.onclick = async () => {
-      try { await markRead(d.id); } catch {}
-    };
+    // clic supprimer (ne doit pas marquer lu)
+    const delBtn = card.querySelector(`[data-del="${d.id}"]`);
+    delBtn?.addEventListener("click", async (e) => {
+      e.preventDefault();
+      e.stopPropagation();
 
-    async function deleteNotif(notifId){
-  const uid = auth.currentUser?.uid;
-  if (!uid) return;
-  await deleteDoc(doc(db, "notifications", uid, "items", notifId));
-}
-    
+      if (!confirm("Supprimer cette newsletter ?")) return;
+
+      try {
+        await deleteNotif(d.id);
+        card.remove(); // UI instant
+      } catch (err) {
+        alert("Impossible de supprimer (permissions).");
+        console.log(err);
+      }
+    });
+
+    // clic carte = markRead
+    card.addEventListener("click", async () => {
+      try { await markRead(d.id); } catch {}
+    });
+
     root.appendChild(card);
   });
 }
@@ -316,14 +353,14 @@ async function broadcastNewsletter(payload){
   const jobs = [];
 
   usersSnap.forEach(uDoc => {
-    const toUid = uDoc.id; // ✅ DESTINATAIRE OBLIGATOIRE
+    const toUid = uDoc.id;
 
     jobs.push(
       addDoc(
         collection(db, "notifications", toUid, "items"),
         {
-          toUid,               // ✅ requis par les rules
-          fromUid,             // ✅ requis par les rules
+          toUid,
+          fromUid,
           fromEmail,
           type: "newsletter",
           title: payload.title,
@@ -352,7 +389,10 @@ onAuthStateChanged(auth, (u)=>{
 
   const admin = isAdminUser(u);
 
-  // ✅ bouton newsletter en haut (style create-post)
+  // (optionnel) si tu gardes adminTools dans le HTML
+  if (adminTools) adminTools.style.display = admin ? "" : "none";
+
+  // ✅ bouton newsletter visible uniquement admin
   if (btnAddNewsletter) {
     btnAddNewsletter.style.display = admin ? "" : "none";
     if (admin) btnAddNewsletter.onclick = openNewsletterModal;
