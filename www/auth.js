@@ -140,10 +140,17 @@ export async function loginEmail({ email, password } = {}) {
 }
 
 // ✅ RESET PASSWORD (plus robuste)
-export async function resetPassword(email, { redirectUrl } = {}) {
-  const e = (email || "").trim();
-  if (!e) throw new Error("Email requis.");
+export async function resetPassword(email) {
+  if (!email) throw new Error("Email requis.");
 
+  const actionCodeSettings = {
+    // ✅ doit être sur un domaine autorisé dans Firebase
+    url: window.location.origin + "/login.html",
+    handleCodeInApp: false,
+  };
+
+  await sendPasswordResetEmail(auth, email, actionCodeSettings);
+}
   const emailOk = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e);
   if (!emailOk) throw new Error("Adresse email invalide.");
 
