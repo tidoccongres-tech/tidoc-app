@@ -330,7 +330,7 @@ async function addComment(postId, postData, inputEl, commentsWrap, sendBtn) {
 // ===== Form =====
 function showForm(show) {
   if (!form) return;
-  form.style.display = show ? "" : "none";
+  form.style.display = show ? "block" : "none";
 }
 
 function clearForm() {
@@ -496,7 +496,9 @@ createBtn?.addEventListener("click", (e) => {
   e.preventDefault();
   e.stopPropagation();
   if (!requireLogin("écrire un post")) return;
+
   showForm(true);
+  form?.scrollIntoView({ behavior: "smooth", block: "start" });
   titleInput?.focus();
 });
 
