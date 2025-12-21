@@ -319,16 +319,19 @@ onAuthStateChanged(auth, (u) => {
       msg.textContent = "Connexion…";
       const email = document.getElementById("liEmail").value.trim();
       const password = document.getElementById("liPass").value;
+     
       await loginEmail({ email, password });
       
-      // localStorage.setItem(LS_NAME, auth.currentUser?.displayName || "");
+      const dn = (auth.currentUser?.displayName || "").trim();
+      if (dn) localStorage.setItem(LS_NAME, dn);
 
-    window.location.href = "./index.html";
-  } catch (e) {
-    authRedirectLock = false;
-    msg.textContent = "Erreur: " + (e?.message || e);
-  }
-};
+      window.dispatchEvent(new CustomEvent("tidoc:auth"));
+      window.location.href = "./index.html";
+    } catch (e) {
+      authRedirectLock = false;
+      msg.textContent = "Erreur: " + (e?.message || e);
+    }
+  };
 
   // ===== RESET =====
   document.getElementById("btnReset").onclick = async () => {
