@@ -165,22 +165,27 @@ async function loadComments(postId, postData, containerEl) {
   }
 
   containerEl.innerHTML = "";
-  snap.forEach((d) => {
-    const c = d.data();
-    const row = document.createElement("div");
-    row.className = "comment";
-    row.innerHTML = `
-  <div class="comment-row">
-    <div>
-      <div class="comment-author">
-  ${escapeHTML(c.authorName || displayNameFrom(c.authorEmail || ""))}${isAdminEmail(c.authorEmail) ? `<span class="crown-inline">${CROWN_GRAY_SVG}</span>` : ""}
-</div>
-      <div class="comment-text">${escapeHTML(c.text || "")}</div>
+
+for (const d of snap.docs) {
+  const c = d.data();
+
+  const fallbackName = (c.authorName || "").trim() || displayNameFrom(c.authorEmail || "");
+  const prettyName = await getNameByUid(c.authorUid, fallbackName);
+
+  const row = document.createElement("div");
+  row.className = "comment";
+  row.innerHTML = `
+    <div class="comment-row">
+      <div>
+        <div class="comment-author">
+          ${escapeHTML(prettyName)}${isAdminEmail(c.authorEmail) ? `<span class="crown-inline">${CROWN_GRAY_SVG}</span>` : ""}
+        </div>
+        <div class="comment-text">${escapeHTML(c.text || "")}</div>
+      </div>
     </div>
-  </div>
-`;
-    containerEl.appendChild(row);
-  });
+  `;
+
+  containerEl.appendChild(row);
 }
 
 async function addComment(postId, postData, inputEl, commentsWrap, sendBtn) {
