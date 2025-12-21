@@ -1,7 +1,5 @@
 // blog.js (MODULE)
 
-console.log("✅ blog.js LOADED");
-
 import { firebaseConfig } from "./firebase-config.js";
 import { initializeApp, getApps, getApp } from "https://www.gstatic.com/firebasejs/10.12.4/firebase-app.js";
 import {
