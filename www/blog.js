@@ -13,6 +13,7 @@ import {
   doc,
   setDoc,
   getDoc,
+  limit,
 } from "https://www.gstatic.com/firebasejs/10.12.4/firebase-firestore.js";
 import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.4/firebase-auth.js";
 
@@ -151,6 +152,33 @@ async function getPostData(postId){
   return snap.exists() ? (snap.data() || null) : null;
 }
 
+// ===== Notifications helpers =====
+function shouldNotify(toUid) {
+  const fromUid = currentUserId();
+  if (!fromUid || !toUid) return false;
+  // ✅ évite les auto-notifs (si tu veux les autoriser, supprime cette ligne)
+  return fromUid !== toUid;
+}
+
+async function createNotif({ toUid, type, text, postId }) {
+  if (!shouldNotify(toUid)) return;
+
+  const from = auth.currentUser;
+  const fromUid = from?.uid || "";
+  const fromEmail = from?.email || "";
+
+  await addDoc(collection(db, "notifications", toUid, "items"), {
+    toUid,
+    fromUid,
+    fromEmail,
+    type: type || "info",
+    text: text || "Notification",
+    postId: postId || "",
+    read: false,
+    createdAt: serverTimestamp(),
+  });
+}
+
 // ===== LIKE SVG =====
 const HEART_SVG = `
 <svg viewBox="0 0 16 16" class="heart-icon" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
@@ -192,18 +220,20 @@ async function toggleLike(postId) {
   } else {
     await setDoc(likeRef, { createdAt: serverTimestamp() });
 
-    // ✅ notif au propriétaire du post (si pas soi-même)
-    const p = await getPostData(postId);
-    const toUid = p?.authorUid || "";
-    if (toUid && toUid !== uid) {
-      const who = myBestName();
-      await createNotif(toUid, {
-        type: "like",
-        text: `${who} a liké ton post`,
-        postId,
-        fromUid: uid
-      });
-    }
+    // ✅ notif "like" à l’auteur du post
+    try {
+      const postSnap = await getDoc(doc(db, "posts", postId));
+      if (postSnap.exists()) {
+        const p = postSnap.data() || {};
+        const toUid = p.authorUid || "";
+        await createNotif({
+          toUid,
+          type: "like",
+          text: `${myBestName()} a aimé ton post`,
+          postId
+        });
+      }
+    } catch (_) {}
   }
 
   await loadPosts();
@@ -266,6 +296,17 @@ async function addComment(postId, postData, inputEl, commentsWrap, sendBtn) {
       createdAt: serverTimestamp()
     });
 
+    // ✅ notif "comment" à l’auteur du post
+    try {
+      const toUid = postData?.authorUid || "";
+      await createNotif({
+        toUid,
+        type: "comment",
+        text: `${myBestName()} a commenté ton post`,
+        postId
+      });
+    } catch (_) {}
+    
     // ✅ notif au propriétaire du post (si pas soi-même)
     const p = postData || await getPostData(postId);
     const toUid = p?.authorUid || "";
