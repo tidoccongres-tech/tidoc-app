@@ -1,3 +1,4 @@
+// notifications.js (MODULE)
 import { auth, db, requireAuthOrRedirect, isAdminUser } from "./auth.js";
 import {
   collection,
@@ -18,6 +19,9 @@ const root = document.getElementById("notifRoot");
 const adminTools = document.getElementById("adminTools");
 const btnAddNewsletter = document.getElementById("btnAddNewsletter");
 
+// =========================
+// Helpers
+// =========================
 function escapeHTML(s=""){
   return String(s)
     .replaceAll("&","&amp;")
@@ -33,6 +37,9 @@ async function markRead(notifId){
   await updateDoc(doc(db, "notifications", uid, "items", notifId), { read: true });
 }
 
+// =========================
+// Load notifs
+// =========================
 async function loadNotifs(){
   const uid = auth.currentUser?.uid;
   if (!uid) return;
@@ -67,12 +74,13 @@ async function loadNotifs(){
     const hasLogo = n.logoUrl;
 
     card.innerHTML = `
-      <div style="display:flex;justify-content:space-between;gap:10px;align-items:center;">
+      <div style="display:flex;justify-content:space-between;gap:10px;align-items:flex-start;">
         <div style="flex:1">
           <div style="font-weight:900;display:flex;gap:8px;align-items:center;">
             ${hasLogo ? `<img src="${escapeHTML(n.logoUrl)}" style="width:22px;height:22px;border-radius:6px;object-fit:cover;">` : ""}
             <span>${escapeHTML(n.title || n.text || "Notification")}</span>
           </div>
+
           ${n.text && n.title ? `<div style="opacity:.85;font-size:13px;margin-top:4px;">${escapeHTML(n.text)}</div>` : ""}
           <div style="opacity:.6;font-size:12px;margin-top:4px;">${escapeHTML(n.type || "")}</div>
 
@@ -102,10 +110,9 @@ async function loadNotifs(){
   });
 }
 
-/* =========================
-   ADMIN NEWSLETTER (UI)
-========================= */
-
+// =========================
+// Admin newsletter modal
+// =========================
 function openNewsletterModal(){
   const overlay = document.createElement("div");
   overlay.style.position = "fixed";
@@ -126,7 +133,8 @@ function openNewsletterModal(){
 
       <div style="margin-top:12px;display:flex;flex-direction:column;gap:10px;">
         <input id="nlTitle" placeholder="Titre (ex : Nouveautés Ti’Doc)" />
-        <textarea id="nlText" rows="5" placeholder="Texte..." style="padding:12px;border:1px solid #ddd;border-radius:12px;font-size:15px"></textarea>
+        <textarea id="nlText" rows="5" placeholder="Texte..."
+          style="padding:12px;border:1px solid #ddd;border-radius:12px;font-size:15px"></textarea>
 
         <div style="display:flex;gap:10px;flex-wrap:wrap;">
           <input id="nlLinkLabel" placeholder="Texte bouton (ex : Shop now)" style="flex:1;min-width:180px" />
@@ -136,11 +144,6 @@ function openNewsletterModal(){
         <div style="display:flex;gap:10px;flex-wrap:wrap;">
           <input id="nlImageUrl" placeholder="URL image (optionnel)" style="flex:1;min-width:220px" />
           <input id="nlLogoUrl" placeholder="URL logo (optionnel)" style="flex:1;min-width:220px" />
-        </div>
-
-        <div class="small" style="opacity:.75;">
-          Programmation : (version “rapide”) on envoie la notification maintenant.
-          Si tu veux “tous les mois / à une date”, je te fais la version Cloud Function + Scheduler.
         </div>
 
         <button class="btn-primary" type="button" id="nlSend">Envoyer à tout le monde</button>
@@ -172,11 +175,7 @@ function openNewsletterModal(){
 
     try{
       nlMsg.textContent = "Envoi…";
-      await broadcastNewsletter({
-        title, text,
-        linkLabel, linkUrl,
-        imageUrl, logoUrl
-      });
+      await broadcastNewsletter({ title, text, linkLabel, linkUrl, imageUrl, logoUrl });
       nlMsg.textContent = "✅ Envoyé !";
       setTimeout(close, 600);
     }catch(e){
@@ -187,11 +186,8 @@ function openNewsletterModal(){
 }
 
 async function broadcastNewsletter(payload){
-  // 1) récupérer tous les users (admin-only, via rules)
   const usersSnap = await getDocs(collection(db, "users"));
 
-  // 2) écrire une notif par user
-  // ⚠️ si tu as BEAUCOUP d’utilisateurs, on passe en Cloud Function.
   const fromUid = auth.currentUser?.uid || "";
   const fromEmail = auth.currentUser?.email || "";
 
@@ -219,13 +215,13 @@ async function broadcastNewsletter(payload){
   await Promise.all(promises);
 }
 
-import { isAdminUser } from "./auth.js"; // ✅ ajoute ça à ton import auth
-
-const adminTools = document.getElementById("adminTools");
-const btnAddNewsletter = document.getElementById("btnAddNewsletter");
-
-onAuthStateChanged(auth, (u)=> {
+// =========================
+// Boot
+// =========================
+onAuthStateChanged(auth, (u)=>{
   if (!u) return;
+
+  loadNotifs();
 
   const admin = isAdminUser(u);
   if (adminTools) adminTools.style.display = admin ? "" : "none";
@@ -233,19 +229,4 @@ onAuthStateChanged(auth, (u)=> {
   if (admin && btnAddNewsletter) {
     btnAddNewsletter.onclick = openNewsletterModal;
   }
-});
-
-/* =========================
-   BOOT
-========================= */
-
-onAuthStateChanged(auth, (u)=>{
-  if (!u) return;
-
-  loadNotifs();
-
-  // afficher outils admin
-  const admin = isAdminUser(u);
-  if (adminTools) adminTools.style.display = admin ? "" : "none";
-  btnAddNewsletter?.addEventListener("click", openNewsletterModal);
 });
