@@ -256,7 +256,7 @@ onAuthStateChanged(auth, (u) => {
 
   // ===== SIGNUP =====
   btnSignup.onclick = async () => {
-  authRedirectLock = true;
+  authRedirectLock = false;
     try {
       msg.textContent = "";
 
