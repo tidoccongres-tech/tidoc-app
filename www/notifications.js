@@ -191,21 +191,34 @@ function openNewsletterModal(){
 // BROADCAST
 // =========================
 async function broadcastNewsletter(payload){
-  const users = await getDocs(collection(db, "users"));
+  const usersSnap = await getDocs(collection(db, "users"));
+
   const fromUid = auth.currentUser.uid;
   const fromEmail = auth.currentUser.email;
 
   const jobs = [];
-  users.forEach(u=>{
+
+  usersSnap.forEach(uDoc => {
+    const toUid = uDoc.id; // ✅ DESTINATAIRE OBLIGATOIRE
+
     jobs.push(
-      addDoc(collection(db, "notifications", u.id, "items"), {
-        ...payload,
-        fromUid,
-        fromEmail,
-        type: "newsletter",
-        read: false,
-        createdAt: serverTimestamp()
-      })
+      addDoc(
+        collection(db, "notifications", toUid, "items"),
+        {
+          toUid,               // ✅ requis par les rules
+          fromUid,             // ✅ requis par les rules
+          fromEmail,
+          type: "newsletter",
+          title: payload.title,
+          text: payload.text,
+          linkLabel: payload.linkLabel || "",
+          linkUrl: payload.linkUrl || "",
+          imageUrl: payload.imageUrl || "",
+          logoUrl: payload.logoUrl || "",
+          read: false,
+          createdAt: serverTimestamp()
+        }
+      )
     );
   });
 
