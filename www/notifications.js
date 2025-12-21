@@ -9,6 +9,7 @@ import {
   doc,
   updateDoc,
   addDoc,
+  deleteDoc,
   serverTimestamp
 } from "https://www.gstatic.com/firebasejs/10.12.4/firebase-firestore.js";
 import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.4/firebase-auth.js";
@@ -83,6 +84,12 @@ async function loadNotifs(){
       try { await markRead(d.id); } catch {}
     };
 
+    async function deleteNotif(notifId){
+  const uid = auth.currentUser?.uid;
+  if (!uid) return;
+  await deleteDoc(doc(db, "notifications", uid, "items", notifId));
+}
+    
     root.appendChild(card);
   });
 }
