@@ -10,7 +10,10 @@ import {
   signInWithEmailAndPassword,
   sendPasswordResetEmail,
   signOut,
-  updateProfile
+  updateProfile,
+  EmailAuthProvider,
+  reauthenticateWithCredential,
+  updatePassword
 } from "https://www.gstatic.com/firebasejs/10.12.4/firebase-auth.js";
 
 import {
@@ -26,8 +29,6 @@ import {
 // CONFIG
 // =====================
 export const ADMIN_EMAILS = ["tidoc.congres@gmail.com"].map(e => e.toLowerCase());
-
-// Avatars (dossier: /avatars/)
 export const AVATARS = Array.from({ length: 10 }, (_, i) => `./avatars/avatar-${i + 1}.png`);
 
 // =====================
@@ -36,6 +37,7 @@ export const AVATARS = Array.from({ length: 10 }, (_, i) => `./avatars/avatar-${
 const app = getApps().length ? getApp() : initializeApp(firebaseConfig);
 
 export const auth = getAuth(app);
+auth.languageCode = "fr";
 export const db = getFirestore(app);
 
 // =====================
@@ -50,26 +52,19 @@ export function isAdminUser(user = auth.currentUser) {
   return ADMIN_EMAILS.includes(email);
 }
 
-// Crée/complète users/{uid}
 export async function ensureUserDoc(user, { displayName, avatarUrl } = {}) {
   if (!user?.uid) return null;
 
   const ref = doc(db, "users", user.uid);
   const snap = await getDoc(ref);
 
-  // ✅ si doc existe : complète si manque avatarUrl / displayName
-    if (snap.exists()) {
+  if (snap.exists()) {
     const data = snap.data() || {};
     const patch = {};
 
-    // avatar: si manquant, ou si on fournit avatarUrl
     if (!data.avatarUrl) patch.avatarUrl = avatarUrl || pickRandomAvatar();
     else if (avatarUrl && avatarUrl !== data.avatarUrl) patch.avatarUrl = avatarUrl;
 
-    // displayName:
-    // - si manquant -> set
-    // - si on fournit displayName -> force update
-    // - sinon si auth.displayName existe et différent -> update (utile si tu changes le nom)
     const wantedName = (displayName || user.displayName || "Utilisateur").trim();
     if (!data.displayName) patch.displayName = wantedName;
     else if (displayName && wantedName !== data.displayName) patch.displayName = wantedName;
@@ -80,11 +75,9 @@ export async function ensureUserDoc(user, { displayName, avatarUrl } = {}) {
       await setDoc(ref, patch, { merge: true });
       return { ...data, ...patch };
     }
-
     return data;
   }
 
-  // ✅ sinon : crée doc
   const finalName = (displayName || user.displayName || "Utilisateur").trim();
   const finalAvatar = avatarUrl || pickRandomAvatar();
 
@@ -117,25 +110,19 @@ export async function getUserProfile(uid) {
 // =====================
 export async function signupEmail({ email, password, displayName } = {}) {
   if (!email || !password) throw new Error("Email + mot de passe requis.");
-
   const name = (displayName || "").trim();
   if (!name) throw new Error("Pseudo requis.");
 
   const cred = await createUserWithEmailAndPassword(auth, email, password);
 
-  // 1) Réserve le pseudo (unique)
   const claimed = await claimUsername(cred.user, name);
-
-  // 2) Met à jour auth profile
   await updateProfile(cred.user, { displayName: claimed.original });
 
-  // 3) Crée/maj doc user avec le displayName + usernameNormalized
   await ensureUserDoc(cred.user, {
     displayName: claimed.original,
     avatarUrl: pickRandomAvatar()
   });
 
-  // 4) Stocke aussi le normalized dans users/{uid} (optionnel mais utile)
   await setDoc(doc(db, "users", cred.user.uid), {
     username: claimed.original,
     usernameNormalized: claimed.normalized,
@@ -145,13 +132,48 @@ export async function signupEmail({ email, password, displayName } = {}) {
   return cred.user;
 }
 
-export async function resetPassword(email) {
-  if (!email) throw new Error("Email requis.");
-  await sendPasswordResetEmail(auth, email);
+export async function loginEmail({ email, password } = {}) {
+  if (!email || !password) throw new Error("Email + mot de passe requis.");
+  const cred = await signInWithEmailAndPassword(auth, email, password);
+  await ensureUserDoc(cred.user);
+  return cred.user;
+}
+
+// ✅ RESET PASSWORD (plus robuste)
+export async function resetPassword(email, { redirectUrl } = {}) {
+  const e = (email || "").trim();
+  if (!e) throw new Error("Email requis.");
+
+  const emailOk = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e);
+  if (!emailOk) throw new Error("Adresse email invalide.");
+
+  // optionnel mais utile: où renvoyer après reset
+  const actionCodeSettings = {
+    url: redirectUrl || (location.origin + "/login.html"),
+    handleCodeInApp: false
+  };
+
+  await sendPasswordResetEmail(auth, e, actionCodeSettings);
 }
 
 export async function logout() {
   await signOut(auth);
+}
+
+// ✅ Changer mot de passe (ancien requis)
+export async function changePasswordWithReauth(oldPassword, newPassword) {
+  const u = auth.currentUser;
+  if (!u || !u.email) throw new Error("Connexion requise.");
+
+  const oldP = String(oldPassword || "");
+  const newP = String(newPassword || "");
+
+  if (!oldP) throw new Error("Ancien mot de passe requis.");
+  if (newP.length < 6) throw new Error("Nouveau mot de passe trop court (min 6).");
+
+  const cred = EmailAuthProvider.credential(u.email, oldP);
+  await reauthenticateWithCredential(u, cred);
+  await updatePassword(u, newP);
 }
 
 // Helper : exiger connexion pour accéder à une page
@@ -161,19 +183,12 @@ export function requireAuthOrRedirect(redirectTo = "./login.html") {
   });
 }
 
-export async function loginEmail({ email, password } = {}) {
-  if (!email || !password) throw new Error("Email + mot de passe requis.");
-  const cred = await signInWithEmailAndPassword(auth, email, password);
-  await ensureUserDoc(cred.user);
-  return cred.user;
-}
-
 export function normalizeUsername(name = "") {
   return name
     .trim()
     .toLowerCase()
-    .replace(/\s+/g, "")       // enlève espaces
-    .replace(/[^a-z0-9._-]/g, ""); // garde simple
+    .replace(/\s+/g, "")
+    .replace(/[^a-z0-9._-]/g, "");
 }
 
 export async function claimUsername(user, displayNameRaw) {
@@ -189,9 +204,7 @@ export async function claimUsername(user, displayNameRaw) {
 
   await runTransaction(db, async (tx) => {
     const snap = await tx.get(ref);
-    if (snap.exists()) {
-      throw new Error("Pseudo déjà pris 😕");
-    }
+    if (snap.exists()) throw new Error("Pseudo déjà pris 😕");
     tx.set(ref, {
       uid: user.uid,
       original,
@@ -203,7 +216,7 @@ export async function claimUsername(user, displayNameRaw) {
 }
 
 // =====================
-// ÉTAT GLOBAL (pour toutes les pages)
+// ÉTAT GLOBAL
 // =====================
 window.TIDOC_AUTH = window.TIDOC_AUTH || null;
 
@@ -214,7 +227,6 @@ onAuthStateChanged(auth, async (user) => {
     return;
   }
 
-  // ✅ état rapide (immédiat)
   const base = {
     uid: user.uid,
     email: (user.email || "").toLowerCase(),
@@ -225,8 +237,7 @@ onAuthStateChanged(auth, async (user) => {
   window.TIDOC_AUTH = base;
   window.dispatchEvent(new CustomEvent("tidoc:auth", { detail: base }));
 
-  // ✅ complète avec Firestore (avatar/role/nom)
-    try {
+  try {
     const profile = await ensureUserDoc(user);
 
     try {
