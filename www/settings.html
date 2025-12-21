@@ -42,17 +42,37 @@
     </section>
 
     <!-- ✅ NOUVEAU : changer mot de passe -->
-    <section class="card" style="margin-top:12px;">
-      <h3 style="margin:0;color:var(--tidoc)">Sécurité</h3>
+    <section class="card security-card">
+  <h2 class="security-title">Sécurité</h2>
+  <div class="security-sub">Change ton mot de passe (ancien requis)</div>
 
-      <div class="row" style="margin-top:10px;display:flex;flex-direction:column;gap:8px;">
-        <input id="oldPass" type="password" placeholder="Ancien mot de passe" />
-        <input id="newPass1" type="password" placeholder="Nouveau mot de passe (6+)" />
-        <input id="newPass2" type="password" placeholder="Confirmer le nouveau mot de passe" />
-        <button class="btn-primary" id="changePassBtn" type="button">Modifier le mot de passe</button>
-        <div id="passMsg" style="font-size:13px;color:var(--muted)"></div>
-      </div>
-    </section>
+  <div class="security-grid">
+    <div class="sec-field">
+      <label for="oldPass">Ancien mot de passe</label>
+      <input id="oldPass" class="sec-input" type="password" placeholder="••••••••" autocomplete="current-password">
+    </div>
+
+    <div class="sec-field">
+      <label for="newPass">Nouveau mot de passe</label>
+      <input id="newPass" class="sec-input" type="password" placeholder="6 caractères minimum" autocomplete="new-password">
+    </div>
+
+    <div class="sec-field">
+      <label for="newPass2">Confirmer le nouveau mot de passe</label>
+      <input id="newPass2" class="sec-input" type="password" placeholder="Répète le nouveau mot de passe" autocomplete="new-password">
+    </div>
+  </div>
+
+  <div class="security-actions">
+    <button class="btn-primary" id="btnChangePwd" type="button">Modifier le mot de passe</button>
+  </div>
+
+  <div class="security-hint">
+    Astuce : évite un mot de passe trop simple. Minimum 6 caractères, idéalement une phrase + chiffres.
+  </div>
+
+  <div id="pwdMsg" class="security-msg"></div>
+</section>
   </main>
 
   <script type="module" src="settings.js?v=1000"></script>
