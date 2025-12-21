@@ -39,16 +39,23 @@ let postInflight = false;
 const commentInflight = new Set(); // postId en cours d'envoi
 
 // ===== Helpers =====
-function showMsg(t = "") { if (postMsg) postMsg.textContent = t; }
+const nameCache = new Map();
 
-function requireLogin(actionText = "faire ça") {
-  if (!auth.currentUser) {
-    alert("Connexion requise 🔒\n\nPour " + actionText + ", connecte-toi.");
-    return false;
+async function getNameByUid(uid, fallback = "Utilisateur") {
+  if (!uid) return fallback;
+  if (nameCache.has(uid)) return nameCache.get(uid);
+
+  try {
+    const snap = await getDoc(doc(db, "users", uid));
+    const d = snap.exists() ? (snap.data() || {}) : {};
+    const n = (d.displayName || d.username || "").trim();
+    const finalName = n || fallback;
+    nameCache.set(uid, finalName);
+    return finalName;
+  } catch {
+    return fallback;
   }
-  return true;
 }
-
 function escapeHTML(s = "") {
   return String(s)
     .replaceAll("&", "&amp;")
