@@ -75,6 +75,11 @@
       </label>
 
       <label class="field">
+  <span>Nombre de places</span>
+  <input id="eventCapacity" type="number" min="1" placeholder="Ex : 20" />
+</label>
+      
+      <label class="field">
         <span>Description</span>
         <textarea id="eventDesc" rows="4" placeholder="Détails utiles..." maxlength="900"></textarea>
       </label>
@@ -92,8 +97,6 @@
       <h2 style="margin:0;color:var(--tidoc)">Évènements</h2>
       <div id="eventsList" style="margin-top:12px;"></div>
     </section>
-
-  </main>
 
   <!-- Tabbar -->
   <nav class="tabbar">
@@ -140,5 +143,8 @@
   <script src="pwa.js"></script>
   <script type="module" src="./header-user-menu.js?v=999"></script>
   <script type="module" src="./auth.js"></script>
+ 
+</main>
+  
 </body>
 </html>
