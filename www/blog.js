@@ -489,42 +489,45 @@ async function loadPosts() {
 }
 
 // ===== Boot =====
-document.addEventListener("DOMContentLoaded", () => {
-  createBtn?.addEventListener("click", (e) => {
-    e.preventDefault();
-    e.stopPropagation();
-    if (!requireLogin("écrire un post")) return;
-    showForm(true);
-    titleInput?.focus();
-  });
+// ===== Boot =====
 
-  cancelBtn?.addEventListener("click", (e) => {
-    e.preventDefault();
-    e.stopPropagation();
-    clearForm();
-    showForm(false);
-  });
-
-  submitBtn?.addEventListener("click", async (e) => {
-    e.preventDefault();
-    e.stopPropagation();
-
-    if (postInflight) return;
-    postInflight = true;
-    if (submitBtn) submitBtn.disabled = true;
-
-    try {
-      await createPost();
-    } catch (err) {
-      console.error("createPost error:", err);
-      showMsg("Erreur: " + (err?.message || String(err)));
-      alert("Erreur Publier:\n\n" + (err?.message || String(err)));
-    } finally {
-      postInflight = false;
-      if (submitBtn) submitBtn.disabled = false;
-    }
-  });
-
-  onAuthStateChanged(auth, () => loadPosts());
-  loadPosts();
+// bouton créer post
+createBtn?.addEventListener("click", (e) => {
+  e.preventDefault();
+  e.stopPropagation();
+  if (!requireLogin("écrire un post")) return;
+  showForm(true);
+  titleInput?.focus();
 });
+
+// annuler
+cancelBtn?.addEventListener("click", (e) => {
+  e.preventDefault();
+  e.stopPropagation();
+  clearForm();
+  showForm(false);
+});
+
+// publier
+submitBtn?.addEventListener("click", async (e) => {
+  e.preventDefault();
+  e.stopPropagation();
+
+  if (postInflight) return;
+  postInflight = true;
+  submitBtn.disabled = true;
+
+  try {
+    await createPost();
+  } catch (err) {
+    console.error("createPost error:", err);
+    showMsg("Erreur: " + (err?.message || String(err)));
+  } finally {
+    postInflight = false;
+    submitBtn.disabled = false;
+  }
+});
+
+// auth + chargement posts
+onAuthStateChanged(auth, () => loadPosts());
+loadPosts();
