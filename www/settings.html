@@ -4,16 +4,13 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Ti’Doc – Paramètres</title>
-  <link rel="stylesheet" href="style.css?v=999" />
+  <link rel="stylesheet" href="style.css?v=1000" />
 </head>
 
 <body>
-  <!-- Topbar + menu profil -->
   <script type="module" src="header-user-menu.js"></script>
 
   <main class="page blog-page">
-
-    <!-- Bouton HOME sous la topbar (mini case) -->
     <div class="page-top-actions">
       <a class="home-icon-btn" href="./index.html" aria-label="Accueil">
         <svg class="home-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
@@ -24,15 +21,11 @@
       </a>
     </div>
 
-    <!-- Carte titre Paramètres -->
     <section class="card" style="margin-top:10px;">
       <h2 style="margin:0;color:var(--tidoc)">Paramètres</h2>
-      <p style="margin:6px 0 0;color:var(--muted);font-size:13px">
-        Gère ton compte Ti’Doc
-      </p>
+      <p style="margin:6px 0 0;color:var(--muted);font-size:13px">Gère ton compte Ti’Doc</p>
     </section>
 
-    <!-- Profil (direct) -->
     <section class="card profile-card" style="margin-top:12px;">
       <div id="currentAvatar" class="profile-avatar"></div>
 
@@ -48,9 +41,20 @@
       </div>
     </section>
 
+    <!-- ✅ NOUVEAU : changer mot de passe -->
+    <section class="card" style="margin-top:12px;">
+      <h3 style="margin:0;color:var(--tidoc)">Sécurité</h3>
+
+      <div class="row" style="margin-top:10px;display:flex;flex-direction:column;gap:8px;">
+        <input id="oldPass" type="password" placeholder="Ancien mot de passe" />
+        <input id="newPass1" type="password" placeholder="Nouveau mot de passe (6+)" />
+        <input id="newPass2" type="password" placeholder="Confirmer le nouveau mot de passe" />
+        <button class="btn-primary" id="changePassBtn" type="button">Modifier le mot de passe</button>
+        <div id="passMsg" style="font-size:13px;color:var(--muted)"></div>
+      </div>
+    </section>
   </main>
 
-  <!-- ✅ IMPORTANT: on charge le bon JS + anti-cache -->
-  <script type="module" src="settings.js?v=7"></script>
+  <script type="module" src="settings.js?v=1000"></script>
 </body>
 </html>
