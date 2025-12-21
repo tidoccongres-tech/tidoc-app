@@ -29,6 +29,8 @@ import {
 // CONFIG
 // =====================
 export const ADMIN_EMAILS = ["tidoc.congres@gmail.com"].map(e => e.toLowerCase());
+
+// Avatars (dossier: /avatars/)
 export const AVATARS = Array.from({ length: 10 }, (_, i) => `./avatars/avatar-${i + 1}.png`);
 
 // =====================
@@ -38,6 +40,7 @@ const app = getApps().length ? getApp() : initializeApp(firebaseConfig);
 
 export const auth = getAuth(app);
 auth.languageCode = "fr";
+
 export const db = getFirestore(app);
 
 // =====================
@@ -52,32 +55,40 @@ export function isAdminUser(user = auth.currentUser) {
   return ADMIN_EMAILS.includes(email);
 }
 
+// Crée/complète users/{uid}
 export async function ensureUserDoc(user, { displayName, avatarUrl } = {}) {
   if (!user?.uid) return null;
 
   const ref = doc(db, "users", user.uid);
   const snap = await getDoc(ref);
 
+  // ✅ si doc existe : complète si manque avatarUrl / displayName
   if (snap.exists()) {
     const data = snap.data() || {};
     const patch = {};
 
+    // avatar: si manquant, ou si on fournit avatarUrl
     if (!data.avatarUrl) patch.avatarUrl = avatarUrl || pickRandomAvatar();
     else if (avatarUrl && avatarUrl !== data.avatarUrl) patch.avatarUrl = avatarUrl;
 
+    // displayName:
     const wantedName = (displayName || user.displayName || "Utilisateur").trim();
     if (!data.displayName) patch.displayName = wantedName;
     else if (displayName && wantedName !== data.displayName) patch.displayName = wantedName;
-    else if (!displayName && user.displayName && user.displayName.trim() !== data.displayName) patch.displayName = user.displayName.trim();
+    else if (!displayName && user.displayName && user.displayName.trim() !== data.displayName) {
+      patch.displayName = user.displayName.trim();
+    }
 
     if (Object.keys(patch).length) {
       patch.updatedAt = serverTimestamp();
       await setDoc(ref, patch, { merge: true });
       return { ...data, ...patch };
     }
+
     return data;
   }
 
+  // ✅ sinon : crée doc
   const finalName = (displayName || user.displayName || "Utilisateur").trim();
   const finalAvatar = avatarUrl || pickRandomAvatar();
 
@@ -106,23 +117,65 @@ export async function getUserProfile(uid) {
 }
 
 // =====================
+// USERNAME UNIQUE
+// =====================
+export function normalizeUsername(name = "") {
+  return name
+    .trim()
+    .toLowerCase()
+    .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+    .replace(/\s+/g, "")
+    .replace(/[^a-z0-9._-]/g, "");
+}
+
+export async function claimUsername(user, displayNameRaw) {
+  const original = (displayNameRaw || "").trim();
+  if (!original) throw new Error("Pseudo requis.");
+
+  const normalized = normalizeUsername(original);
+  if (!normalized || normalized.length < 3) {
+    throw new Error("Pseudo invalide (min 3 caractères, lettres/chiffres/._-).");
+  }
+
+  const ref = doc(db, "usernames", normalized);
+
+  await runTransaction(db, async (tx) => {
+    const snap = await tx.get(ref);
+    if (snap.exists()) throw new Error("Pseudo déjà pris 😕");
+    tx.set(ref, {
+      uid: user.uid,
+      original,
+      createdAt: serverTimestamp()
+    });
+  });
+
+  return { original, normalized };
+}
+
+// =====================
 // AUTH ACTIONS
 // =====================
 export async function signupEmail({ email, password, displayName } = {}) {
   if (!email || !password) throw new Error("Email + mot de passe requis.");
+
   const name = (displayName || "").trim();
   if (!name) throw new Error("Pseudo requis.");
 
   const cred = await createUserWithEmailAndPassword(auth, email, password);
 
+  // 1) Réserve le pseudo (unique)
   const claimed = await claimUsername(cred.user, name);
+
+  // 2) Met à jour auth profile
   await updateProfile(cred.user, { displayName: claimed.original });
 
+  // 3) Crée/maj doc user
   await ensureUserDoc(cred.user, {
     displayName: claimed.original,
     avatarUrl: pickRandomAvatar()
   });
 
+  // 4) Stocke aussi le normalized dans users/{uid} (utile)
   await setDoc(doc(db, "users", cred.user.uid), {
     username: claimed.original,
     usernameNormalized: claimed.normalized,
@@ -139,25 +192,18 @@ export async function loginEmail({ email, password } = {}) {
   return cred.user;
 }
 
-// ✅ RESET PASSWORD (plus robuste)
+// ✅ RESET PASSWORD (redirige vers reset.html)
 export async function resetPassword(email) {
-  if (!email) throw new Error("Email requis.");
+  const e = String(email || "").trim();
+  if (!e) throw new Error("Email requis.");
 
-  const actionCodeSettings = {
-    // ✅ doit être sur un domaine autorisé dans Firebase
-    url: window.location.origin + "/login.html",
-    handleCodeInApp: false,
-  };
-
-  await sendPasswordResetEmail(auth, email, actionCodeSettings);
-}
   const emailOk = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e);
   if (!emailOk) throw new Error("Adresse email invalide.");
 
-  // optionnel mais utile: où renvoyer après reset
+  // 🔁 page custom (tu dois l’avoir sur GitHub Pages)
   const actionCodeSettings = {
-    url: redirectUrl || (location.origin + "/login.html"),
-    handleCodeInApp: false
+    url: "https://tidoccongres-tech.github.io/reset.html",
+    handleCodeInApp: true
   };
 
   await sendPasswordResetEmail(auth, e, actionCodeSettings);
@@ -190,40 +236,8 @@ export function requireAuthOrRedirect(redirectTo = "./login.html") {
   });
 }
 
-export function normalizeUsername(name = "") {
-  return name
-    .trim()
-    .toLowerCase()
-    .replace(/\s+/g, "")
-    .replace(/[^a-z0-9._-]/g, "");
-}
-
-export async function claimUsername(user, displayNameRaw) {
-  const original = (displayNameRaw || "").trim();
-  if (!original) throw new Error("Pseudo requis.");
-
-  const normalized = normalizeUsername(original);
-  if (!normalized || normalized.length < 3) {
-    throw new Error("Pseudo invalide (min 3 caractères, lettres/chiffres/._-).");
-  }
-
-  const ref = doc(db, "usernames", normalized);
-
-  await runTransaction(db, async (tx) => {
-    const snap = await tx.get(ref);
-    if (snap.exists()) throw new Error("Pseudo déjà pris 😕");
-    tx.set(ref, {
-      uid: user.uid,
-      original,
-      createdAt: serverTimestamp()
-    });
-  });
-
-  return { original, normalized };
-}
-
 // =====================
-// ÉTAT GLOBAL
+// ÉTAT GLOBAL (pour toutes les pages)
 // =====================
 window.TIDOC_AUTH = window.TIDOC_AUTH || null;
 
@@ -234,6 +248,7 @@ onAuthStateChanged(auth, async (user) => {
     return;
   }
 
+  // ✅ état rapide (immédiat)
   const base = {
     uid: user.uid,
     email: (user.email || "").toLowerCase(),
@@ -244,6 +259,7 @@ onAuthStateChanged(auth, async (user) => {
   window.TIDOC_AUTH = base;
   window.dispatchEvent(new CustomEvent("tidoc:auth", { detail: base }));
 
+  // ✅ complète avec Firestore (avatar/role/nom)
   try {
     const profile = await ensureUserDoc(user);
 
