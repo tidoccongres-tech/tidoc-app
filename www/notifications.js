@@ -138,53 +138,163 @@ function openNewsletterModal(){
   let logoUrl = "";
 
   const overlay = document.createElement("div");
-  overlay.style.position = "fixed";
-  overlay.style.inset = "0";
-  overlay.style.background = "rgba(0,0,0,.45)";
-  overlay.style.display = "flex";
-  overlay.style.alignItems = "center";
-  overlay.style.justifyContent = "center";
-  overlay.style.zIndex = "9999";
+  overlay.className = "modal-overlay";
 
   overlay.innerHTML = `
-    <div class="card" style="width:min(520px,94vw)">
-      <h2>Nouvelle newsletter</h2>
+    <section class="card modal-card">
+      <div class="modal-head">
+        <div>
+          <h2 style="margin:0;color:var(--tidoc)">Nouvelle newsletter</h2>
+          <div style="font-size:13px;color:var(--muted);margin-top:4px">Envoi en notification à tous les utilisateurs</div>
+        </div>
+        <button class="btn-outline" type="button" id="nlClose">Fermer</button>
+      </div>
 
-      <input id="nlTitle" placeholder="Titre" />
-      <textarea id="nlText" rows="4" placeholder="Texte"></textarea>
+      <div class="modal-body">
 
-      <input id="nlLinkLabel" placeholder="Texte bouton (optionnel)" />
-      <input id="nlLinkUrl" placeholder="Lien bouton (optionnel)" />
+        <div class="modal-field">
+          <label>Titre</label>
+          <input id="nlTitle" placeholder="Ex : Nouveautés Ti’Doc" />
+        </div>
 
-      <button class="btn-outline" id="pickImage">Choisir image</button>
-      <button class="btn-outline" id="pickLogo">Choisir logo</button>
+        <div class="modal-field">
+          <label>Texte</label>
+          <textarea id="nlText" rows="5" placeholder="Écris ton message..." ></textarea>
+        </div>
 
-      <button class="btn-primary" id="sendNl">Envoyer</button>
-    </div>
+        <div class="modal-grid">
+          <div class="modal-field">
+            <label>Texte du bouton (optionnel)</label>
+            <input id="nlLinkLabel" placeholder="Ex : Shop now" />
+          </div>
+
+          <div class="modal-field">
+            <label>Lien du bouton (optionnel)</label>
+            <input id="nlLinkUrl" placeholder="https://..." />
+          </div>
+        </div>
+
+        <div class="modal-actions" style="justify-content:flex-start;">
+          <button class="btn-outline" type="button" id="pickImage">Choisir image</button>
+          <button class="btn-outline" type="button" id="pickLogo">Choisir logo</button>
+          <div id="nlPicked" style="font-size:13px;color:var(--muted)"></div>
+        </div>
+
+        <div class="preview-card">
+          <div class="preview-toprow">
+            <img id="prevLogo" class="preview-logo" style="display:none" alt="logo">
+            <div style="flex:1">
+              <p id="prevTitle" class="preview-title">Aperçu du titre…</p>
+              <p id="prevText" class="preview-text">Aperçu du texte…</p>
+            </div>
+          </div>
+          <img id="prevImg" class="preview-media" style="display:none" alt="image">
+          <div style="margin-top:10px;display:flex;justify-content:flex-start;">
+            <a id="prevBtn" class="btn-primary" target="_blank" style="display:none;text-decoration:none;"></a>
+          </div>
+        </div>
+
+        <div class="modal-actions">
+          <div id="nlMsg" style="margin-right:auto;font-size:13px;color:var(--muted)"></div>
+          <button class="btn-primary" type="button" id="nlSend">Envoyer à tout le monde</button>
+        </div>
+
+      </div>
+    </section>
   `;
 
   document.body.appendChild(overlay);
 
+  const close = () => overlay.remove();
+  overlay.querySelector("#nlClose").onclick = close;
+  overlay.addEventListener("click", (e)=>{ if (e.target === overlay) close(); });
+
+  const titleEl = overlay.querySelector("#nlTitle");
+  const textEl  = overlay.querySelector("#nlText");
+  const labEl   = overlay.querySelector("#nlLinkLabel");
+  const urlEl   = overlay.querySelector("#nlLinkUrl");
+
+  const prevTitle = overlay.querySelector("#prevTitle");
+  const prevText  = overlay.querySelector("#prevText");
+  const prevImg   = overlay.querySelector("#prevImg");
+  const prevLogo  = overlay.querySelector("#prevLogo");
+  const prevBtn   = overlay.querySelector("#prevBtn");
+  const picked    = overlay.querySelector("#nlPicked");
+
+  function refreshPreview(){
+    const t = titleEl.value.trim();
+    const x = textEl.value.trim();
+    const bl = labEl.value.trim();
+    const bu = urlEl.value.trim();
+
+    prevTitle.textContent = t || "Aperçu du titre…";
+    prevText.textContent  = x || "Aperçu du texte…";
+
+    if (logoUrl){
+      prevLogo.src = logoUrl;
+      prevLogo.style.display = "";
+    } else {
+      prevLogo.style.display = "none";
+    }
+
+    if (imageUrl){
+      prevImg.src = imageUrl;
+      prevImg.style.display = "";
+    } else {
+      prevImg.style.display = "none";
+    }
+
+    if (bl && bu){
+      prevBtn.textContent = bl;
+      prevBtn.href = bu;
+      prevBtn.style.display = "inline-block";
+    } else {
+      prevBtn.style.display = "none";
+    }
+
+    const bits = [];
+    if (imageUrl) bits.push("Image ✅");
+    if (logoUrl) bits.push("Logo ✅");
+    picked.textContent = bits.length ? bits.join(" • ") : "";
+  }
+
+  titleEl.addEventListener("input", refreshPreview);
+  textEl.addEventListener("input", refreshPreview);
+  labEl.addEventListener("input", refreshPreview);
+  urlEl.addEventListener("input", refreshPreview);
+
   overlay.querySelector("#pickImage").onclick = () =>
-    openGalleryPicker(url => imageUrl = url);
+    openGalleryPicker((url) => { imageUrl = url; refreshPreview(); });
 
   overlay.querySelector("#pickLogo").onclick = () =>
-    openGalleryPicker(url => logoUrl = url);
+    openGalleryPicker((url) => { logoUrl = url; refreshPreview(); });
 
-  overlay.querySelector("#sendNl").onclick = async () => {
-    const title = overlay.querySelector("#nlTitle").value.trim();
-    const text = overlay.querySelector("#nlText").value.trim();
-    const linkLabel = overlay.querySelector("#nlLinkLabel").value.trim();
-    const linkUrl = overlay.querySelector("#nlLinkUrl").value.trim();
+  overlay.querySelector("#nlSend").onclick = async () => {
+    const nlMsg = overlay.querySelector("#nlMsg");
 
-    if (!title || !text) return alert("Titre + texte requis");
+    const title = titleEl.value.trim();
+    const text = textEl.value.trim();
+    const linkLabel = labEl.value.trim();
+    const linkUrl = urlEl.value.trim();
 
-    await broadcastNewsletter({
-      title, text, linkLabel, linkUrl, imageUrl, logoUrl
-    });
+    if (!title || !text){ nlMsg.textContent = "❌ Titre + texte requis."; return; }
+    if ((linkLabel && !linkUrl) || (!linkLabel && linkUrl)){
+      nlMsg.textContent = "❌ Bouton: il faut texte + lien.";
+      return;
+    }
 
-    overlay.remove();
+    try{
+      nlMsg.textContent = "Envoi…";
+      await broadcastNewsletter({ title, text, linkLabel, linkUrl, imageUrl, logoUrl });
+      nlMsg.textContent = "✅ Envoyé !";
+      setTimeout(close, 500);
+    }catch(e){
+      console.log(e);
+      nlMsg.textContent = "Erreur: " + (e?.message || e);
+    }
   };
+
+  refreshPreview();
 }
 
 // =========================
