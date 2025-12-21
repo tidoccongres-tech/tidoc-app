@@ -1109,3 +1109,8 @@ main, .page, .card{
   fill:#178CA8; /* couleur Ti’Doc */
   display:block;
 }
+
+/* évite que le contenu soit sous la topbar sticky */
+.page.blog-page{
+  padding-top: calc(56px + 12px);
+}
