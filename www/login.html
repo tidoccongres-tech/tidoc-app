@@ -276,16 +276,24 @@ btnSignup.onclick = async () => {
   };
 
   // ===== RESET =====
-  document.getElementById("btnReset").onclick = async () => {
-    const email = document.getElementById("liEmail").value.trim();
-    if(!email) { msg.textContent = "Mets ton email d’abord."; return; }
-    try {
-      await resetPassword(email);
-      msg.textContent = "Email de réinitialisation envoyé ✅";
-    } catch (e) {
-      msg.textContent = "Erreur: " + (e?.message || e);
-    }
-  };
+document.getElementById("btnReset").onclick = async () => {
+  const email = document.getElementById("liEmail").value.trim();
+
+  if (!email) { msg.textContent = "Mets ton email d’abord."; return; }
+
+  try {
+    msg.textContent = "Envoi de l’email…";
+    await resetPassword(email, { redirectUrl: location.origin + "/login.html" });
+    msg.textContent = "Email de réinitialisation envoyé ✅ (check spam aussi)";
+  } catch (e) {
+    const code = (e?.code || "");
+    if (code === "auth/user-not-found") msg.textContent = "❌ Aucun compte avec cet email.";
+    else if (code === "auth/invalid-email") msg.textContent = "❌ Email invalide.";
+    else if (code === "auth/too-many-requests") msg.textContent = "⏳ Trop de tentatives, réessaie plus tard.";
+    else msg.textContent = "Erreur: " + (e?.message || e);
+    console.log("reset error:", e);
+  }
+};
   
 </script>
 </body>
