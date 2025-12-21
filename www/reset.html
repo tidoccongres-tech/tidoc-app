@@ -1,1 +1,93 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Ti’Doc – Réinitialisation</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
 
+<body>
+  <main class="page blog-page" style="max-width:520px;margin:20px auto;">
+    <section class="card">
+      <h2 style="margin:0;color:var(--tidoc)">Nouveau mot de passe</h2>
+      <p style="margin:6px 0 0;color:var(--muted);font-size:13px">
+        Choisis un nouveau mot de passe (6+ caractères).
+      </p>
+
+      <div style="height:14px"></div>
+
+      <label class="field">
+        <span>Nouveau mot de passe</span>
+        <input id="pass1" type="password" placeholder="Nouveau mot de passe" />
+      </label>
+
+      <label class="field">
+        <span>Confirmer le mot de passe</span>
+        <input id="pass2" type="password" placeholder="Confirme le mot de passe" />
+      </label>
+
+      <div style="height:12px"></div>
+
+      <button class="btn-primary" id="btnReset" type="button" style="width:100%">
+        Valider
+      </button>
+
+      <div id="msg" style="margin-top:10px;font-size:13px;color:var(--muted)"></div>
+    </section>
+  </main>
+
+  <script type="module">
+    import { auth } from "./auth.js";
+    import {
+      confirmPasswordReset
+    } from "https://www.gstatic.com/firebasejs/10.12.4/firebase-auth.js";
+
+    const msg = document.getElementById("msg");
+    const pass1 = document.getElementById("pass1");
+    const pass2 = document.getElementById("pass2");
+    const btn = document.getElementById("btnReset");
+
+    const params = new URLSearchParams(location.search);
+    const oobCode = params.get("oobCode");
+    const mode = params.get("mode");
+
+    // sécurité : si le lien n'est pas un reset
+    if (mode !== "resetPassword" || !oobCode) {
+      msg.textContent = "Lien invalide ou incomplet.";
+      btn.disabled = true;
+    }
+
+    btn.onclick = async () => {
+      const p1 = pass1.value || "";
+      const p2 = pass2.value || "";
+
+      if (p1.length < 6) {
+        msg.textContent = "❌ Mot de passe trop court (min 6).";
+        return;
+      }
+      if (p1 !== p2) {
+        msg.textContent = "❌ Les mots de passe ne correspondent pas.";
+        return;
+      }
+
+      msg.textContent = "Modification en cours…";
+
+      try {
+        await confirmPasswordReset(auth, oobCode, p1);
+        msg.textContent = "✅ Mot de passe modifié ! Redirection…";
+        setTimeout(() => location.href = "./login.html", 1200);
+      } catch (e) {
+        const code = (e?.code || "");
+        if (code === "auth/expired-action-code") {
+          msg.textContent = "❌ Lien expiré. Refais “mot de passe oublié”.";
+        } else if (code === "auth/invalid-action-code") {
+          msg.textContent = "❌ Lien invalide. Refais “mot de passe oublié”.";
+        } else {
+          msg.textContent = "Erreur: " + (e?.message || e);
+        }
+      }
+    };
+  </script>
+</body>
+</html>
