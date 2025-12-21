@@ -8,11 +8,28 @@ const nameEl = document.getElementById("profileName");
 const emailEl = document.getElementById("profileEmail");
 const changeAvatarBtn = document.getElementById("changeAvatarBtn");
 
-const oldPass = document.getElementById("oldPass");
-const newPass1 = document.getElementById("newPass1");
-const newPass2 = document.getElementById("newPass2");
-const changePassBtn = document.getElementById("changePassBtn");
-const passMsg = document.getElementById("passMsg");
+const msg = document.getElementById("pwdMsg");
+const oldP = document.getElementById("oldPass");
+const newP = document.getElementById("newPass");
+const newP2 = document.getElementById("newPass2");
+
+document.getElementById("btnChangePwd").onclick = async () => {
+  msg.textContent = "";
+
+  if (newP.value !== newP2.value) {
+    msg.textContent = "❌ Les deux nouveaux mots de passe ne correspondent pas.";
+    return;
+  }
+
+  try {
+    msg.textContent = "Modification…";
+    await changePasswordWithReauth(oldP.value, newP.value); // ta fonction auth.js
+    msg.textContent = "✅ Mot de passe modifié.";
+    oldP.value = newP.value = newP2.value = "";
+  } catch (e) {
+    msg.textContent = "❌ " + (e?.message || e);
+  }
+};
 
 function setPassMsg(t=""){ if (passMsg) passMsg.textContent = t; }
 
