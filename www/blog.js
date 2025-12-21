@@ -39,6 +39,9 @@ let postInflight = false;
 const commentInflight = new Set(); // postId en cours d'envoi
 
 // ===== Helpers =====
+
+
+
 const nameCache = new Map();
 
 async function getNameByUid(uid, fallback = "Utilisateur") {
