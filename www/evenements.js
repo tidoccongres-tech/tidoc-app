@@ -22,6 +22,11 @@ import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/
 const app = getApps().length ? getApp() : initializeApp(firebaseConfig);
 const db = getFirestore(app);
 const auth = getAuth(app);
+const PACKS = {
+  essentiel: { workshopsAllowed: 1, conferencesAllowed: 2 },
+  standard:  { workshopsAllowed: 2, conferencesAllowed: 4 },
+  premium:   { workshopsAllowed: 3, conferencesAllowed: 7 },
+};
 
 // DOM
 const openEventForm = document.getElementById("openEventForm");
