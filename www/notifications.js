@@ -9,6 +9,7 @@ import {
   doc,
   updateDoc
 } from "https://www.gstatic.com/firebasejs/10.12.4/firebase-firestore.js";
+import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.4/firebase-auth.js";
 
 requireAuthOrRedirect("./login.html");
 
@@ -33,7 +34,7 @@ async function loadNotifs(){
   const uid = auth.currentUser?.uid;
   if (!uid) return;
 
-  root.innerHTML = `<div class="card"><p>Chargement…</p></div>`;
+  root.innerHTML = `<section class="card"><p>Chargement…</p></section>`;
 
   const qy = query(
     collection(db, "notifications", uid, "items"),
@@ -44,7 +45,7 @@ async function loadNotifs(){
   const snap = await getDocs(qy);
 
   if (snap.empty){
-    root.innerHTML = `<div class="card"><p>Aucune notification.</p></div>`;
+    root.innerHTML = `<section class="card"><p>Aucune notification.</p></section>`;
     return;
   }
 
@@ -56,6 +57,7 @@ async function loadNotifs(){
     card.className = "card";
     card.style.cursor = "pointer";
     card.style.opacity = n.read ? "0.7" : "1";
+    card.style.marginBottom = "10px";
 
     card.innerHTML = `
       <div style="display:flex;justify-content:space-between;gap:10px;align-items:center;">
@@ -70,7 +72,6 @@ async function loadNotifs(){
     card.addEventListener("click", async ()=>{
       try{ await markRead(d.id); }catch(_){}
       if (n.postId){
-        // on redirige vers blog et on passera l’ouverture du post ensuite
         window.location.href = `./blog.html?postId=${encodeURIComponent(n.postId)}`;
       }
     });
@@ -79,8 +80,4 @@ async function loadNotifs(){
   });
 }
 
-auth.onAuthStateChanged?.(auth, ()=>{}); // ignore
-import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.4/firebase-auth.js";
-onAuthStateChanged(auth, (u)=>{
-  if (u) loadNotifs();
-});
+onAuthStateChanged(auth, (u)=>{ if (u) loadNotifs(); });
