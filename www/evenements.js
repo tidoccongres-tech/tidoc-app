@@ -86,7 +86,9 @@ function applyAdminUI() {
 async function createEvent() {
   if (!isAdmin()) {
     alert("Réservé à l’admin Ti’Doc.");
-    return;
+  const capacity = Number(document.getElementById("eventCapacity")?.value || 0);
+  if (capacity < 1) { showMsg("Ajoute un nombre de places (>=1)."); return; }
+  return;
   }
 
   try {
@@ -126,6 +128,8 @@ async function createEvent() {
       endAt,
       createdAt: serverTimestamp(),
       createdBy: auth.currentUser?.uid || "",
+      capacity,
+      bookedCount: 0,
     });
 
     clearForm();
@@ -134,6 +138,7 @@ async function createEvent() {
   } catch (e) {
     console.log("createEvent error:", e);
     alert("Impossible de publier l’évènement (Rules Firestore ?)");
+    ["eventDate","eventStart","eventEnd","eventTitle","eventPlace","eventDesc","eventCapacity"].forEach(...)
   }
 }
 
