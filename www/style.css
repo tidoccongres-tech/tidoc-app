@@ -1236,30 +1236,20 @@ main, .page, .card{
 .blog-topbar{
   overflow: visible !important;
 }
-/* ✅ Tablette : élargit le contenu pour enlever les grands blancs */
+/* ✅ TABLETTE : marges propres + contenu plus large */
 @media (min-width: 768px){
-  .page{
-    max-width: 900px;     /* ajuste 820-980 si tu veux */
-    padding-left: 16px;
-    padding-right: 16px;
-  }
-}
-
-/* ✅ Tablette : page quasi plein écran (moins de blancs) */
-@media (min-width: 768px){
-  .page{
-    max-width: 100% !important;
-    margin: 0 !important;
-    padding-left: 24px;
-    padding-right: 24px;
-  }
-}
-
-/* ✅ Desktop : on re-limite un peu pour pas que ça devienne trop large */
-@media (min-width: 1200px){
   .page{
     max-width: 1100px !important;
     margin: 0 auto !important;
+    padding-left: 32px !important;
+    padding-right: 32px !important;
+  }
+}
+
+/* ✅ DESKTOP large */
+@media (min-width: 1200px){
+  .page{
+    max-width: 1200px !important;
   }
 }
 
