@@ -4,10 +4,16 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Ti'Doc — Galerie</title>
-  <link rel="stylesheet" href="style.css?v=203">
 
-  <link rel="manifest" href="/manifest.webmanifest">
+  <!-- IMPORTANT: mets bien ./ si tu es sur GitHub Pages -->
+  <link rel="stylesheet" href="./style.css?v=203">
+  <link rel="manifest" href="./manifest.webmanifest">
   <meta name="theme-color" content="#178CA8">
+</head>
+
+<body>
+  <!-- Topbar (1 seule fois) -->
+  <script type="module" src="./header-user-menu.js?v=999"></script>
 
   <main class="page blog-page">
     <!-- Année -->
@@ -16,7 +22,7 @@
       <button class="year-btn" type="button" data-year="2026">Ti’Doc 2026</button>
     </div>
 
-    <!-- ✅ Admin only (caché par défaut, affiché par galerie.js si admin) -->
+    <!-- Admin only -->
     <button class="create-post" id="addPhotosBtn" type="button" style="display:none;">
       <span class="create-post-plus">＋</span>
       <span>Ajouter des photos</span>
