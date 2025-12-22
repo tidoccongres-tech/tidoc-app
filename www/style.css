@@ -1401,3 +1401,25 @@ main, .page, .card{
 .profile-actions .btn-outline{
   width:100%;
 }
+
+.profile-card .btn-outline {
+  background: var(--tidoc);
+  color: #fff;
+  border: none;
+  padding: 10px 18px;
+  border-radius: 14px;
+  font-weight: 700;
+  box-shadow: 0 6px 18px rgba(23,140,168,.25);
+  transition: transform .15s ease, box-shadow .15s ease, background .15s ease;
+}
+
+.profile-card .btn-outline:hover {
+  background: #137c95;
+  transform: translateY(-1px);
+  box-shadow: 0 10px 22px rgba(23,140,168,.35);
+}
+
+.profile-card .btn-outline:active {
+  transform: translateY(0);
+  box-shadow: 0 4px 12px rgba(23,140,168,.2);
+}
