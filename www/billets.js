@@ -291,33 +291,20 @@ function renderResult({ qrText, packKey, holderName, ticketNumber } = {}) {
   const conf = pack ? pack.conferencesAllowed : "—";
   const ws   = pack ? pack.workshopsAllowed : "—";
 
-  const isPremium = (packKey || "").toLowerCase() === "premium";
-
   boxEl.innerHTML = `
   <div style="position:relative; display:flex; flex-direction:column; gap:12px;">
 
-    <!-- ✅ BOUTON POUBELLE (remplace Supprimer) -->
+    <!-- ✅ poubelle (au lieu de "Supprimer") -->
     <button
       class="delete-btn"
       id="deleteTicketInlineBtn"
       type="button"
       aria-label="Supprimer le billet"
       title="Supprimer"
-      style="
-        position:absolute;
-        top:0;
-        right:0;
-        width:40px;
-        height:40px;
-        padding:0;
-        border-radius:12px;
-        display:flex;
-        align-items:center;
-        justify-content:center;
-      "
+      style="position:absolute; top:0; right:0;"
     >
-      <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true" style="display:block">
-        <path fill="currentColor" d="M9 3h6l1 2h4v2H4V5h4l1-2Zm1 7h2v9h-2v-9Zm4 0h2v9h-2v-9ZM7 10h2v9H7v-9Zm-1 11h12a2 2 0 0 0 2-2V8H4v11a2 2 0 0 0 2 2Z"/>
+      <svg class="trash-ico" viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M9 3h6l1 2h4v2H4V5h4l1-2Zm1 7h2v9h-2v-9Zm4 0h2v9h-2v-9ZM7 10h2v9H7v-9ZM6 7h12l-1 14a2 2 0 0 1-2 2H9a2 2 0 0 1-2-2L6 7Z"/>
       </svg>
     </button>
 
@@ -325,64 +312,12 @@ function renderResult({ qrText, packKey, holderName, ticketNumber } = {}) {
       ✅ Billet importé
     </div>
 
-    <!-- ✅ QR BOX "MODE PREMIUM" -->
-    <div
-      style="
-        position:relative;
-        border-radius:16px;
-        padding:12px;
-        border: 1px solid ${isPremium ? "rgba(255,215,0,.35)" : "var(--line)"};
-        background: ${isPremium
-          ? "linear-gradient(180deg, rgba(255,215,0,.14), rgba(255,255,255,.90))"
-          : "rgba(255,255,255,.85)"};
-        box-shadow: ${isPremium
-          ? "0 10px 24px rgba(0,0,0,.08)"
-          : "none"};
-        overflow:hidden;
-      "
-    >
-      ${
-        isPremium
-          ? `
-          <div style="
-            position:absolute;
-            top:10px;
-            right:10px;
-            font-size:12px;
-            font-weight:900;
-            padding:6px 10px;
-            border-radius:999px;
-            color:#7a5a00;
-            background:rgba(255,215,0,.35);
-            border:1px solid rgba(255,215,0,.45);
-          ">
-            Premium
-          </div>
-        `
-          : ""
-      }
+    <!-- ✅ QR premium -->
+    <div class="qr-premium">
+      <div class="qr-title">QR Code</div>
 
-      <div style="font-weight:900; margin-bottom:8px; display:flex; align-items:center; gap:8px;">
-        QR Code
-        ${
-          isPremium
-            ? `<span style="font-size:12px; opacity:.75;">✨</span>`
-            : ""
-        }
-      </div>
-
-      <div style="display:flex; justify-content:center; padding:8px 0;">
-        <div
-          id="qrRender"
-          style="
-            width:220px;
-            height:220px;
-            border-radius:14px;
-            padding:10px;
-            background:rgba(255,255,255,.92);
-            border:1px solid ${isPremium ? "rgba(255,215,0,.35)" : "var(--line)"};
-          "
-        ></div>
+      <div class="qr-box">
+        <div id="qrRender" style="width:220px;height:220px;"></div>
       </div>
     </div>
 
@@ -393,14 +328,13 @@ function renderResult({ qrText, packKey, holderName, ticketNumber } = {}) {
       <div><b>Conférences :</b> ${conf}</div>
       <div><b>Workshops :</b> ${ws}</div>
     </div>
-
   </div>
-`;
+  `;
 
-  const delBtn = boxEl.querySelector("#deleteTicketInlineBtn");
-  delBtn?.addEventListener("click", deleteMyTicketAndUnclaim);
+  boxEl.querySelector("#deleteTicketInlineBtn")
+    ?.addEventListener("click", deleteMyTicketAndUnclaim);
 
-  // QR code affichable si qrcodejs chargé
+  // QR code (qrcodejs)
   const host = boxEl.querySelector("#qrRender");
   if (host && window.QRCode && qrText) {
     host.innerHTML = "";
@@ -411,7 +345,6 @@ function renderResult({ qrText, packKey, holderName, ticketNumber } = {}) {
     </div>`;
   }
 }
-
 async function loadSavedTicket() {
   const u = auth.currentUser;
   if (!u) {
