@@ -1523,3 +1523,205 @@ main, .page, .card{
   overflow:hidden;
   text-overflow:ellipsis;
 }
+
+/* =========================================
+   TIDOC — SETTINGS / HOME PREMIUM PACK
+   À COLLER TOUT EN BAS DU CSS
+   (ne casse pas l’existant, améliore tout)
+   ========================================= */
+
+/* --- Fond de page + rythme --- */
+.page.blog-page{
+  /* garde ton padding-top sticky, mais rend le fond + doux */
+  background:
+    radial-gradient(900px 420px at 20% -10%, rgba(23,140,168,.12), transparent 60%),
+    radial-gradient(900px 420px at 90% 10%, rgba(31,181,208,.10), transparent 55%),
+    var(--bg);
+}
+
+/* toutes les cartes plus “premium” */
+.card{
+  border-radius:20px;
+  box-shadow:0 18px 40px rgba(0,0,0,.07);
+  border:1px solid rgba(23,140,168,.10);
+}
+
+/* un peu plus d’air entre sections */
+.card + .card{ margin-top:16px; }
+
+/* --- En-tête Paramètres (la première carte “Paramètres”) --- */
+.settings-hero,
+.settings-head,
+.settings-header,
+.card.settings-card:first-of-type{
+  /* au cas où tu as pas de classe dédiée -> on stylise la 1ère carte de la page settings */
+  background: linear-gradient(
+    135deg,
+    rgba(23,140,168,.12),
+    rgba(23,140,168,.03)
+  );
+  border:1px solid rgba(23,140,168,.18);
+  box-shadow:
+    0 22px 44px rgba(23,140,168,.18),
+    inset 0 1px 0 rgba(255,255,255,.65);
+}
+
+/* titre “Paramètres” plus impactant */
+.card h2{
+  letter-spacing:.2px;
+}
+
+/* --- Profil card (tu l’aimes déjà) : on garde ton style, mais on harmonise la typographie --- */
+.profile-card .profile-email{
+  opacity:.9;
+}
+
+/* --- Sécurité (carte) : même vibe que profil, mais avec un accent “safe” --- */
+.security-card{
+  border-radius:22px;
+  background: linear-gradient(
+    135deg,
+    rgba(23,140,168,.08),
+    rgba(255,255,255,.80)
+  );
+  border:1px solid rgba(23,140,168,.18);
+  box-shadow:
+    0 18px 36px rgba(0,0,0,.06),
+    inset 0 1px 0 rgba(255,255,255,.70);
+}
+
+.security-title{
+  font-size:20px;
+  letter-spacing:.2px;
+}
+
+.security-sub{
+  opacity:.95;
+}
+
+/* inputs “premium” (tous les inputs de sécurité + settings) */
+.sec-input,
+.event-form input,
+.event-form textarea,
+.event-form select,
+.post-form input,
+.post-form textarea,
+.comment-form input{
+  background:rgba(255,255,255,.92);
+  border:1px solid rgba(0,0,0,.10);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.60);
+  transition: box-shadow .15s ease, border-color .15s ease, transform .05s ease;
+}
+
+.sec-input:focus,
+.event-form input:focus,
+.event-form textarea:focus,
+.event-form select:focus,
+.post-form input:focus,
+.post-form textarea:focus,
+.comment-form input:focus{
+  border-color: rgba(23,140,168,.55);
+  box-shadow:
+    0 0 0 4px rgba(23,140,168,.12),
+    inset 0 1px 0 rgba(255,255,255,.65);
+}
+
+/* labels sécurité plus “app” */
+.sec-field label{
+  font-weight:900;
+  letter-spacing:.15px;
+}
+
+/* bouton principal (sécurité) encore + premium */
+.security-actions .btn-primary,
+.profile-card .btn-outline,
+.btn-primary{
+  box-shadow:0 14px 26px rgba(23,140,168,.25);
+}
+
+.security-actions .btn-primary{
+  background: linear-gradient(135deg, #178CA8, #1fb5d0);
+  height:48px;
+  border-radius:16px;
+  font-weight:900;
+  letter-spacing:.2px;
+}
+
+.security-actions .btn-primary:active{
+  transform: translateY(1px);
+}
+
+/* message (succès/erreur) plus propre */
+.security-msg{
+  padding:10px 12px;
+  border-radius:14px;
+  border:1px solid rgba(0,0,0,.06);
+  background:rgba(255,255,255,.72);
+}
+
+/* --- Petites cartes “settings-item” (si tu en as) --- */
+.settings-item{
+  border-radius:18px;
+  border:1px solid rgba(23,140,168,.12);
+  box-shadow:0 14px 30px rgba(0,0,0,.06);
+  transition: transform .12s ease, box-shadow .12s ease;
+}
+
+.settings-item:hover{
+  transform: translateY(-1px);
+  box-shadow:0 18px 34px rgba(0,0,0,.08);
+}
+
+/* --- HOME : même style de “tuiles premium” --- */
+.home-card{
+  border-radius:22px;
+  background: linear-gradient(
+    135deg,
+    rgba(23,140,168,.12),
+    rgba(23,140,168,.03)
+  );
+  border:1px solid rgba(23,140,168,.18);
+  box-shadow:
+    0 22px 44px rgba(23,140,168,.18),
+    inset 0 1px 0 rgba(255,255,255,.65);
+}
+
+.home-tile{
+  border-radius:18px;
+  border:1px solid rgba(23,140,168,.10);
+  box-shadow:0 14px 30px rgba(0,0,0,.06);
+  transition: transform .12s ease, box-shadow .12s ease;
+}
+
+.home-tile:hover{
+  transform: translateY(-1px);
+  box-shadow:0 18px 34px rgba(0,0,0,.08);
+}
+
+.home-photo-grid img,
+.home-logo{
+  box-shadow:0 16px 32px rgba(0,0,0,.08);
+  border:1px solid rgba(23,140,168,.10);
+}
+
+/* --- Bouton Home sticky (petite case) : plus “glass” --- */
+.home-icon-btn{
+  border-radius:16px;
+  background: rgba(255,255,255,.72);
+  backdrop-filter: blur(10px);
+  border:1px solid rgba(23,140,168,.18);
+  box-shadow:0 14px 26px rgba(0,0,0,.06);
+}
+
+/* --- Harmonisation des titres (plus app / plus net) --- */
+.home-title,
+.settings-title,
+.security-title,
+.card h2{
+  text-rendering: geometricPrecision;
+}
+
+/* --- Micro détail : adoucit les paragraphes --- */
+.card p{
+  line-height:1.35;
+}
