@@ -1510,3 +1510,16 @@ main, .page, .card{
 .security-msg:has(❌){
   color:#c0392b;
 }
+
+.profile-name{
+  display:flex;
+  align-items:center;
+  gap:6px;
+  font-weight:800;
+  font-size:14px;
+  color:#fff;
+  max-width:160px;
+  white-space:nowrap;
+  overflow:hidden;
+  text-overflow:ellipsis;
+}
