@@ -1423,3 +1423,98 @@ main, .page, .card{
   transform: translateY(0);
   box-shadow: 0 4px 12px rgba(23,140,168,.2);
 }
+
+/* =========================
+   SETTINGS – PROFIL HERO
+   ========================= */
+
+.profile-card{
+  margin-top:14px;
+  padding:20px;
+  border-radius:22px;
+  background: linear-gradient(
+    135deg,
+    rgba(23,140,168,.14),
+    rgba(23,140,168,.04)
+  );
+  border:1px solid rgba(23,140,168,.25);
+  box-shadow:
+    0 20px 40px rgba(23,140,168,.25),
+    inset 0 1px 0 rgba(255,255,255,.6);
+}
+
+.profile-row{
+  gap:18px;
+}
+
+/* avatar plus impactant */
+.profile-avatar-lg{
+  width:90px;
+  height:90px;
+  border-radius:24px;
+  border:2px solid rgba(23,140,168,.35);
+  box-shadow:0 18px 36px rgba(23,140,168,.35);
+  background:#fff;
+}
+
+/* nom = point focal */
+.profile-name{
+  font-size:18px;
+  letter-spacing:.2px;
+}
+
+/* bouton AVATAR = action principale */
+.profile-card .btn-outline{
+  background: linear-gradient(135deg, #178CA8, #1fb5d0);
+  color:#fff;
+  border:none;
+  height:48px;
+  border-radius:16px;
+  font-weight:800;
+}
+
+/* =========================
+   SETTINGS – SÉCURITÉ CLEAN
+   ========================= */
+
+.security-card{
+  margin-top:16px;
+  border-radius:18px;
+  box-shadow:0 12px 28px rgba(0,0,0,.06);
+}
+
+.security-title{
+  display:flex;
+  align-items:center;
+  gap:8px;
+}
+
+.security-title::before{
+  content:"🔐";
+  font-size:18px;
+}
+
+.sec-input{
+  background:#fafafa;
+}
+
+.sec-input:focus{
+  background:#fff;
+}
+
+.card + .card{
+  margin-top:14px;
+}
+
+.security-msg{
+  font-weight:700;
+}
+
+.security-msg:has(✔),
+.security-msg:has(✅){
+  color:#1e9f6e;
+}
+
+.security-msg:has(❌){
+  color:#c0392b;
+}
