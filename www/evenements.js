@@ -14,13 +14,14 @@ import {
   query,
   orderBy,
   Timestamp,
-  setDoc,
 } from "https://www.gstatic.com/firebasejs/10.12.4/firebase-firestore.js";
 import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.4/firebase-auth.js";
 
-// ✅ init
-const app = getApps().length ? getApp() : initializeApp(firebaseConfig);
-const db = getFirestore(app);
+/* =========================
+   INIT
+   ========================= */
+const app  = getApps().length ? getApp() : initializeApp(firebaseConfig);
+const db   = getFirestore(app);
 const auth = getAuth(app);
 
 const ADMIN_EMAIL = "tidoc.congres@gmail.com";
@@ -31,67 +32,74 @@ const PACKS = {
   premium:   { workshopsAllowed: 3, conferencesAllowed: 7 },
 };
 
-// DOM
+/* =========================
+   DOM
+   ========================= */
 const openEventForm = document.getElementById("openEventForm");
-const eventForm = document.getElementById("eventForm");
-const cancelEvent = document.getElementById("cancelEvent");
-const publishEvent = document.getElementById("publishEvent");
-const eventsList = document.getElementById("eventsList");
-const eventMsg = document.getElementById("eventMsg");
+const eventForm     = document.getElementById("eventForm");
+const cancelEvent   = document.getElementById("cancelEvent");
+const publishEvent  = document.getElementById("publishEvent");
+const eventsList    = document.getElementById("eventsList");
+const eventMsg      = document.getElementById("eventMsg");
 
-// helpers
-function isAdmin() {
+/* =========================
+   HELPERS
+   ========================= */
+function isAdmin(){
   if (window.TIDOC_AUTH?.isAdmin) return true;
   const email = (auth.currentUser?.email || "").toLowerCase();
-  return email === ADMIN_EMAIL;
+  return email === ADMIN_EMAIL.toLowerCase();
 }
-function showMsg(t = "") { if (eventMsg) eventMsg.textContent = t; }
 
-function escapeHTML(s = "") {
+function showMsg(t=""){ if (eventMsg) eventMsg.textContent = t; }
+
+function escapeHTML(s=""){
   return String(s)
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;")
-    .replaceAll("'", "&#039;");
+    .replaceAll("&","&amp;")
+    .replaceAll("<","&lt;")
+    .replaceAll(">","&gt;")
+    .replaceAll('"',"&quot;")
+    .replaceAll("'","&#039;");
 }
 
-function mapsUrl(address) {
+function mapsUrl(address){
   return "https://www.google.com/maps/search/?api=1&query=" + encodeURIComponent(address);
 }
 
-function formatDayMonth(dateObj) {
+function formatDayMonth(dateObj){
   const day = dateObj.getDate();
-  const month = dateObj.toLocaleDateString("fr-FR", { month: "short" }).toUpperCase();
+  const month = dateObj.toLocaleDateString("fr-FR", { month:"short" }).toUpperCase();
   return { day, month };
 }
 
-function formatTime(dateObj) {
-  return dateObj.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" });
+function formatTime(dateObj){
+  return dateObj.toLocaleTimeString("fr-FR", { hour:"2-digit", minute:"2-digit" });
 }
 
-function showForm(show) {
+function showForm(show){
   if (!eventForm) return;
   eventForm.hidden = false;
   eventForm.style.display = show ? "" : "none";
 }
 
-function clearForm() {
-  ["eventDate", "eventStart", "eventEnd", "eventTitle", "eventPlace", "eventDesc", "eventCapacity"]
-    .forEach((id) => {
+function clearForm(){
+  ["eventDate","eventStart","eventEnd","eventTitle","eventPlace","eventDesc","eventCapacity"]
+    .forEach((id)=>{
       const el = document.getElementById(id);
       if (el) el.value = "";
     });
   showMsg("");
 }
 
-function applyAdminUI() {
+function applyAdminUI(){
   const admin = isAdmin();
   if (openEventForm) openEventForm.style.display = admin ? "flex" : "none";
   if (!admin) showForm(false);
 }
 
-// ===== Rights / Ticket =====
+/* =========================
+   RIGHTS / TICKET
+   ========================= */
 async function getMyRights(){
   const uid = auth.currentUser?.uid;
   if (!uid) return { ok:false, reason:"nologin" };
@@ -99,42 +107,44 @@ async function getMyRights(){
   const tSnap = await getDoc(doc(db, "userTickets", uid));
   if (!tSnap.exists()) return { ok:false, reason:"noticket" };
 
-  const packKey = (tSnap.data()?.packKey || "").toLowerCase();
+  const packKey = String(tSnap.data()?.packKey || "").toLowerCase();
   const pack = PACKS[packKey];
   if (!pack) return { ok:false, reason:"badpack" };
 
   const uSnap = await getDoc(doc(db, "userUsage", uid));
   const usage = uSnap.exists() ? (uSnap.data() || {}) : {};
-  const wsUsed = Number(usage.workshopUsed || 0);
+  const wsUsed   = Number(usage.workshopUsed || 0);
   const confUsed = Number(usage.conferenceUsed || 0);
 
   return {
     ok:true,
     packKey,
+    wsUsed,
+    confUsed,
+    wsAllowed: pack.workshopsAllowed,
+    confAllowed: pack.conferencesAllowed,
     wsLeft: Math.max(0, pack.workshopsAllowed - wsUsed),
     confLeft: Math.max(0, pack.conferencesAllowed - confUsed),
   };
 }
 
-// ===== CRUD events =====
-async function createEvent() {
-  if (!isAdmin()) {
-    alert("Réservé à l’admin Ti’Doc.");
-    return;
-  }
+/* =========================
+   CRUD EVENTS (ADMIN)
+   ========================= */
+async function createEvent(){
+  if (!isAdmin()) { alert("Réservé à l’admin Ti’Doc."); return; }
 
-  try {
-    const d = document.getElementById("eventDate")?.value || "";
+  try{
+    const d     = document.getElementById("eventDate")?.value || "";
     const start = document.getElementById("eventStart")?.value || "";
-    const end = document.getElementById("eventEnd")?.value || "";
+    const end   = document.getElementById("eventEnd")?.value || "";
     const title = document.getElementById("eventTitle")?.value?.trim() || "";
     const place = document.getElementById("eventPlace")?.value?.trim() || "";
-    const type = document.getElementById("eventType")?.value || "Autre";
-    const desc = document.getElementById("eventDesc")?.value?.trim() || "";
-
+    const type  = document.getElementById("eventType")?.value || "Autre";
+    const desc  = document.getElementById("eventDesc")?.value?.trim() || "";
     const capacity = Number(document.getElementById("eventCapacity")?.value || 0);
-    if (capacity < 1) { showMsg("Ajoute un nombre de places (>=1)."); return; }
 
+    if (capacity < 1) { showMsg("Ajoute un nombre de places (>=1)."); return; }
     if (!d || !title) { showMsg("Il faut au minimum une date + un titre."); return; }
 
     const startHHMM = start || "00:00";
@@ -144,7 +154,7 @@ async function createEvent() {
     const startAt = Timestamp.fromDate(startDate);
 
     let endAt = null;
-    if (end) {
+    if (end){
       const [eh, em] = end.split(":").map(Number);
       const endDate = new Date(d + "T00:00:00");
       endDate.setHours(eh, em, 0, 0);
@@ -152,12 +162,8 @@ async function createEvent() {
     }
 
     await addDoc(collection(db, "events"), {
-      title,
-      desc,
-      place,
-      type,
-      startAt,
-      endAt,
+      title, desc, place, type,
+      startAt, endAt,
       capacity,
       bookedCount: 0,
       createdAt: serverTimestamp(),
@@ -167,51 +173,65 @@ async function createEvent() {
     clearForm();
     showForm(false);
     await loadEvents();
-  } catch (e) {
+  } catch(e){
     console.log("createEvent error:", e);
     alert("Impossible de publier l’évènement (Rules Firestore ?)");
   }
 }
 
-async function deleteEvent(eventId) {
+async function deleteEvent(eventId){
   if (!isAdmin()) return;
   if (!confirm("Supprimer cet évènement ?")) return;
 
-  try {
+  try{
     await deleteDoc(doc(db, "events", eventId));
     await loadEvents();
-  } catch (e) {
+  } catch(e){
     console.log("deleteEvent error:", e);
     alert("Suppression impossible (rules ?).");
   }
 }
 
-// ===== Registration =====
+/* =========================
+   REGISTRATION (JOIN / LEAVE)
+   ========================= */
+function eventTypeKey(evType=""){
+  const t = String(evType).toLowerCase();
+  if (t.includes("workshop")) return "ws";
+  if (t.includes("conf")) return "conf";
+  return "other";
+}
+
+async function requireTicketOrRedirect(){
+  const r = await getMyRights();
+  if (r.ok) return r;
+
+  if (r.reason === "noticket" || r.reason === "badpack") {
+    alert("Tu dois importer ton billet pour t’inscrire.");
+    location.href = "./billets.html";
+    return null;
+  }
+  alert("Connexion requise.");
+  return null;
+}
+
 async function registerToEvent(eventId){
   const uid = auth.currentUser?.uid;
   if (!uid) { location.href="./login.html"; return; }
 
-  const rights = await getMyRights();
-  if (!rights.ok){
-    if (rights.reason === "noticket" || rights.reason === "badpack") {
-      alert("Tu dois importer ton billet pour t’inscrire.");
-      location.href = "./billets.html";
-      return;
-    }
-    alert("Connexion requise.");
-    return;
-  }
+  const rights = await requireTicketOrRedirect();
+  if (!rights) return;
 
-  const evRef = doc(db, "events", eventId);
-  const regRef = doc(db, "events", eventId, "registrations", uid);
+  const evRef    = doc(db, "events", eventId);
+  const regRef   = doc(db, "events", eventId, "registrations", uid);
   const usageRef = doc(db, "userUsage", uid);
 
-  await runTransaction(db, async (tx) => {
+  await runTransaction(db, async (tx)=>{
     const evSnap = await tx.get(evRef);
     if (!evSnap.exists()) throw new Error("Évènement introuvable.");
 
     const ev = evSnap.data() || {};
-    const cap = Number(ev.capacity || 0);
+    const cap    = Number(ev.capacity || 0);
     const booked = Number(ev.bookedCount || 0);
 
     const regSnap = await tx.get(regRef);
@@ -219,21 +239,18 @@ async function registerToEvent(eventId){
 
     if (cap > 0 && booked >= cap) throw new Error("Plus de places disponibles.");
 
-    const type = (ev.type || "").toLowerCase();
+    const typeKey = eventTypeKey(ev.type);
 
     const uSnap = await tx.get(usageRef);
     const usage = uSnap.exists() ? (uSnap.data() || {}) : {};
-    const wsUsed = Number(usage.workshopUsed || 0);
+    const wsUsed   = Number(usage.workshopUsed || 0);
     const confUsed = Number(usage.conferenceUsed || 0);
 
-    const wsAllowed = PACKS[rights.packKey].workshopsAllowed;
-    const confAllowed = PACKS[rights.packKey].conferencesAllowed;
-
-    if (type.includes("workshop")) {
-      if (wsUsed >= wsAllowed) throw new Error("Tu n’as plus de workshop disponible.");
+    if (typeKey === "ws"){
+      if (wsUsed >= rights.wsAllowed) throw new Error("Tu n’as plus de workshop disponible.");
       tx.set(usageRef, { workshopUsed: wsUsed + 1 }, { merge:true });
-    } else if (type.includes("conf")) {
-      if (confUsed >= confAllowed) throw new Error("Tu n’as plus de conférence disponible.");
+    } else if (typeKey === "conf"){
+      if (confUsed >= rights.confAllowed) throw new Error("Tu n’as plus de conférence disponible.");
       tx.set(usageRef, { conferenceUsed: confUsed + 1 }, { merge:true });
     } else {
       throw new Error("Type d’évènement non éligible à l’inscription.");
@@ -244,20 +261,66 @@ async function registerToEvent(eventId){
   });
 }
 
-// ===== Render =====
-function renderEventCard(id, e) {
+async function unregisterFromEvent(eventId){
+  const uid = auth.currentUser?.uid;
+  if (!uid) { location.href="./login.html"; return; }
+
+  const rights = await getMyRights(); // pas besoin de redirect pour se désinscrire
+  // si pas de billet, on permet quand même la désinscription (au cas où)
+  const evRef    = doc(db, "events", eventId);
+  const regRef   = doc(db, "events", eventId, "registrations", uid);
+  const usageRef = doc(db, "userUsage", uid);
+
+  await runTransaction(db, async (tx)=>{
+    const evSnap = await tx.get(evRef);
+    if (!evSnap.exists()) throw new Error("Évènement introuvable.");
+
+    const regSnap = await tx.get(regRef);
+    if (!regSnap.exists()) throw new Error("Tu n’es pas inscrit(e).");
+
+    const ev = evSnap.data() || {};
+    const booked = Number(ev.bookedCount || 0);
+    const typeKey = eventTypeKey(ev.type);
+
+    const uSnap = await tx.get(usageRef);
+    const usage = uSnap.exists() ? (uSnap.data() || {}) : {};
+    const wsUsed   = Number(usage.workshopUsed || 0);
+    const confUsed = Number(usage.conferenceUsed || 0);
+
+    if (typeKey === "ws"){
+      tx.set(usageRef, { workshopUsed: Math.max(0, wsUsed - 1) }, { merge:true });
+    } else if (typeKey === "conf"){
+      tx.set(usageRef, { conferenceUsed: Math.max(0, confUsed - 1) }, { merge:true });
+    }
+
+    tx.delete(regRef);
+    tx.set(evRef, { bookedCount: Math.max(0, booked - 1) }, { merge:true });
+  });
+}
+
+/* =========================
+   RENDER
+   ========================= */
+async function userIsRegistered(eventId, uid){
+  if (!uid) return false;
+  const snap = await getDoc(doc(db, "events", eventId, "registrations", uid));
+  return snap.exists();
+}
+
+function renderEventCard(id, e){
   const startAtDate = e.startAt?.toDate ? e.startAt.toDate() : null;
   if (!startAtDate) return null;
 
   const { day, month } = formatDayMonth(startAtDate);
   const timeTxt = formatTime(startAtDate);
-  const endTxt = e.endAt?.toDate ? formatTime(e.endAt.toDate()) : "";
-  const place = (e.place || "").trim();
-  const canDelete = isAdmin();
+  const endTxt  = e.endAt?.toDate ? formatTime(e.endAt.toDate()) : "";
+  const place   = (e.place || "").trim();
 
-  const cap = Number(e.capacity || 0);
+  const cap    = Number(e.capacity || 0);
   const booked = Number(e.bookedCount || 0);
-  const left = cap > 0 ? Math.max(0, cap - booked) : null;
+  const left   = cap > 0 ? Math.max(0, cap - booked) : null;
+
+  const canDelete = isAdmin();
 
   const card = document.createElement("section");
   card.className = "event-card";
@@ -278,7 +341,7 @@ function renderEventCard(id, e) {
 
       <div class="event-meta">
         <span>🕒 ${timeTxt}${endTxt ? " – " + endTxt : ""}</span>
-        ${cap ? `<span>• 👥 ${left} / ${cap} places restantes</span>` : ""}
+        ${cap ? `<span>• 👥 ${booked}/${cap} inscrits • ${left} places restantes</span>` : ""}
         ${e.type ? `<span>• ${escapeHTML(e.type)}</span>` : ""}
         ${
           place
@@ -287,46 +350,84 @@ function renderEventCard(id, e) {
         }
       </div>
 
-      ${!canDelete ? `
+      ${
+        !canDelete
+          ? `
         <div style="margin-top:10px;display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
-          <button class="btn-primary event-add" type="button" data-join="${id}">
-            S’inscrire
-          </button>
+          <button class="btn-primary event-add" type="button" data-toggle="${id}">…</button>
+          <span data-status="${id}" style="font-size:12px;color:var(--muted);font-weight:800;"></span>
+        </div>
+        <div style="margin-top:8px;">
           <span data-rights="${id}" style="font-size:12px;color:var(--muted);font-weight:700;"></span>
         </div>
-      ` : ""}
+          `
+          : ""
+      }
     </div>
   `;
 
-  if (canDelete) {
-    card.querySelector(`[data-del="${id}"]`)?.addEventListener("click", () => deleteEvent(id));
+  // delete admin
+  if (canDelete){
+    card.querySelector(`[data-del="${id}"]`)?.addEventListener("click", ()=> deleteEvent(id));
+    return card;
   }
 
-  card.querySelector(`[data-join="${id}"]`)?.addEventListener("click", async () => {
-    try{
-      await registerToEvent(id);
-      alert("✅ Inscription validée !");
-      await loadEvents();
-    }catch(err){
-      alert("❌ " + (err?.message || String(err)));
-    }
-  });
-
-  // affiche les quotas restants
+  // bind quotas + button state
   (async ()=>{
-    const el = card.querySelector(`[data-rights="${id}"]`);
-    if (!el) return;
-    if (!auth.currentUser) { el.textContent = "Connecte-toi pour t’inscrire."; return; }
+    const uid = auth.currentUser?.uid;
 
-    const r = await getMyRights();
-    if (!r.ok){ el.textContent = "Billet requis (importe-le)."; return; }
-    el.textContent = `Workshops restants : ${r.wsLeft} • Conférences restantes : ${r.confLeft}`;
+    const btn    = card.querySelector(`[data-toggle="${id}"]`);
+    const status = card.querySelector(`[data-status="${id}"]`);
+    const rightsEl = card.querySelector(`[data-rights="${id}"]`);
+
+    if (!btn) return;
+
+    if (!uid){
+      btn.textContent = "Se connecter";
+      btn.addEventListener("click", ()=> location.href="./login.html");
+      if (rightsEl) rightsEl.textContent = "Connecte-toi pour t’inscrire.";
+      return;
+    }
+
+    // quotas
+    if (rightsEl){
+      const r = await getMyRights();
+      if (!r.ok) rightsEl.textContent = "Billet requis (importe-le).";
+      else {
+        rightsEl.textContent =
+          `Workshops : ${r.wsUsed}/${r.wsAllowed} (reste ${r.wsLeft}) • ` +
+          `Conférences : ${r.confUsed}/${r.confAllowed} (reste ${r.confLeft})`;
+      }
+    }
+
+    // registration state
+    const isIn = await userIsRegistered(id, uid);
+    btn.textContent = isIn ? "Se désinscrire" : "S’inscrire";
+    if (status) status.textContent = isIn ? "✅ Inscrit(e)" : "";
+
+    btn.addEventListener("click", async ()=>{
+      try{
+        if (isIn){
+          await unregisterFromEvent(id);
+          alert("✅ Désinscription validée !");
+        } else {
+          await registerToEvent(id);
+          alert("✅ Inscription validée !");
+        }
+        await loadEvents();
+      } catch(err){
+        alert("❌ " + (err?.message || String(err)));
+      }
+    });
   })();
 
   return card;
 }
 
-async function loadEvents() {
+/* =========================
+   LOAD EVENTS
+   ========================= */
+async function loadEvents(){
   if (!eventsList) return;
 
   eventsList.innerHTML = `<section class="card"><p>Chargement…</p></section>`;
@@ -336,36 +437,38 @@ async function loadEvents() {
 
   eventsList.innerHTML = "";
 
-  if (snap.empty) {
+  if (snap.empty){
     eventsList.innerHTML = `<section class="card"><p>Aucun évènement pour l’instant.</p></section>`;
     return;
   }
 
-  snap.forEach((d) => {
+  snap.forEach((d)=>{
     const card = renderEventCard(d.id, d.data());
     if (card) eventsList.appendChild(card);
   });
 }
 
-// boot
-document.addEventListener("DOMContentLoaded", () => {
+/* =========================
+   BOOT
+   ========================= */
+document.addEventListener("DOMContentLoaded", ()=>{
   applyAdminUI();
   window.addEventListener("tidoc:auth", applyAdminUI);
 
-  openEventForm?.addEventListener("click", () => {
+  openEventForm?.addEventListener("click", ()=>{
     if (!isAdmin()) return alert("Réservé à l’admin Ti’Doc.");
     showForm(true);
     document.getElementById("eventDate")?.focus();
   });
 
-  cancelEvent?.addEventListener("click", () => {
+  cancelEvent?.addEventListener("click", ()=>{
     clearForm();
     showForm(false);
   });
 
   publishEvent?.addEventListener("click", createEvent);
 
-  onAuthStateChanged(auth, () => {
+  onAuthStateChanged(auth, ()=>{
     applyAdminUI();
     loadEvents();
   });
