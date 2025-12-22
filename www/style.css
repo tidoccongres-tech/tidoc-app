@@ -1262,3 +1262,23 @@ main, .page, .card{
     margin: 0 auto !important;
   }
 }
+
+/* ✅ Poubelle admin en SVG (propre + même couleur que Ti'Doc) */
+.delete-btn{
+  width:36px;
+  height:36px;
+  border-radius:12px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  background:rgba(23,140,168,.10);
+  border:1px solid rgba(23,140,168,.20);
+  color:var(--tidoc);
+}
+
+.delete-btn .trash-ico{
+  width:18px;
+  height:18px;
+  fill:currentColor;
+  display:block;
+}
