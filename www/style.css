@@ -1496,3 +1496,57 @@ main.page.blog-page{ padding-top: calc(56px + 12px) !important; }
   height:auto;
   border-radius:14px;
 }
+
+/* EVENEMENTS — rendre Date / Time / Select aussi beaux que les inputs */
+:root{
+  --field-bg: rgba(255,255,255,.92);
+  --field-border: rgba(23,140,168,.18);
+  --field-shadow: 0 10px 22px rgba(0,0,0,.06);
+}
+
+/* cible la carte "Nouvel événement" (si tu as une classe, remplace .blog-page par plus précis) */
+.blog-page input[type="date"],
+.blog-page input[type="time"],
+.blog-page select{
+  width: 100%;
+  height: 46px;
+  padding: 0 14px;
+  border-radius: 14px;
+  border: 1px solid var(--field-border);
+  background: var(--field-bg);
+  box-shadow: var(--field-shadow);
+  color: var(--text);
+  font-size: 15px;
+  outline: none;
+
+  /* important pour enlever le look natif */
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+/* focus propre */
+.blog-page input[type="date"]:focus,
+.blog-page input[type="time"]:focus,
+.blog-page select:focus{
+  border-color: rgba(23,140,168,.45);
+  box-shadow: 0 0 0 4px rgba(23,140,168,.12), var(--field-shadow);
+}
+
+/* SELECT : ajoute une flèche custom (le type "Conférence") */
+.blog-page select{
+  padding-right: 44px;
+  background-image:
+    linear-gradient(45deg, transparent 50%, rgba(0,0,0,.45) 50%),
+    linear-gradient(135deg, rgba(0,0,0,.45) 50%, transparent 50%);
+  background-position:
+    calc(100% - 18px) 50%,
+    calc(100% - 12px) 50%;
+  background-size: 6px 6px, 6px 6px;
+  background-repeat: no-repeat;
+}
+
+/* (Safari iOS) Aligne un peu mieux le texte des date/time */
+.blog-page input[type="date"],
+.blog-page input[type="time"]{
+  line-height: 46px;
+}
