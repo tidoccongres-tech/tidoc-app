@@ -172,6 +172,9 @@ function renderEventCard(id, e) {
   const endTxt = e.endAt?.toDate ? formatTime(e.endAt.toDate()) : "";
   const place = (e.place || "").trim();
   const canDelete = isAdmin();
+  const cap = Number(e.capacity || 0);
+  const booked = Number(e.bookedCount || 0);
+  const left = cap > 0 ? Math.max(0, cap - booked) : null;
 
   const card = document.createElement("section");
   card.className = "event-card";
@@ -192,6 +195,15 @@ function renderEventCard(id, e) {
 
       <div class="event-meta">
         <span>🕒 ${timeTxt}${endTxt ? " – " + endTxt : ""}</span>
+        ${!canDelete ? `
+  <div style="margin-top:10px;display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
+    <button class="btn-primary event-add" type="button" data-join="${id}">
+      S’inscrire
+    </button>
+    <span class="muted" data-rights="${id}" style="font-size:12px;"></span>
+  </div>
+` : ""}
+        ${cap ? `<span>• 👥 ${left} / ${cap} places restantes</span>` : ""}
         ${e.type ? `<span>• ${escapeHTML(e.type)}</span>` : ""}
         ${
           place
@@ -206,12 +218,35 @@ function renderEventCard(id, e) {
     card.querySelector(`[data-del="${id}"]`)?.addEventListener("click", () => deleteEvent(id));
   }
 
+  card.querySelector(`[data-join="${id}"]`)?.addEventListener("click", async () => {
+  try{
+    await registerToEvent(id);
+    alert("✅ Inscription validée !");
+    await loadEvents();
+  }catch(e){
+    alert("❌ " + (e?.message || String(e)));
+  }
+});
+  
   return card;
 }
 async function registerToEvent(eventId){
   const uid = auth.currentUser?.uid;
   if (!uid) { location.href="./login.html"; return; }
 
+(async ()=>{
+  const el = card.querySelector(`[data-rights="${id}"]`);
+  if (!el) return;
+  if (!auth.currentUser) { el.textContent = "Connecte-toi pour t’inscrire."; return; }
+
+  const r = await getMyRights();
+  if (!r.ok){
+    el.textContent = "Billet requis (importe-le).";
+    return;
+  }
+  el.textContent = `Workshops restants : ${r.wsLeft} • Conférences restantes : ${r.confLeft}`;
+})();
+  
   // droits
   const rights = await getMyRights();
   if (!rights.ok){
