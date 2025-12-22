@@ -1592,3 +1592,54 @@ main.page.blog-page > section.card:first-of-type h2{
   backdrop-filter: blur(10px);
   border: 1px solid rgba(23,140,168,.18);
 }
+
+/* =========================
+   TOPBAR — PREMIUM
+   ========================= */
+
+.blog-topbar{
+  position: sticky;
+  top: 0;
+  height: 56px;
+  padding: 0 14px;
+  background: linear-gradient(135deg, #178CA8, #1fb5d0);
+  box-shadow: 0 14px 30px rgba(0,0,0,.14);
+  border-bottom: 1px solid rgba(255,255,255,.18);
+  overflow: hidden;
+}
+
+.blog-topbar::after{
+  content:"";
+  position:absolute;
+  inset:0;
+  pointer-events:none;
+  background:
+    radial-gradient(900px 220px at 10% 0%, rgba(255,255,255,.20), transparent 60%),
+    radial-gradient(700px 220px at 90% 10%, rgba(255,255,255,.12), transparent 55%);
+  opacity: .85;
+}
+
+.blog-topbar-left,
+.blog-topbar-right{
+  position: relative;
+  z-index: 1;
+}
+
+/* boutons (cloche etc.) plus premium */
+.blog-topbar .icon-btn{
+  border-radius: 14px;
+  transition: transform .12s ease, background .12s ease;
+}
+.blog-topbar .icon-btn:hover{
+  background: rgba(255,255,255,.14);
+  transform: translateY(-1px);
+}
+.blog-topbar .icon-btn:active{
+  transform: translateY(0);
+}
+
+/* avatar topbar : un peu plus "bijou" */
+.profile-circle{
+  box-shadow: 0 10px 22px rgba(0,0,0,.18);
+  border: 1px solid rgba(255,255,255,.45);
+}
