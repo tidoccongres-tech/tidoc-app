@@ -874,14 +874,6 @@ img, svg{
   color: currentColor;
 }
 
-/* profil layout */
-.profile-card{
-  margin-top:12px;
-  display:flex;
-  gap:14px;
-  align-items:center;
-}
-
 /* FORCE le bleu Ti'Doc sur le nom du profil */
 #profileName{
   color: var(--tidoc) !important;
