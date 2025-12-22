@@ -1457,3 +1457,110 @@ main.page.blog-page > section.card:first-of-type{
 main.page.blog-page > section.card:first-of-type h2{
   letter-spacing:.2px;
 }
+
+/* =========================
+   AVATARS — PREMIUM PACK
+   ========================= */
+
+/* Fond doux comme settings */
+.page.avatars-page{
+  background:
+    radial-gradient(900px 420px at 20% -10%, rgba(23,140,168,.12), transparent 60%),
+    radial-gradient(900px 420px at 90% 10%, rgba(31,181,208,.10), transparent 55%),
+    var(--bg);
+}
+
+/* Carte avatars plus premium */
+.avatar-card{
+  border-radius:22px;
+  background: linear-gradient(135deg, rgba(23,140,168,.14), rgba(23,140,168,.03));
+  border:1px solid rgba(23,140,168,.18);
+  box-shadow:
+    0 22px 44px rgba(23,140,168,.16),
+    inset 0 1px 0 rgba(255,255,255,.65);
+}
+
+/* Texte titre/subtitle plus clean */
+.avatar-card h2{
+  letter-spacing:.2px;
+}
+.avatar-sub{
+  margin:6px 0 14px;
+  color:var(--muted);
+  font-size:13px;
+  font-weight:700;
+}
+
+/* Grid : un peu plus d’air */
+.avatar-grid-small{
+  gap:10px;
+}
+
+/* Tuile avatar premium */
+.avatar-item-small{
+  border:1px solid rgba(0,0,0,.08);
+  border-radius:16px;
+  padding:8px;
+  background:rgba(255,255,255,.85);
+  box-shadow:0 10px 22px rgba(0,0,0,.06);
+  transition: transform .12s ease, box-shadow .12s ease, border-color .12s ease, background .12s ease;
+}
+
+.avatar-item-small:hover{
+  transform: translateY(-1px);
+  box-shadow:0 16px 28px rgba(0,0,0,.09);
+}
+
+.avatar-item-small.active{
+  border-color: rgba(23,140,168,.55);
+  background: rgba(23,140,168,.10);
+  box-shadow:0 18px 36px rgba(23,140,168,.22);
+}
+
+.avatar-item-small img{
+  border-radius:12px;
+}
+
+/* Bouton Enregistrer = même vibe premium (comme changer d’avatar / sécurité) */
+.avatar-save{
+  width:100%;
+  background: linear-gradient(135deg, #178CA8, #1fb5d0);
+  height:48px;
+  border-radius:16px;
+  font-weight:900;
+  letter-spacing:.2px;
+  box-shadow:0 14px 26px rgba(23,140,168,.25);
+  transition: transform .15s ease, box-shadow .15s ease, background .15s ease, opacity .15s ease;
+}
+
+.avatar-save:hover{
+  background:#137c95;
+  transform:translateY(-1px);
+  box-shadow:0 10px 22px rgba(23,140,168,.35);
+}
+
+.avatar-save:active{
+  transform:translateY(0);
+  box-shadow:0 4px 12px rgba(23,140,168,.2);
+}
+
+/* Disabled plus propre */
+.avatar-save:disabled{
+  opacity:.55;
+  cursor:not-allowed;
+  transform:none;
+  box-shadow:none;
+}
+
+/* Message : cache si vide */
+#avatarMsg:empty{ display:none; }
+#avatarMsg{
+  margin:10px 0 0;
+  font-size:13px;
+  font-weight:700;
+  color:var(--muted);
+  padding:10px 12px;
+  border-radius:14px;
+  border:1px solid rgba(0,0,0,.06);
+  background:rgba(255,255,255,.72);
+}
