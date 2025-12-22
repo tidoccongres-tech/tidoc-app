@@ -1244,3 +1244,21 @@ main, .page, .card{
     padding-right: 16px;
   }
 }
+
+/* ✅ Tablette : page quasi plein écran (moins de blancs) */
+@media (min-width: 768px){
+  .page{
+    max-width: 100% !important;
+    margin: 0 !important;
+    padding-left: 24px;
+    padding-right: 24px;
+  }
+}
+
+/* ✅ Desktop : on re-limite un peu pour pas que ça devienne trop large */
+@media (min-width: 1200px){
+  .page{
+    max-width: 1100px !important;
+    margin: 0 auto !important;
+  }
+}
