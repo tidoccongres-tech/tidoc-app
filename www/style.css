@@ -1751,3 +1751,8 @@ main.page.blog-page > section.card:first-of-type h2{
   top: calc(56px + 6px) !important;
   z-index: 25000 !important;
 }
+
+.blog-topbar{
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
