@@ -1231,3 +1231,8 @@ main, .page, .card{
 
 /* micro typo */
 .card p{ line-height:1.35; }
+
+/* ✅ Fix dropdown : ne pas couper les menus sous la topbar */
+.blog-topbar{
+  overflow: visible !important;
+}
