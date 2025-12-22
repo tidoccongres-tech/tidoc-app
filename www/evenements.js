@@ -1,4 +1,4 @@
-// evenements.js (MODULE) — admin button fiable
+// evenements.js (MODULE)
 import { firebaseConfig } from "./firebase-config.js";
 import { initializeApp, getApps, getApp } from "https://www.gstatic.com/firebasejs/10.12.4/firebase-app.js";
 import {
@@ -9,12 +9,12 @@ import {
   getDoc,
   doc,
   deleteDoc,
-  setDoc,
   runTransaction,
   serverTimestamp,
   query,
   orderBy,
   Timestamp,
+  setDoc,
 } from "https://www.gstatic.com/firebasejs/10.12.4/firebase-firestore.js";
 import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.4/firebase-auth.js";
 
@@ -22,6 +22,7 @@ import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/
 const app = getApps().length ? getApp() : initializeApp(firebaseConfig);
 const db = getFirestore(app);
 const auth = getAuth(app);
+
 const PACKS = {
   essentiel: { workshopsAllowed: 1, conferencesAllowed: 2 },
   standard:  { workshopsAllowed: 2, conferencesAllowed: 4 },
@@ -37,14 +38,8 @@ const eventsList = document.getElementById("eventsList");
 const eventMsg = document.getElementById("eventMsg");
 
 // helpers
-function isAdmin() {
-  // ✅ marche même si Firestore est lent
-  return !!window.TIDOC_AUTH?.isAdmin;
-}
-
-function showMsg(t = "") {
-  if (eventMsg) eventMsg.textContent = t;
-}
+function isAdmin() { return !!window.TIDOC_AUTH?.isAdmin; }
+function showMsg(t = "") { if (eventMsg) eventMsg.textContent = t; }
 
 function escapeHTML(s = "") {
   return String(s)
@@ -76,27 +71,50 @@ function showForm(show) {
 }
 
 function clearForm() {
-  ["eventDate", "eventStart", "eventEnd", "eventTitle", "eventPlace", "eventDesc"].forEach((id) => {
-    const el = document.getElementById(id);
-    if (el) el.value = "";
-  });
+  ["eventDate", "eventStart", "eventEnd", "eventTitle", "eventPlace", "eventDesc", "eventCapacity"]
+    .forEach((id) => {
+      const el = document.getElementById(id);
+      if (el) el.value = "";
+    });
   showMsg("");
 }
 
-// ✅ FORCE l’affichage/masquage du bouton admin
 function applyAdminUI() {
   const admin = isAdmin();
   if (openEventForm) openEventForm.style.display = admin ? "flex" : "none";
   if (!admin) showForm(false);
 }
 
-// CRUD
+// ===== Rights / Ticket =====
+async function getMyRights(){
+  const uid = auth.currentUser?.uid;
+  if (!uid) return { ok:false, reason:"nologin" };
+
+  const tSnap = await getDoc(doc(db, "userTickets", uid));
+  if (!tSnap.exists()) return { ok:false, reason:"noticket" };
+
+  const packKey = (tSnap.data()?.packKey || "").toLowerCase();
+  const pack = PACKS[packKey];
+  if (!pack) return { ok:false, reason:"badpack" };
+
+  const uSnap = await getDoc(doc(db, "userUsage", uid));
+  const usage = uSnap.exists() ? (uSnap.data() || {}) : {};
+  const wsUsed = Number(usage.workshopUsed || 0);
+  const confUsed = Number(usage.conferenceUsed || 0);
+
+  return {
+    ok:true,
+    packKey,
+    wsLeft: Math.max(0, pack.workshopsAllowed - wsUsed),
+    confLeft: Math.max(0, pack.conferencesAllowed - confUsed),
+  };
+}
+
+// ===== CRUD events =====
 async function createEvent() {
   if (!isAdmin()) {
     alert("Réservé à l’admin Ti’Doc.");
-  const capacity = Number(document.getElementById("eventCapacity")?.value || 0);
-  if (capacity < 1) { showMsg("Ajoute un nombre de places (>=1)."); return; }
-  return;
+    return;
   }
 
   try {
@@ -108,10 +126,10 @@ async function createEvent() {
     const type = document.getElementById("eventType")?.value || "Autre";
     const desc = document.getElementById("eventDesc")?.value?.trim() || "";
 
-    if (!d || !title) {
-      showMsg("Il faut au minimum une date + un titre.");
-      return;
-    }
+    const capacity = Number(document.getElementById("eventCapacity")?.value || 0);
+    if (capacity < 1) { showMsg("Ajoute un nombre de places (>=1)."); return; }
+
+    if (!d || !title) { showMsg("Il faut au minimum une date + un titre."); return; }
 
     const startHHMM = start || "00:00";
     const [sh, sm] = startHHMM.split(":").map(Number);
@@ -134,10 +152,10 @@ async function createEvent() {
       type,
       startAt,
       endAt,
-      createdAt: serverTimestamp(),
-      createdBy: auth.currentUser?.uid || "",
       capacity,
       bookedCount: 0,
+      createdAt: serverTimestamp(),
+      createdBy: auth.currentUser?.uid || "",
     });
 
     clearForm();
@@ -146,7 +164,6 @@ async function createEvent() {
   } catch (e) {
     console.log("createEvent error:", e);
     alert("Impossible de publier l’évènement (Rules Firestore ?)");
-    ["eventDate","eventStart","eventEnd","eventTitle","eventPlace","eventDesc","eventCapacity"].forEach(...)
   }
 }
 
@@ -163,6 +180,65 @@ async function deleteEvent(eventId) {
   }
 }
 
+// ===== Registration =====
+async function registerToEvent(eventId){
+  const uid = auth.currentUser?.uid;
+  if (!uid) { location.href="./login.html"; return; }
+
+  const rights = await getMyRights();
+  if (!rights.ok){
+    if (rights.reason === "noticket" || rights.reason === "badpack") {
+      alert("Tu dois importer ton billet pour t’inscrire.");
+      location.href = "./billets.html";
+      return;
+    }
+    alert("Connexion requise.");
+    return;
+  }
+
+  const evRef = doc(db, "events", eventId);
+  const regRef = doc(db, "events", eventId, "registrations", uid);
+  const usageRef = doc(db, "userUsage", uid);
+
+  await runTransaction(db, async (tx) => {
+    const evSnap = await tx.get(evRef);
+    if (!evSnap.exists()) throw new Error("Évènement introuvable.");
+
+    const ev = evSnap.data() || {};
+    const cap = Number(ev.capacity || 0);
+    const booked = Number(ev.bookedCount || 0);
+
+    const regSnap = await tx.get(regRef);
+    if (regSnap.exists()) throw new Error("Tu es déjà inscrit(e).");
+
+    if (cap > 0 && booked >= cap) throw new Error("Plus de places disponibles.");
+
+    const type = (ev.type || "").toLowerCase();
+
+    const uSnap = await tx.get(usageRef);
+    const usage = uSnap.exists() ? (uSnap.data() || {}) : {};
+    const wsUsed = Number(usage.workshopUsed || 0);
+    const confUsed = Number(usage.conferenceUsed || 0);
+
+    const wsAllowed = PACKS[rights.packKey].workshopsAllowed;
+    const confAllowed = PACKS[rights.packKey].conferencesAllowed;
+
+    if (type.includes("workshop")) {
+      if (wsUsed >= wsAllowed) throw new Error("Tu n’as plus de workshop disponible.");
+      tx.set(usageRef, { workshopUsed: wsUsed + 1 }, { merge:true });
+    } else if (type.includes("conf")) {
+      if (confUsed >= confAllowed) throw new Error("Tu n’as plus de conférence disponible.");
+      tx.set(usageRef, { conferenceUsed: confUsed + 1 }, { merge:true });
+    } else {
+      throw new Error("Type d’évènement non éligible à l’inscription.");
+    }
+
+    tx.set(regRef, { uid, createdAt: serverTimestamp() });
+    tx.set(evRef, { bookedCount: booked + 1 }, { merge:true });
+  });
+}
+
+// ===== Render =====
 function renderEventCard(id, e) {
   const startAtDate = e.startAt?.toDate ? e.startAt.toDate() : null;
   if (!startAtDate) return null;
@@ -172,6 +248,7 @@ function renderEventCard(id, e) {
   const endTxt = e.endAt?.toDate ? formatTime(e.endAt.toDate()) : "";
   const place = (e.place || "").trim();
   const canDelete = isAdmin();
+
   const cap = Number(e.capacity || 0);
   const booked = Number(e.bookedCount || 0);
   const left = cap > 0 ? Math.max(0, cap - booked) : null;
@@ -195,14 +272,6 @@ function renderEventCard(id, e) {
 
       <div class="event-meta">
         <span>🕒 ${timeTxt}${endTxt ? " – " + endTxt : ""}</span>
-        ${!canDelete ? `
-  <div style="margin-top:10px;display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
-    <button class="btn-primary event-add" type="button" data-join="${id}">
-      S’inscrire
-    </button>
-    <span class="muted" data-rights="${id}" style="font-size:12px;"></span>
-  </div>
-` : ""}
         ${cap ? `<span>• 👥 ${left} / ${cap} places restantes</span>` : ""}
         ${e.type ? `<span>• ${escapeHTML(e.type)}</span>` : ""}
         ${
@@ -211,6 +280,15 @@ function renderEventCard(id, e) {
             : ""
         }
       </div>
+
+      ${!canDelete ? `
+        <div style="margin-top:10px;display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
+          <button class="btn-primary event-add" type="button" data-join="${id}">
+            S’inscrire
+          </button>
+          <span data-rights="${id}" style="font-size:12px;color:var(--muted);font-weight:700;"></span>
+        </div>
+      ` : ""}
     </div>
   `;
 
@@ -219,92 +297,29 @@ function renderEventCard(id, e) {
   }
 
   card.querySelector(`[data-join="${id}"]`)?.addEventListener("click", async () => {
-  try{
-    await registerToEvent(id);
-    alert("✅ Inscription validée !");
-    await loadEvents();
-  }catch(e){
-    alert("❌ " + (e?.message || String(e)));
-  }
-});
-  
+    try{
+      await registerToEvent(id);
+      alert("✅ Inscription validée !");
+      await loadEvents();
+    }catch(err){
+      alert("❌ " + (err?.message || String(err)));
+    }
+  });
+
+  // affiche les quotas restants
+  (async ()=>{
+    const el = card.querySelector(`[data-rights="${id}"]`);
+    if (!el) return;
+    if (!auth.currentUser) { el.textContent = "Connecte-toi pour t’inscrire."; return; }
+
+    const r = await getMyRights();
+    if (!r.ok){ el.textContent = "Billet requis (importe-le)."; return; }
+    el.textContent = `Workshops restants : ${r.wsLeft} • Conférences restantes : ${r.confLeft}`;
+  })();
+
   return card;
 }
-async function registerToEvent(eventId){
-  const uid = auth.currentUser?.uid;
-  if (!uid) { location.href="./login.html"; return; }
 
-(async ()=>{
-  const el = card.querySelector(`[data-rights="${id}"]`);
-  if (!el) return;
-  if (!auth.currentUser) { el.textContent = "Connecte-toi pour t’inscrire."; return; }
-
-  const r = await getMyRights();
-  if (!r.ok){
-    el.textContent = "Billet requis (importe-le).";
-    return;
-  }
-  el.textContent = `Workshops restants : ${r.wsLeft} • Conférences restantes : ${r.confLeft}`;
-})();
-  
-  // droits
-  const rights = await getMyRights();
-  if (!rights.ok){
-    // pas de billet -> billets.html
-    if (rights.reason === "noticket" || rights.reason === "badpack") {
-      alert("Tu dois importer ton billet pour t’inscrire.");
-      location.href = "./billets.html";
-      return;
-    }
-    alert("Connexion requise.");
-    return;
-  }
-
-  const evRef = doc(db, "events", eventId);
-  const regRef = doc(db, "events", eventId, "registrations", uid);
-  const usageRef = doc(db, "userUsage", uid);
-
-  await runTransaction(db, async (tx) => {
-    const evSnap = await tx.get(evRef);
-    if (!evSnap.exists()) throw new Error("Évènement introuvable.");
-
-    const ev = evSnap.data() || {};
-    const cap = Number(ev.capacity || 0);
-    const booked = Number(ev.bookedCount || 0);
-
-    // déjà inscrit ?
-    const regSnap = await tx.get(regRef);
-    if (regSnap.exists()) throw new Error("Tu es déjà inscrit(e).");
-
-    // places
-    if (cap > 0 && booked >= cap) throw new Error("Plus de places disponibles.");
-
-    // quota selon type
-    const type = (ev.type || "").toLowerCase();
-    const uSnap = await tx.get(usageRef);
-    const usage = uSnap.exists() ? (uSnap.data() || {}) : {};
-    const wsUsed = Number(usage.workshopUsed || 0);
-    const confUsed = Number(usage.conferenceUsed || 0);
-
-    const wsAllowed = PACKS[rights.packKey].workshopsAllowed;
-    const confAllowed = PACKS[rights.packKey].conferencesAllowed;
-
-    if (type.includes("workshop")) {
-      if (wsUsed >= wsAllowed) throw new Error("Tu n’as plus de workshop disponible.");
-      tx.set(usageRef, { workshopUsed: wsUsed + 1 }, { merge:true });
-    } else if (type.includes("conf")) {
-      if (confUsed >= confAllowed) throw new Error("Tu n’as plus de conférence disponible.");
-      tx.set(usageRef, { conferenceUsed: confUsed + 1 }, { merge:true });
-    } else {
-      // si “Autre” : choisis une règle (ici on bloque)
-      throw new Error("Type d’évènement non éligible à l’inscription.");
-    }
-
-    // crée inscription + incrémente compteur
-    tx.set(regRef, { uid, createdAt: serverTimestamp() });
-    tx.set(evRef, { bookedCount: booked + 1 }, { merge:true });
-  });
-}
 async function loadEvents() {
   if (!eventsList) return;
 
@@ -326,11 +341,8 @@ async function loadEvents() {
   });
 }
 
-
-
 // boot
 document.addEventListener("DOMContentLoaded", () => {
-  // ✅ affichage admin dès que window.TIDOC_AUTH arrive
   applyAdminUI();
   window.addEventListener("tidoc:auth", applyAdminUI);
 
