@@ -1236,3 +1236,11 @@ main, .page, .card{
 .blog-topbar{
   overflow: visible !important;
 }
+/* ✅ Tablette : élargit le contenu pour enlever les grands blancs */
+@media (min-width: 768px){
+  .page{
+    max-width: 900px;     /* ajuste 820-980 si tu veux */
+    padding-left: 16px;
+    padding-right: 16px;
+  }
+}
