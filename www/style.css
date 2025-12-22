@@ -2016,3 +2016,22 @@ main.page.blog-page > section.card:first-of-type h2{
   font-weight:750;
 }
 
+/* ===== iOS FIX : topbar tappable ===== */
+.blog-topbar{
+  position: fixed !important;
+  top: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  height: 56px !important;
+  z-index: 50000 !important;
+  pointer-events: auto !important;
+}
+
+/* le contenu ne passe pas sous la topbar */
+.page.blog-page{
+  padding-top: calc(56px + 12px) !important;
+}
+
+/* si tu as des pages non "blog-page", ajoute aussi ceci au besoin :
+.page{ padding-top: calc(56px + 20px); }
+*/
