@@ -22,7 +22,7 @@ const LS_NAME = "tidoc_name";
   const s = document.createElement("style");
   s.id = "tidoc-header-css";
   s.textContent = `
-    .blog-topbar{position:sticky;top:0;height:56px;background:#178CA8;z-index:9999;
+    ..blog-topbar{position:fixed;top:0;left:0;right:0;height:56px;background:#178CA8;z-index:50000;
       display:flex;justify-content:space-between;align-items:center;padding:0 14px}
     .blog-topbar-left,.blog-topbar-right{display:flex;align-items:center;gap:10px}
     .icon-btn{background:none;border:none;color:#fff;padding:8px;border-radius:12px;position:relative}
