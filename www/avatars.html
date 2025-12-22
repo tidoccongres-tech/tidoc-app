@@ -11,9 +11,10 @@
   <!-- Topbar + menu profil -->
   <script type="module" src="header-user-menu.js"></script>
 
-  <main class="page blog-page">
+  <!-- ✅ ajoute avatars-page pour le fond premium -->
+  <main class="page blog-page avatars-page">
 
-    <!-- Bouton HOME sous la topbar (même que Profil) -->
+    <!-- Bouton HOME sous la topbar -->
     <div class="page-top-actions">
       <a class="home-icon-btn" href="./index.html" aria-label="Accueil">
         <svg class="home-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
@@ -24,22 +25,24 @@
       </a>
     </div>
 
-    <!-- UNE SEULE CARTE : titre + avatars + enregistrer -->
-    <section class="card" style="margin-top:10px;">
+    <!-- ✅ carte premium -->
+    <section class="card avatar-card" style="margin-top:10px;">
       <h2 style="margin:0;color:var(--tidoc)">Choisir un avatar</h2>
-      <p style="margin:6px 0 14px;color:var(--muted);font-size:13px">
-        Appuie sur un avatar puis clique sur “Enregistrer”.
-      </p>
+
+      <!-- ✅ classe avatar-sub (plus clean) -->
+      <p class="avatar-sub">Appuie sur un avatar puis clique sur “Enregistrer”.</p>
 
       <div id="avatarGrid" class="avatar-grid-small"></div>
 
       <div style="height:12px"></div>
 
-      <button class="btn-primary" id="saveAvatarBtn" type="button" disabled>
+      <!-- ✅ bouton premium animé -->
+      <button class="btn-primary avatar-save" id="saveAvatarBtn" type="button" disabled>
         Enregistrer
       </button>
 
-      <p id="avatarMsg" style="margin:10px 0 0;color:var(--muted);font-size:13px;"></p>
+      <!-- ✅ on enlève le style inline, géré par CSS premium -->
+      <p id="avatarMsg"></p>
     </section>
 
   </main>
