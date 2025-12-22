@@ -5,23 +5,24 @@
   --line:#eaeaea;
 }
 
-/* ===== RESET ===== */
+/* ===== RESET / BASE ===== */
 *{ box-sizing:border-box; }
 
 html, body{
   margin:0;
   min-height:100%;
-  overflow-x:hidden;                 /* évite le “gros zoom / débordement” */
+  overflow-x:hidden;
   -webkit-overflow-scrolling:touch;
   font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;
   background:var(--bg);
   color:#1f2a2e;
 }
 
-img, svg{
-  max-width:100%;
-  height:auto;
-}
+/* ⚠️ IMPORTANT : on laisse img responsive, MAIS PAS les SVG inline (iPad bug "énorme icône") */
+img{ max-width:100%; height:auto; }
+
+/* Les SVG inline gardent leur taille via leurs classes (.icon, .home-icon, .tab-ico, etc.) */
+svg{ max-width:none; height:auto; }
 
 /* ===== PAGE ===== */
 .page{
@@ -29,6 +30,11 @@ img, svg{
   padding-bottom:160px; /* place tabbar */
   max-width:520px;
   margin:0 auto;
+}
+
+/* évite que le contenu soit sous la topbar sticky */
+.page.blog-page{
+  padding-top: calc(56px + 12px);
 }
 
 /* ===== CARTES ===== */
@@ -39,6 +45,8 @@ img, svg{
   background:#fff;
   box-shadow:0 10px 24px rgba(0,0,0,.06);
 }
+
+.card + .card{ margin-top:14px; }
 
 .center{ display:flex; justify-content:center; }
 
@@ -98,7 +106,36 @@ img, svg{
   background:rgba(23,140,168,.12);
 }
 
-/* ===== TOPBAR (Blog/Galerie/Events + Home maintenant) ===== */
+/* ===== TABBAR ICONES ===== */
+.tabbar .tab{
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  justify-content:center;
+  gap:4px;
+  min-width:56px;
+}
+
+.tab-ico{
+  width:22px;
+  height:22px;
+  display:block;
+  color: var(--muted);
+}
+
+.tab-label{
+  font-size:11px;
+  font-weight:800;
+  color: var(--muted);
+  line-height:1;
+}
+
+.tab.active .tab-ico,
+.tab.active .tab-label{
+  color: var(--tidoc);
+}
+
+/* ===== TOPBAR ===== */
 .blog-topbar{
   position:sticky;
   top:0;
@@ -108,7 +145,8 @@ img, svg{
   align-items:center;
   padding:0 14px;
   background:var(--tidoc);
-  z-index:999;
+  z-index:10000;
+  pointer-events:auto !important;
 }
 
 .blog-topbar-left{
@@ -136,15 +174,27 @@ img, svg{
   justify-content:center;
 }
 
-/* ===== PROFIL TOPBAR ===== */
+/* ===== PROFIL TOPBAR (header-user-menu) ===== */
 .profile-btn{
   position:relative;
   border:none;
   background:transparent;
   padding:0;
   cursor:pointer;
+  display:flex;                 /* avatar + pseudo en ligne */
+  align-items:center;
+  gap:10px;
+  pointer-events:auto;
 }
 
+.profile-badge{
+  position:relative;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+}
+
+/* avatar rond dans la topbar */
 .profile-circle{
   width:34px;
   height:34px;
@@ -159,15 +209,16 @@ img, svg{
   box-shadow:0 6px 18px rgba(0,0,0,.15);
 }
 
+/* image + initial (header) */
 #profileImg{
   width:100%;
   height:100%;
   object-fit:cover;
   display:none;
 }
-
 #profileInitial{ display:block; }
 
+/* pastille statut */
 .status-dot{
   position:absolute;
   right:-2px;
@@ -179,6 +230,38 @@ img, svg{
   border:2px solid var(--tidoc);
 }
 
+/* la pastille reste SUR l’avatar */
+.profile-badge .status-dot{
+  position:absolute;
+  right:-2px;
+  bottom:-2px;
+}
+
+/* ✅ NOM DANS LA TOPBAR (blanc) : on scope pour ne pas casser Settings */
+.blog-topbar .profile-name{
+  display:flex;
+  align-items:center;
+  gap:6px;
+  color:#fff;
+  font-weight:900;
+  font-size:14px;
+  line-height:1;
+  max-width:140px;
+  white-space:nowrap;
+  overflow:hidden;
+  text-overflow:ellipsis;
+}
+
+/* petite couronne */
+.crown-ico{
+  width:16px;
+  height:16px;
+  display:block;
+  flex:0 0 auto;
+}
+.crown-inline{ display:inline-flex; margin-left:4px; }
+
+/* menu profil */
 .profile-menu{
   position:absolute;
   top:56px;
@@ -187,8 +270,19 @@ img, svg{
   border:1px solid rgba(0,0,0,.08);
   border-radius:12px;
   box-shadow:0 10px 30px rgba(0,0,0,.12);
-  z-index:9999;
+  z-index:10001;
   overflow:hidden;
+
+  /* ✅ fermé par défaut sans bloquer */
+  display:none !important;
+  pointer-events:none !important;
+}
+
+/* ✅ OUVERTURE via .open */
+.profile-menu.open{
+  display:block !important;
+  pointer-events:auto !important;
+  z-index:10001 !important;
 }
 
 .menu-item{
@@ -198,6 +292,20 @@ img, svg{
   background:#fff;
   text-align:left;
   font-weight:600;
+}
+
+/* overlays invisibles interdits */
+#headerUserMenuOverlay,
+.header-overlay,
+.menu-overlay{
+  display:none !important;
+  pointer-events:none !important;
+}
+
+/* FORCE le bleu Ti'Doc sur le nom du profil (si élément #profileName existe sur Settings) */
+#profileName{
+  color: var(--tidoc) !important;
+  font-weight: 900;
 }
 
 /* ===== BLOG / EVENTS / GALERIE (bouton créer) ===== */
@@ -210,7 +318,7 @@ img, svg{
   border-radius:14px;
   padding:14px 16px;
   display:flex;
-  align-items:center;     /* centrage vertical */
+  align-items:center;
   gap:12px;
   font-weight:800;
   color:var(--tidoc);
@@ -226,6 +334,13 @@ img, svg{
   background:rgba(23,140,168,.12);
   font-size:18px;
   line-height:1;
+}
+
+/* bouton cliquable forum */
+#createPostBtn{
+  position:relative;
+  z-index:2;
+  pointer-events:auto;
 }
 
 /* ===== POSTS ===== */
@@ -245,9 +360,12 @@ img, svg{
   overflow-wrap:anywhere;
 }
 
+.post-author{ font-weight:600; }
+
 .post-sub{
   font-size:12px;
   opacity:.6;
+  display:block;
 }
 
 .post-body{
@@ -266,28 +384,21 @@ img, svg{
   margin-top:10px;
 }
 
-.like-btn {
-  background: none;
-  border: none;
-  cursor: pointer;
-  padding: 0;
+/* like */
+.like-btn{
+  background:none;
+  border:none;
+  cursor:pointer;
+  padding:0;
 }
-
-.like-btn .heart-icon {
-  width: 20px;
-  height: 20px;
-  fill: #b5b5b5; /* gris */
-  transition: fill 0.2s ease;
+.like-btn .heart-icon{
+  width:20px;
+  height:20px;
+  fill:#b5b5b5;
+  transition:fill .2s ease;
 }
-
-.like-btn.liked .heart-icon {
-  fill: #178CA8; /* couleur Ti’Doc */
-}
-
-.like-count {
-  font-size: 13px;
-  opacity: 0.7;
-}
+.like-btn.liked .heart-icon{ fill:#178CA8; }
+.like-count{ font-size:13px; opacity:.7; }
 
 .delete-btn,
 .comment-del{
@@ -412,7 +523,6 @@ img, svg{
   color:var(--tidoc);
   font-weight:900;
 }
-
 .event-date .day{ font-size:20px; display:block; }
 .event-date .month{ font-size:11px; }
 
@@ -448,15 +558,52 @@ img, svg{
 }
 
 .event-place{
-  color: var(--tidoc);
-  font-weight: 700;
-  text-decoration: none;
+  color:var(--tidoc);
+  font-weight:700;
+  text-decoration:none;
 }
-.event-place:hover{
-  text-decoration: underline;
+.event-place:hover{ text-decoration:underline; }
+
+.event-select{
+  margin-top:10px;
+  display:flex;
+  justify-content:flex-start;
 }
 
-/* ===== GALERIE : switch années ===== */
+.event-add{
+  height:40px;
+  border-radius:12px;
+  font-weight:800;
+}
+
+/* ===== EVENT FORM (ADMIN) ===== */
+.event-form .field span{
+  font-size:12px;
+  color:var(--muted);
+  font-weight:800;
+}
+
+.event-form input,
+.event-form textarea,
+.event-form select{
+  width:100%;
+  border:1px solid var(--line);
+  border-radius:12px;
+  padding:12px;
+  font-size:14px;
+  outline:none;
+}
+
+.event-row-2{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:10px;
+}
+@media (max-width:520px){
+  .event-row-2{ grid-template-columns:1fr; }
+}
+
+/* ===== GALERIE ===== */
 .gallery-grid{
   margin-top:12px;
   display:grid;
@@ -465,6 +612,7 @@ img, svg{
 }
 
 .gallery-item{
+  position:relative; /* pour actions */
   display:block;
   border-radius:16px;
   overflow:hidden;
@@ -480,7 +628,63 @@ img, svg{
   display:block;
 }
 
-/* ===== FIX bouton inviter (toujours en haut à droite de la carte Ti'Doc) ===== */
+/* switch années */
+.gallery-years{
+  display:flex;
+  gap:10px;
+  margin-bottom:12px;
+}
+
+.year-btn{
+  flex:1;
+  border:1px solid var(--line);
+  background:#fff;
+  border-radius:12px;
+  padding:10px 12px;
+  font-weight:800;
+  color:var(--muted);
+  cursor:pointer;
+}
+.year-btn.active{
+  color:var(--tidoc);
+  background:rgba(23,140,168,.12);
+  border-color:rgba(23,140,168,.25);
+}
+
+/* actions galerie */
+.gallery-actions{
+  position:absolute;
+  top:8px;
+  right:8px;
+  display:flex;
+  gap:8px;
+  z-index:20;
+}
+.gallery-btn{
+  border:none;
+  background:#fff;
+  border-radius:10px;
+  padding:6px 8px;
+  cursor:pointer;
+  box-shadow:0 10px 24px rgba(0,0,0,.10);
+  text-decoration:none;
+  color:inherit;
+  font-size:14px;
+  line-height:1;
+}
+.gallery-del{
+  position:absolute;
+  top:8px;
+  right:8px;
+  border:none;
+  background:#fff;
+  border-radius:10px;
+  padding:6px 8px;
+  cursor:pointer;
+  box-shadow:0 10px 24px rgba(0,0,0,.10);
+}
+
+/* ===== HOME ===== */
 .home-card{ position:relative; }
 
 .home-invite-icon{
@@ -488,24 +692,18 @@ img, svg{
   top:12px !important;
   right:12px !important;
   left:auto !important;
-
   width:40px;
   height:40px;
   border:1px solid var(--line);
   border-radius:14px;
   background:rgba(23,140,168,.12);
   color:var(--tidoc);
-
   display:flex;
   align-items:center;
   justify-content:center;
   z-index:10;
 }
-
-.home-invite-icon .icon{
-  width:20px;
-  height:20px;
-}
+.home-invite-icon .icon{ width:20px; height:20px; }
 
 .home-hero{
   display:flex;
@@ -541,9 +739,7 @@ img, svg{
   color:var(--muted);
 }
 
-.home-contact-btn{
-  width:100%;
-}
+.home-contact-btn{ width:100%; }
 
 /* accès rapides */
 .home-quick{
@@ -576,9 +772,7 @@ img, svg{
 }
 
 /* photos accueil */
-.home-photos{
-  margin-top:14px;
-}
+.home-photos{ margin-top:14px; }
 
 .home-section-title{
   font-weight:900;
@@ -634,174 +828,103 @@ img, svg{
   transition:transform .15s ease, background .15s ease;
   text-decoration:none;
 }
-
 .social-icon:hover{
   background:rgba(23,140,168,.22);
   transform:translateY(-2px);
 }
 
-/* ===== GALERIE : switch années ===== */
-.gallery-years{
-  display:flex;
-  gap:10px;
-  margin-bottom:12px;
+/* ===== Bouton HOME sous la topbar (mini case) ===== */
+.page-top-actions{
+  position:sticky;
+  top:54px;
+  z-index:900;
+  padding:10px 0 0;
+  background:var(--bg);
 }
 
-.year-btn{
-  flex:1;
+.home-icon-btn{
+  width:44px;
+  height:44px;
+  border-radius:14px;
   border:1px solid var(--line);
-  background:#fff;
-  border-radius:12px;
-  padding:10px 12px;
-  font-weight:800;
-  color:var(--muted);
-  cursor:pointer;
-}
-
-.year-btn.active{
-  color:var(--tidoc);
   background:rgba(23,140,168,.12);
-  border-color:rgba(23,140,168,.25);
-}
-
-/* bouton supprimer photo (si tu l’utilises) */
-.gallery-del{
-  position:absolute;
-  top:8px;
-  right:8px;
-  border:none;
-  background:#fff;
-  border-radius:10px;
-  padding:6px 8px;
-  cursor:pointer;
-  box-shadow:0 10px 24px rgba(0,0,0,.10);
-}
-
-/* pour que le bouton delete puisse se placer */
-.gallery-item{
-  position:relative;
-}
-
-.event-select{
-  margin-top:10px;
-  display:flex;
-  justify-content:flex-start;
-}
-
-.event-add{
-  height:40px;
-  border-radius:12px;
-  font-weight:800;
-}
-
-.blog-topbar{ z-index: 10000; }
-.profile-menu{ z-index: 10001; }
-.profile-btn{ pointer-events: auto; }
-
-/* ===== TABBAR ICONES ===== */
-.tabbar .tab{
-  display:flex;
-  flex-direction:column;
+  color:var(--tidoc);
+  display:inline-flex;
   align-items:center;
   justify-content:center;
-  gap:4px;
-  min-width:56px;
+  text-decoration:none;
+  box-shadow:0 10px 24px rgba(0,0,0,.06);
 }
 
-.tab-ico{
-  width:22px;
-  height:22px;
+/* ✅ taille FIXE du SVG maison (évite le "logo géant") */
+.home-icon{
+  width:22px !important;
+  height:22px !important;
   display:block;
-  color: var(--muted);
+  color:currentColor;
 }
 
-.tab-label{
-  font-size:11px;
-  font-weight:800;
-  color: var(--muted);
-  line-height:1;
-}
-
-.tab.active .tab-ico,
-.tab.active .tab-label{
-  color: var(--tidoc);
-}
 /* ===== LOGIN ===== */
-.login-wrapper {
-  min-height: 100vh;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  background: #178CA8; /* bleu Ti'Doc */
-  animation: pageFade 350ms ease-out both;
-}
-
-.login-card {
-  position: relative;
-  background: white;
-  padding: 60px 30px 30px;
-  width: 100%;
-  max-width: 360px;
-  border-radius: 16px;
-  box-shadow: 0 10px 30px rgba(0,0,0,0.08);
-  text-align: center;
-  animation: cardIn 420ms cubic-bezier(.2,.9,.2,1) both;
-}
-
-.login-logo {
-  position: absolute;
-  top: -40px;
-  left: 50%;
-  transform: translateX(-50%);
-  width: 80px;
-  height: 80px;
-  background: white;
-  border-radius: 50%;
-  box-shadow: 0 6px 16px rgba(0,0,0,0.15);
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  animation: logoPop 520ms cubic-bezier(.2,1.2,.2,1) both;
-  animation-delay: 120ms;
-}
-
-.login-logo img {
-  width: 60px;
-  height: 60px;
-  object-fit: contain;
-  border-radius: 50%;
-}
-
-/* ===== Animations ===== */
-@keyframes pageFade {
-  from { opacity: 0; }
-  to   { opacity: 1; }
-}
-
-@keyframes cardIn {
-  from { opacity: 0; transform: translateY(18px) scale(0.98); }
-  to   { opacity: 1; transform: translateY(0) scale(1); }
-}
-
-@keyframes logoPop {
-  0%   { transform: translateX(-50%) scale(0.7); opacity: 0; }
-  60%  { transform: translateX(-50%) scale(1.08); opacity: 1; }
-  100% { transform: translateX(-50%) scale(1); }
-}
-
-
-.profile-circle{
-  width:34px;
-  height:34px;
-  border-radius:50%;
-  background:#fff;
-  overflow:hidden;
+.login-wrapper{
+  min-height:100vh;
   display:flex;
-  align-items:center;
   justify-content:center;
-  box-shadow:0 6px 18px rgba(0,0,0,.15);
+  align-items:center;
+  background:#178CA8;
+  animation:pageFade 350ms ease-out both;
 }
 
+.login-card{
+  position:relative;
+  background:white;
+  padding:60px 30px 30px;
+  width:100%;
+  max-width:360px;
+  border-radius:16px;
+  box-shadow:0 10px 30px rgba(0,0,0,0.08);
+  text-align:center;
+  animation:cardIn 420ms cubic-bezier(.2,.9,.2,1) both;
+}
+
+.login-logo{
+  position:absolute;
+  top:-40px;
+  left:50%;
+  transform:translateX(-50%);
+  width:80px;
+  height:80px;
+  background:white;
+  border-radius:50%;
+  box-shadow:0 6px 16px rgba(0,0,0,0.15);
+  display:flex;
+  justify-content:center;
+  align-items:center;
+  animation:logoPop 520ms cubic-bezier(.2,1.2,.2,1) both;
+  animation-delay:120ms;
+}
+
+.login-logo img{
+  width:60px;
+  height:60px;
+  object-fit:contain;
+  border-radius:50%;
+}
+
+@keyframes pageFade{
+  from{ opacity:0; }
+  to{ opacity:1; }
+}
+@keyframes cardIn{
+  from{ opacity:0; transform:translateY(18px) scale(0.98); }
+  to{ opacity:1; transform:translateY(0) scale(1); }
+}
+@keyframes logoPop{
+  0%{ transform:translateX(-50%) scale(0.7); opacity:0; }
+  60%{ transform:translateX(-50%) scale(1.08); opacity:1; }
+  100%{ transform:translateX(-50%) scale(1); }
+}
+
+/* ===== AVATARS (page avatars.html) ===== */
 .profile-avatar{
   width:64px;
   height:64px;
@@ -812,7 +935,6 @@ img, svg{
   align-items:center;
   justify-content:center;
 }
-
 .profile-avatar img{
   width:100%;
   height:100%;
@@ -832,55 +954,17 @@ img, svg{
   padding:4px;
   cursor:pointer;
 }
-
 .avatar-item-small img{
   width:100%;
   display:block;
   border-radius:8px;
 }
-
 .avatar-item-small.active{
   border-color:var(--tidoc);
   background:rgba(23,140,168,.1);
 }
 
-/* ===== Bouton HOME sous la topbar (mini case) ===== */
-.page-top-actions{
-  position: sticky;
-  top: 54px;              /* juste sous la barre bleue */
-  z-index: 900;
-  padding: 10px 0 0;
-  background: var(--bg);  /* évite que ça “flotte” sur le contenu */
-}
-
-.home-icon-btn{
-  width: 44px;
-  height: 44px;
-  border-radius: 14px;
-  border: 1px solid var(--line);
-  background: rgba(23,140,168,.12);  /* “case” Ti’Doc */
-  color: var(--tidoc);
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  text-decoration: none;
-  box-shadow: 0 10px 24px rgba(0,0,0,.06);
-}
-
-.home-icon{
-  width: 22px;
-  height: 22px;
-  display: block;
-  color: currentColor;
-}
-
-/* FORCE le bleu Ti'Doc sur le nom du profil */
-#profileName{
-  color: var(--tidoc) !important;
-  font-weight: 900;
-}
-
-/* Paramètres : items */
+/* ===== SETTINGS : items ===== */
 .settings-item{
   display:block;
   border:1px solid var(--line);
@@ -890,17 +974,15 @@ img, svg{
   background:#fff;
   box-shadow:0 10px 24px rgba(0,0,0,.06);
   margin-top:10px;
-  color: inherit;                /* ✅ IMPORTANT */
+  color:inherit;
 }
-
-.settings-item:visited{ color: inherit; }     /* ✅ IMPORTANT */
-.settings-item:hover{ filter: brightness(0.99); }
+.settings-item:visited{ color:inherit; }
+.settings-item:hover{ filter:brightness(0.99); }
 
 .settings-title{
   font-weight:900;
   color:var(--tidoc);
 }
-
 .settings-sub{
   margin-top:4px;
   font-size:13px;
@@ -908,518 +990,7 @@ img, svg{
   font-weight:700;
 }
 
-/* Forum : assure que le bouton est cliquable */
-#createPostBtn{
-  position: relative;
-  z-index: 2;
-  pointer-events: auto;
-}
-
-/* ===== HEADER : avatar + pseudo en ligne ===== */
-.profile-btn{
-  display:flex;
-  align-items:center;
-  gap:10px;
-}
-
-/* bloc avatar devient le “point d’ancrage” de la pastille */
-.profile-badge{
-  position:relative;
-  display:flex;
-  align-items:center;
-  justify-content:center;
-}
-
-/* la pastille reste SUR l’avatar */
-.profile-badge .status-dot{
-  position:absolute;
-  right:-2px;
-  bottom:-2px;
-}
-
-/* pseudo à côté */
-.profile-name{
-  display:flex;
-  align-items:center;
-  gap:6px;
-  color:#fff;
-  font-weight:900;
-  font-size:14px;
-  line-height:1;
-  max-width:140px;
-  white-space:nowrap;
-  overflow:hidden;
-  text-overflow:ellipsis;
-}
-
-/* petite couronne */
-.crown-ico{
-  width:16px;
-  height:16px;
-  display:block;
-  flex:0 0 auto;
-}
-
-.gallery-actions{
-  position:absolute;
-  top:8px;
-  right:8px;
-  display:flex;
-  gap:8px;
-  z-index:20;
-}
-
-.gallery-btn{
-  border:none;
-  background:#fff;
-  border-radius:10px;
-  padding:6px 8px;
-  cursor:pointer;
-  box-shadow:0 10px 24px rgba(0,0,0,.10);
-  text-decoration:none;
-  color:inherit;
-  font-size:14px;
-  line-height:1;
-}
-
-/* =========================
-   HARD FIX iPad taps (FINAL)
-   À COLLER TOUT EN BAS
-   ========================= */
-
-/* Le contenu doit rester cliquable */
-main, .page, .card{
-  position: relative;
-  z-index: 1;
-  pointer-events: auto !important;
-}
-
-/* La topbar et la tabbar doivent rester cliquables */
-.blog-topbar{
-  pointer-events: auto !important;
-  z-index: 10000 !important;
-}
-.tabbar{
-  pointer-events: auto !important;
-  z-index: 10000 !important;
-}
-
-/* Le menu profil ne doit PAS bloquer quand il est fermé */
-.profile-menu{
-  display: none !important;
-  pointer-events: none !important;
-}
-
-/* ✅ OUVERTURE via la classe .open (comme ton JS) */
-.profile-menu.open{
-  display: block !important;
-  pointer-events: auto !important;
-  z-index: 10001 !important;
-}
-
-/* Sécurité : overlays invisibles interdits */
-#headerUserMenuOverlay,
-.header-overlay,
-.menu-overlay{
-  display: none !important;
-  pointer-events: none !important;
-}
-
-.post-author {
-  font-weight: 600;
-}
-
-.post-sub { display:block; }
-.crown-inline { display:inline-flex; margin-left:4px; }
-
-.notif-menu{position:absolute;top:58px;right:12px;background:#fff;border-radius:12px;z-index:10000;
- box-shadow:0 10px 30px rgba(0,0,0,.15);overflow:hidden;min-width:220px}
-.notif-empty{padding:12px 14px;font-size:13px;opacity:.7}
-
-/* badge rouge sur la cloche */
-.notif-wrap{position:relative;display:inline-flex}
-.notif-dot{
-  position:absolute;
-  top:6px; right:6px;
-  width:10px; height:10px;
-  border-radius:50%;
-  background:#ff3b30;            /* rouge iPhone */
-  border:2px solid #178CA8;      /* bord bleu topbar */
-  display:none;
-}
-.notif-dot.on{display:block}
-
-/* push-up (toast) */
-.notif-toast{
-  position:fixed;
-  top:10px; left:50%;
-  transform:translateX(-50%);
-  width:min(420px,92vw);
-  background:#fff;
-  border:1px solid rgba(0,0,0,.08);
-  border-radius:14px;
-  box-shadow:0 10px 30px rgba(0,0,0,.18);
-  padding:12px 14px;
-  z-index:20000;
-  display:none;
-}
-.notif-toast.on{display:block}
-.notif-toast-title{font-weight:900;font-size:13px;margin:0 0 2px}
-.notif-toast-text{font-size:13px;opacity:.8;margin:0}
-
-.pw-wrap{
-  position:relative;
-  width:100%;
-}
-
-.pw-wrap input{
-  width:100%;
-  padding-right:46px; /* place pour l’œil */
-}
-
-.pw-toggle{
-  position:absolute;
-  right:10px;
-  top:50%;
-  transform:translateY(-50%);
-  width:34px;
-  height:34px;
-  border:none;
-  background:transparent;
-  cursor:pointer;
-  opacity:.75;
-  display:flex;
-  align-items:center;
-  justify-content:center;
-}
-
-.pw-toggle:hover{ opacity:1; }
-
-.pw-toggle svg{
-  width:20px;
-  height:20px;
-  fill:#178CA8; /* couleur Ti’Doc */
-  display:block;
-}
-
-/* évite que le contenu soit sous la topbar sticky */
-.page.blog-page{
-  padding-top: calc(56px + 12px);
-}
-
-/* ===== Modal newsletter (admin) ===== */
-.modal-overlay{
-  position: fixed;
-  inset: 0;
-  background: rgba(0,0,0,.45);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 9999;
-  padding: 16px;
-}
-
-.modal-card{
-  width: min(560px, 94vw);
-  max-height: 88vh;
-  overflow: auto;
-}
-
-.modal-head{
-  display:flex;
-  justify-content:space-between;
-  align-items:center;
-  gap:12px;
-}
-
-.modal-body{
-  margin-top: 12px;
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-.modal-grid{
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 10px;
-}
-
-@media (max-width: 520px){
-  .modal-grid{ grid-template-columns: 1fr; }
-}
-
-.modal-field label{
-  display:block;
-  font-size: 12px;
-  color: var(--muted);
-  margin: 0 0 6px;
-}
-
-.modal-field input,
-.modal-field textarea{
-  width: 100%;
-  padding: 12px;
-  border: 1px solid #ddd;
-  border-radius: 12px;
-  font-size: 15px;
-  background: #fff;
-}
-
-.modal-actions{
-  display:flex;
-  gap:10px;
-  flex-wrap: wrap;
-  justify-content:flex-end;
-  margin-top: 6px;
-}
-
-.modal-actions .btn-outline,
-.modal-actions .btn-primary{
-  height: 42px;
-}
-
-.preview-card{
-  border: 1px dashed #cfe7ee;
-  border-radius: 14px;
-  padding: 12px;
-  background: #f7fcfe;
-}
-
-.preview-title{
-  font-weight: 900;
-  margin: 0;
-}
-
-.preview-text{
-  margin: 6px 0 0;
-  font-size: 13px;
-  opacity: .85;
-}
-
-.preview-media{
-  margin-top: 10px;
-  width: 100%;
-  border-radius: 12px;
-  max-height: 200px;
-  object-fit: cover;
-}
-
-.preview-toprow{
-  display:flex;
-  align-items:center;
-  gap:10px;
-}
-
-.preview-logo{
-  width: 26px;
-  height: 26px;
-  border-radius: 8px;
-  object-fit: cover;
-}
-
-/* ===== Sécurité (changement MDP) ===== */
-.security-card{
-  padding:16px;
-}
-
-.security-title{
-  margin:0 0 10px;
-  color:var(--tidoc);
-  font-size:20px;
-  font-weight:900;
-}
-
-.security-sub{
-  margin:-6px 0 14px;
-  color:var(--muted);
-  font-size:13px;
-}
-
-.security-grid{
-  display:grid;
-  gap:10px;
-}
-
-.sec-field label{
-  display:block;
-  font-size:13px;
-  color:var(--muted);
-  margin:0 0 6px;
-  font-weight:700;
-}
-
-.sec-input{
-  width:100%;
-  height:44px;
-  border-radius:12px;
-  border:1px solid rgba(0,0,0,.12);
-  padding:0 12px;
-  font-size:15px;
-  outline:none;
-  background:#fff;
-}
-
-.sec-input:focus{
-  border-color: rgba(23,140,168,.55);
-  box-shadow:0 0 0 4px rgba(23,140,168,.12);
-}
-
-.security-actions{
-  display:flex;
-  align-items:center;
-  gap:10px;
-  margin-top:10px;
-}
-
-.security-actions .btn-primary{
-  height:44px;
-  padding:0 14px;
-  border-radius:12px;
-  font-weight:800;
-  flex:1;
-}
-
-.security-hint{
-  font-size:12.5px;
-  color:var(--muted);
-  margin-top:10px;
-  line-height:1.35;
-}
-
-.security-msg{
-  margin-top:10px;
-  font-size:13px;
-  color:var(--muted);
-}
-
-/* ===== EVENT FORM (ADMIN) ===== */
-.event-form .field span{
-  font-size:12px;
-  color:var(--muted);
-  font-weight:800;
-}
-
-.event-form input,
-.event-form textarea,
-.event-form select{
-  width:100%;
-  border:1px solid var(--line);
-  border-radius:12px;
-  padding:12px;
-  font-size:14px;
-  outline:none;
-}
-
-.event-row-2{
-  display:grid;
-  grid-template-columns:1fr 1fr;
-  gap:10px;
-}
-
-@media (max-width:520px){
-  .event-row-2{ grid-template-columns:1fr; }
-}
-
-/* ===== SETTINGS : profil (plus clean) ===== */
-.profile-card{ padding:16px; }
-
-.profile-row{
-  display:flex;
-  gap:14px;
-  align-items:center;
-}
-
-.profile-avatar-lg{
-  width:74px;
-  height:74px;
-  border-radius:18px;                /* carré arrondi -> plus moderne */
-  overflow:hidden;
-  background:#e9f7fb;
-  border:1px solid rgba(0,0,0,.06);
-  box-shadow:0 10px 24px rgba(0,0,0,.08);
-  display:flex;
-  align-items:center;
-  justify-content:center;
-  flex:0 0 auto;
-}
-
-.profile-avatar-lg img{
-  width:100%;
-  height:100%;
-  object-fit:cover;
-  display:block;
-}
-
-.profile-info{ flex:1; min-width:0; }
-
-.profile-topline{
-  display:flex;
-  align-items:center;
-  gap:10px;
-}
-
-.profile-name{
-  font-weight:900;
-  font-size:16px;
-  color:var(--tidoc);
-  overflow:hidden;
-  text-overflow:ellipsis;
-  white-space:nowrap;
-}
-
-.profile-email{
-  margin-top:4px;
-  font-size:13px;
-  color:var(--muted);
-  overflow:hidden;
-  text-overflow:ellipsis;
-  white-space:nowrap;
-}
-
-.profile-badge{
-  font-size:12px;
-  font-weight:900;
-  padding:6px 10px;
-  border-radius:999px;
-  background:rgba(23,140,168,.12);
-  color:var(--tidoc);
-  border:1px solid rgba(23,140,168,.25);
-}
-
-.profile-actions{
-  margin-top:12px;
-}
-.profile-actions .btn-outline{
-  width:100%;
-}
-
-.profile-card .btn-outline {
-  background: var(--tidoc);
-  color: #fff;
-  border: none;
-  padding: 10px 18px;
-  border-radius: 14px;
-  font-weight: 700;
-  box-shadow: 0 6px 18px rgba(23,140,168,.25);
-  transition: transform .15s ease, box-shadow .15s ease, background .15s ease;
-}
-
-.profile-card .btn-outline:hover {
-  background: #137c95;
-  transform: translateY(-1px);
-  box-shadow: 0 10px 22px rgba(23,140,168,.35);
-}
-
-.profile-card .btn-outline:active {
-  transform: translateY(0);
-  box-shadow: 0 4px 12px rgba(23,140,168,.2);
-}
-
-/* =========================
-   SETTINGS – PROFIL HERO
-   ========================= */
-
+/* ===== SETTINGS : profil card ===== */
 .profile-card{
   margin-top:14px;
   padding:20px;
@@ -1436,26 +1007,75 @@ main, .page, .card{
 }
 
 .profile-row{
+  display:flex;
   gap:18px;
+  align-items:center;
 }
 
-/* avatar plus impactant */
 .profile-avatar-lg{
   width:90px;
   height:90px;
   border-radius:24px;
+  overflow:hidden;
   border:2px solid rgba(23,140,168,.35);
   box-shadow:0 18px 36px rgba(23,140,168,.35);
   background:#fff;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  flex:0 0 auto;
+}
+.profile-avatar-lg img{
+  width:100%;
+  height:100%;
+  object-fit:cover;
+  display:block;
 }
 
-/* nom = point focal */
-.profile-name{
+.profile-info{ flex:1; min-width:0; }
+
+.profile-topline{
+  display:flex;
+  align-items:center;
+  gap:10px;
+}
+
+/* ✅ NOM DANS SETTINGS (bleu) : scoping propre */
+.profile-card .profile-name{
+  font-weight:900;
   font-size:18px;
   letter-spacing:.2px;
+  color:var(--tidoc);
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+  display:block;
 }
 
-/* bouton AVATAR = action principale */
+.profile-email{
+  margin-top:4px;
+  font-size:13px;
+  color:var(--muted);
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+  opacity:.9;
+}
+
+.profile-badge{
+  font-size:12px;
+  font-weight:900;
+  padding:6px 10px;
+  border-radius:999px;
+  background:rgba(23,140,168,.12);
+  color:var(--tidoc);
+  border:1px solid rgba(23,140,168,.25);
+}
+
+.profile-actions{ margin-top:12px; }
+.profile-actions .btn-outline{ width:100%; }
+
+/* bouton "Changer d’avatar" premium */
 .profile-card .btn-outline{
   background: linear-gradient(135deg, #178CA8, #1fb5d0);
   color:#fff;
@@ -1463,121 +1083,23 @@ main, .page, .card{
   height:48px;
   border-radius:16px;
   font-weight:800;
+  box-shadow:0 14px 26px rgba(23,140,168,.25);
+  transition: transform .15s ease, box-shadow .15s ease, background .15s ease;
+}
+.profile-card .btn-outline:hover{
+  background:#137c95;
+  transform:translateY(-1px);
+  box-shadow:0 10px 22px rgba(23,140,168,.35);
+}
+.profile-card .btn-outline:active{
+  transform:translateY(0);
+  box-shadow:0 4px 12px rgba(23,140,168,.2);
 }
 
-/* =========================
-   SETTINGS – SÉCURITÉ CLEAN
-   ========================= */
-
+/* ===== SETTINGS : Sécurité ===== */
 .security-card{
   margin-top:16px;
-  border-radius:18px;
-  box-shadow:0 12px 28px rgba(0,0,0,.06);
-}
-
-.security-title{
-  display:flex;
-  align-items:center;
-  gap:8px;
-}
-
-.security-title::before{
-  content:"🔐";
-  font-size:18px;
-}
-
-.sec-input{
-  background:#fafafa;
-}
-
-.sec-input:focus{
-  background:#fff;
-}
-
-.card + .card{
-  margin-top:14px;
-}
-
-.security-msg{
-  font-weight:700;
-}
-
-.security-msg:has(✔),
-.security-msg:has(✅){
-  color:#1e9f6e;
-}
-
-.security-msg:has(❌){
-  color:#c0392b;
-}
-
-.profile-name{
-  display:flex;
-  align-items:center;
-  gap:6px;
-  font-weight:800;
-  font-size:14px;
-  color:#fff;
-  max-width:160px;
-  white-space:nowrap;
-  overflow:hidden;
-  text-overflow:ellipsis;
-}
-
-/* =========================================
-   TIDOC — SETTINGS / HOME PREMIUM PACK
-   À COLLER TOUT EN BAS DU CSS
-   (ne casse pas l’existant, améliore tout)
-   ========================================= */
-
-/* --- Fond de page + rythme --- */
-.page.blog-page{
-  /* garde ton padding-top sticky, mais rend le fond + doux */
-  background:
-    radial-gradient(900px 420px at 20% -10%, rgba(23,140,168,.12), transparent 60%),
-    radial-gradient(900px 420px at 90% 10%, rgba(31,181,208,.10), transparent 55%),
-    var(--bg);
-}
-
-/* toutes les cartes plus “premium” */
-.card{
-  border-radius:20px;
-  box-shadow:0 18px 40px rgba(0,0,0,.07);
-  border:1px solid rgba(23,140,168,.10);
-}
-
-/* un peu plus d’air entre sections */
-.card + .card{ margin-top:16px; }
-
-/* --- En-tête Paramètres (la première carte “Paramètres”) --- */
-.settings-hero,
-.settings-head,
-.settings-header,
-.card.settings-card:first-of-type{
-  /* au cas où tu as pas de classe dédiée -> on stylise la 1ère carte de la page settings */
-  background: linear-gradient(
-    135deg,
-    rgba(23,140,168,.12),
-    rgba(23,140,168,.03)
-  );
-  border:1px solid rgba(23,140,168,.18);
-  box-shadow:
-    0 22px 44px rgba(23,140,168,.18),
-    inset 0 1px 0 rgba(255,255,255,.65);
-}
-
-/* titre “Paramètres” plus impactant */
-.card h2{
-  letter-spacing:.2px;
-}
-
-/* --- Profil card (tu l’aimes déjà) : on garde ton style, mais on harmonise la typographie --- */
-.profile-card .profile-email{
-  opacity:.9;
-}
-
-/* --- Sécurité (carte) : même vibe que profil, mais avec un accent “safe” --- */
-.security-card{
+  padding:16px;
   border-radius:22px;
   background: linear-gradient(
     135deg,
@@ -1591,52 +1113,66 @@ main, .page, .card{
 }
 
 .security-title{
+  margin:0 0 10px;
+  color:var(--tidoc);
   font-size:20px;
+  font-weight:900;
+  display:flex;
+  align-items:center;
+  gap:8px;
   letter-spacing:.2px;
+}
+.security-title::before{
+  content:"🔐";
+  font-size:18px;
 }
 
 .security-sub{
+  margin:-6px 0 14px;
+  color:var(--muted);
+  font-size:13px;
   opacity:.95;
 }
 
-/* inputs “premium” (tous les inputs de sécurité + settings) */
-.sec-input,
-.event-form input,
-.event-form textarea,
-.event-form select,
-.post-form input,
-.post-form textarea,
-.comment-form input{
-  background:rgba(255,255,255,.92);
-  border:1px solid rgba(0,0,0,.10);
-  box-shadow: inset 0 1px 0 rgba(255,255,255,.60);
-  transition: box-shadow .15s ease, border-color .15s ease, transform .05s ease;
+.security-grid{
+  display:grid;
+  gap:10px;
 }
 
-.sec-input:focus,
-.event-form input:focus,
-.event-form textarea:focus,
-.event-form select:focus,
-.post-form input:focus,
-.post-form textarea:focus,
-.comment-form input:focus{
+.sec-field label{
+  display:block;
+  font-size:13px;
+  color:var(--muted);
+  margin:0 0 6px;
+  font-weight:900;
+  letter-spacing:.15px;
+}
+
+.sec-input{
+  width:100%;
+  height:44px;
+  border-radius:12px;
+  border:1px solid rgba(0,0,0,.12);
+  padding:0 12px;
+  font-size:15px;
+  outline:none;
+  background:#fafafa;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.60);
+  transition: box-shadow .15s ease, border-color .15s ease;
+}
+.sec-input:focus{
+  background:#fff;
   border-color: rgba(23,140,168,.55);
   box-shadow:
     0 0 0 4px rgba(23,140,168,.12),
     inset 0 1px 0 rgba(255,255,255,.65);
 }
 
-/* labels sécurité plus “app” */
-.sec-field label{
-  font-weight:900;
-  letter-spacing:.15px;
-}
-
-/* bouton principal (sécurité) encore + premium */
-.security-actions .btn-primary,
-.profile-card .btn-outline,
-.btn-primary{
-  box-shadow:0 14px 26px rgba(23,140,168,.25);
+.security-actions{
+  display:flex;
+  align-items:center;
+  gap:10px;
+  margin-top:10px;
 }
 
 .security-actions .btn-primary{
@@ -1645,83 +1181,215 @@ main, .page, .card{
   border-radius:16px;
   font-weight:900;
   letter-spacing:.2px;
+  flex:1;
+  box-shadow:0 14px 26px rgba(23,140,168,.25);
+}
+.security-actions .btn-primary:active{ transform:translateY(1px); }
+
+.security-hint{
+  font-size:12.5px;
+  color:var(--muted);
+  margin-top:10px;
+  line-height:1.35;
 }
 
-.security-actions .btn-primary:active{
-  transform: translateY(1px);
-}
-
-/* message (succès/erreur) plus propre */
 .security-msg{
+  margin-top:10px;
+  font-size:13px;
+  color:var(--muted);
+  font-weight:700;
   padding:10px 12px;
   border-radius:14px;
   border:1px solid rgba(0,0,0,.06);
   background:rgba(255,255,255,.72);
 }
 
-/* --- Petites cartes “settings-item” (si tu en as) --- */
-.settings-item{
-  border-radius:18px;
-  border:1px solid rgba(23,140,168,.12);
-  box-shadow:0 14px 30px rgba(0,0,0,.06);
-  transition: transform .12s ease, box-shadow .12s ease;
+/* couleurs selon contenu (si supporté) */
+.security-msg:has(✔),
+.security-msg:has(✅){ color:#1e9f6e; }
+.security-msg:has(❌){ color:#c0392b; }
+
+/* ===== Notifs ===== */
+.notif-menu{
+  position:absolute;
+  top:58px;
+  right:12px;
+  background:#fff;
+  border-radius:12px;
+  z-index:10000;
+  box-shadow:0 10px 30px rgba(0,0,0,.15);
+  overflow:hidden;
+  min-width:220px;
+}
+.notif-empty{ padding:12px 14px; font-size:13px; opacity:.7; }
+
+/* badge rouge sur la cloche */
+.notif-wrap{ position:relative; display:inline-flex; }
+.notif-dot{
+  position:absolute;
+  top:6px; right:6px;
+  width:10px; height:10px;
+  border-radius:50%;
+  background:#ff3b30;
+  border:2px solid #178CA8;
+  display:none;
+}
+.notif-dot.on{ display:block; }
+
+/* toast */
+.notif-toast{
+  position:fixed;
+  top:10px; left:50%;
+  transform:translateX(-50%);
+  width:min(420px,92vw);
+  background:#fff;
+  border:1px solid rgba(0,0,0,.08);
+  border-radius:14px;
+  box-shadow:0 10px 30px rgba(0,0,0,.18);
+  padding:12px 14px;
+  z-index:20000;
+  display:none;
+}
+.notif-toast.on{ display:block; }
+.notif-toast-title{ font-weight:900; font-size:13px; margin:0 0 2px; }
+.notif-toast-text{ font-size:13px; opacity:.8; margin:0; }
+
+/* ===== Password toggle ===== */
+.pw-wrap{ position:relative; width:100%; }
+.pw-wrap input{ width:100%; padding-right:46px; }
+
+.pw-toggle{
+  position:absolute;
+  right:10px;
+  top:50%;
+  transform:translateY(-50%);
+  width:34px;
+  height:34px;
+  border:none;
+  background:transparent;
+  cursor:pointer;
+  opacity:.75;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+}
+.pw-toggle:hover{ opacity:1; }
+.pw-toggle svg{
+  width:20px;
+  height:20px;
+  fill:#178CA8;
+  display:block;
 }
 
-.settings-item:hover{
-  transform: translateY(-1px);
-  box-shadow:0 18px 34px rgba(0,0,0,.08);
+/* ===== Modal newsletter (admin) ===== */
+.modal-overlay{
+  position:fixed;
+  inset:0;
+  background:rgba(0,0,0,.45);
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  z-index:9999;
+  padding:16px;
 }
 
-/* --- HOME : même style de “tuiles premium” --- */
-.home-card{
-  border-radius:22px;
-  background: linear-gradient(
-    135deg,
-    rgba(23,140,168,.12),
-    rgba(23,140,168,.03)
-  );
-  border:1px solid rgba(23,140,168,.18);
-  box-shadow:
-    0 22px 44px rgba(23,140,168,.18),
-    inset 0 1px 0 rgba(255,255,255,.65);
+.modal-card{
+  width:min(560px, 94vw);
+  max-height:88vh;
+  overflow:auto;
 }
 
-.home-tile{
-  border-radius:18px;
-  border:1px solid rgba(23,140,168,.10);
-  box-shadow:0 14px 30px rgba(0,0,0,.06);
-  transition: transform .12s ease, box-shadow .12s ease;
+.modal-head{
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  gap:12px;
 }
 
-.home-tile:hover{
-  transform: translateY(-1px);
-  box-shadow:0 18px 34px rgba(0,0,0,.08);
+.modal-body{
+  margin-top:12px;
+  display:flex;
+  flex-direction:column;
+  gap:12px;
 }
 
-.home-photo-grid img,
-.home-logo{
-  box-shadow:0 16px 32px rgba(0,0,0,.08);
-  border:1px solid rgba(23,140,168,.10);
+.modal-grid{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:10px;
+}
+@media (max-width:520px){
+  .modal-grid{ grid-template-columns:1fr; }
 }
 
-/* --- Bouton Home sticky (petite case) : plus “glass” --- */
-.home-icon-btn{
-  border-radius:16px;
-  background: rgba(255,255,255,.72);
-  backdrop-filter: blur(10px);
-  border:1px solid rgba(23,140,168,.18);
-  box-shadow:0 14px 26px rgba(0,0,0,.06);
+.modal-field label{
+  display:block;
+  font-size:12px;
+  color:var(--muted);
+  margin:0 0 6px;
 }
 
-/* --- Harmonisation des titres (plus app / plus net) --- */
-.home-title,
-.settings-title,
-.security-title,
-.card h2{
-  text-rendering: geometricPrecision;
+.modal-field input,
+.modal-field textarea{
+  width:100%;
+  padding:12px;
+  border:1px solid #ddd;
+  border-radius:12px;
+  font-size:15px;
+  background:#fff;
 }
 
-/* --- Micro détail : adoucit les paragraphes --- */
-.card p{
-  line-height:1.35;
+.modal-actions{
+  display:flex;
+  gap:10px;
+  flex-wrap:wrap;
+  justify-content:flex-end;
+  margin-top:6px;
 }
+.modal-actions .btn-outline,
+.modal-actions .btn-primary{ height:42px; }
+
+.preview-card{
+  border:1px dashed #cfe7ee;
+  border-radius:14px;
+  padding:12px;
+  background:#f7fcfe;
+}
+
+.preview-title{ font-weight:900; margin:0; }
+.preview-text{ margin:6px 0 0; font-size:13px; opacity:.85; }
+
+.preview-media{
+  margin-top:10px;
+  width:100%;
+  border-radius:12px;
+  max-height:200px;
+  object-fit:cover;
+}
+
+.preview-toprow{
+  display:flex;
+  align-items:center;
+  gap:10px;
+}
+
+.preview-logo{
+  width:26px;
+  height:26px;
+  border-radius:8px;
+  object-fit:cover;
+}
+
+/* ===== HARD FIX iPad taps ===== */
+main, .page, .card{
+  position:relative;
+  z-index:1;
+  pointer-events:auto !important;
+}
+.tabbar{
+  pointer-events:auto !important;
+  z-index:10000 !important;
+}
+
+/* micro typo */
+.card p{ line-height:1.35; }
