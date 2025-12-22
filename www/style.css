@@ -1564,3 +1564,31 @@ main.page.blog-page > section.card:first-of-type h2{
   border:1px solid rgba(0,0,0,.06);
   background:rgba(255,255,255,.72);
 }
+
+/* =========================
+   HOME MINI BTN — FIX STRIP
+   (Settings + Avatars only)
+   ========================= */
+
+/* Donne aussi un fond premium à Settings (comme Avatars) */
+.page.settings-page{
+  background:
+    radial-gradient(900px 420px at 20% -10%, rgba(23,140,168,.12), transparent 60%),
+    radial-gradient(900px 420px at 90% 10%, rgba(31,181,208,.10), transparent 55%),
+    var(--bg);
+}
+
+/* ✅ Plus de "grande case" sticky derrière : on laisse le fond de la page apparaître */
+.page.settings-page .page-top-actions,
+.page.avatars-page  .page-top-actions{
+  background: transparent !important;
+  padding: 12px 0 6px; /* garde l'air autour du bouton */
+}
+
+/* (option) un petit effet glass juste sur le bouton, pas sur toute la bande */
+.page.settings-page .home-icon-btn,
+.page.avatars-page  .home-icon-btn{
+  background: rgba(255,255,255,.78);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(23,140,168,.18);
+}
