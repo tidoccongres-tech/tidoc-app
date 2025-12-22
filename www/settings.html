@@ -53,22 +53,42 @@
   <div class="security-grid">
     <div class="sec-field">
       <label for="oldPass">Ancien mot de passe</label>
-      <input id="oldPass" class="sec-input" type="password" placeholder="••••••••" autocomplete="current-password">
+
+      <div class="pw-wrap">
+        <input id="oldPass" class="sec-input" type="password"
+               placeholder="••••••••" autocomplete="current-password">
+        <button class="pw-toggle" type="button"
+                aria-label="Afficher le mot de passe" data-target="oldPass"></button>
+      </div>
+
+      <div id="oldPassStatus" class="oldpass-status"></div>
     </div>
 
     <div class="sec-field">
       <label for="newPass">Nouveau mot de passe</label>
-      <input id="newPass" class="sec-input" type="password" placeholder="6 caractères minimum" autocomplete="new-password">
+      <div class="pw-wrap">
+        <input id="newPass" class="sec-input" type="password"
+               placeholder="6 caractères minimum" autocomplete="new-password" disabled>
+        <button class="pw-toggle" type="button"
+                aria-label="Afficher le mot de passe" data-target="newPass"></button>
+      </div>
     </div>
 
     <div class="sec-field">
       <label for="newPass2">Confirmer le nouveau mot de passe</label>
-      <input id="newPass2" class="sec-input" type="password" placeholder="Répète le nouveau mot de passe" autocomplete="new-password">
+      <div class="pw-wrap">
+        <input id="newPass2" class="sec-input" type="password"
+               placeholder="Répète le nouveau mot de passe" autocomplete="new-password" disabled>
+        <button class="pw-toggle" type="button"
+                aria-label="Afficher le mot de passe" data-target="newPass2"></button>
+      </div>
     </div>
   </div>
 
   <div class="security-actions">
-    <button class="btn-primary" id="btnChangePwd" type="button">Modifier le mot de passe</button>
+    <button class="btn-primary" id="btnChangePwd" type="button" disabled>
+      Modifier le mot de passe
+    </button>
   </div>
 
   <div class="security-hint">
