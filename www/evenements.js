@@ -23,6 +23,8 @@ const app = getApps().length ? getApp() : initializeApp(firebaseConfig);
 const db = getFirestore(app);
 const auth = getAuth(app);
 
+const ADMIN_EMAIL = "tidoc.congres@gmail.com";
+
 const PACKS = {
   essentiel: { workshopsAllowed: 1, conferencesAllowed: 2 },
   standard:  { workshopsAllowed: 2, conferencesAllowed: 4 },
@@ -38,7 +40,11 @@ const eventsList = document.getElementById("eventsList");
 const eventMsg = document.getElementById("eventMsg");
 
 // helpers
-function isAdmin() { return !!window.TIDOC_AUTH?.isAdmin; }
+function isAdmin() {
+  if (window.TIDOC_AUTH?.isAdmin) return true;
+  const email = (auth.currentUser?.email || "").toLowerCase();
+  return email === ADMIN_EMAIL;
+}
 function showMsg(t = "") { if (eventMsg) eventMsg.textContent = t; }
 
 function escapeHTML(s = "") {
