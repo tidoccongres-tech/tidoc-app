@@ -99,7 +99,7 @@ function buildProfile(left){
 
   const wrap = document.createElement("div");
   wrap.id = "tidocProfileWrap";
-  wrap.className = "profile-wrap";
+  wrap.className = "profile-wrap";      // ✅ important (ancre le menu)
 
   const btn = document.createElement("button");
   btn.className = "profile-btn";
@@ -128,10 +128,14 @@ function buildProfile(left){
 
   closeMenu(menu);
 
-  btn.addEventListener("click", (e)=>{
-    e.stopPropagation();
+  const toggle = (e) => {
+    e?.stopPropagation?.();
     menu.classList.contains("open") ? closeMenu(menu) : openMenu(menu);
-  });
+  };
+
+  // ✅ iPad: parfois click saute → on force touchend aussi
+  btn.addEventListener("click", toggle, { passive:false });
+  btn.addEventListener("touchend", (e)=>{ e.preventDefault(); toggle(e); }, { passive:false });
 
   menu.addEventListener("click", async (e)=>{
     e.stopPropagation();
@@ -145,7 +149,11 @@ function buildProfile(left){
     document.addEventListener("click", ()=>{
       const m = document.getElementById("tidocProfileMenu");
       if (m) closeMenu(m);
-    });
+    }, true);
+    document.addEventListener("touchstart", ()=>{
+      const m = document.getElementById("tidocProfileMenu");
+      if (m) closeMenu(m);
+    }, { passive:true, capture:true });
   }
 
   wrap.appendChild(btn);
