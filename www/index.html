@@ -1,7 +1,6 @@
 <!DOCTYPE html>
 <html lang="fr">
 <head>
-  
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Ti'Doc</title>
@@ -9,13 +8,13 @@
   <link rel="stylesheet" href="style.css?v=9" />
   <link rel="manifest" href="manifest.webmanifest" />
   <meta name="theme-color" content="#178CA8" />
+</head>
 
-  <main class="page">
+<body>
+  <main class="page home-page">
 
-    <!-- Carte "hero" -->
-    <section class="card home-card">
+    <section class="card home-card home-card-premium">
 
-      <!-- inviter (icône) -->
       <button class="home-invite-icon" id="inviteBtn" type="button" aria-label="Inviter">
         <svg viewBox="0 0 20 20" class="icon" aria-hidden="true">
           <path d="M12 0v2h4.475L9.066 9.165l1.47 1.292L18 2.926V8h2V0h-8ZM18 12h2v8H0V0h8v2H2v16h16v-6Z"/>
@@ -31,35 +30,34 @@
           </div>
         </div>
 
-        <a href="mailto:tidoc.congres@gmail.com" class="btn-primary home-contact-btn">
+        <!-- ✅ bouton premium animé -->
+        <a href="mailto:tidoc.congres@gmail.com" class="btn-primary home-contact-btn home-contact-premium">
           Nous contacter
         </a>
       </div>
     </section>
 
-    <!-- Accès rapides -->
-    <section class="home-quick">
-      <a class="home-tile" href="blog.html">
+    <section class="home-quick home-quick-premium">
+      <a class="home-tile home-tile-premium" href="blog.html">
         <div class="home-tile-title">Forum</div>
         <div class="home-tile-sub">Actus & posts</div>
       </a>
 
-      <a class="home-tile" href="evenements.html">
+      <a class="home-tile home-tile-premium" href="evenements.html">
         <div class="home-tile-title">Événements</div>
         <div class="home-tile-sub">Conf & WS</div>
       </a>
 
-      <a class="home-tile" href="galerie.html">
+      <a class="home-tile home-tile-premium" href="galerie.html">
         <div class="home-tile-title">Galerie</div>
         <div class="home-tile-sub">Photos</div>
       </a>
     </section>
 
-    <!-- Photos -->
-    <section class="home-photos">
+    <section class="home-photos home-photos-premium">
       <div class="home-section-title">Moments Ti’Doc</div>
 
-      <div class="home-photo-grid">
+      <div class="home-photo-grid home-photo-grid-premium">
         <img src="photos/home1.jpeg" alt="Ti’Doc 1" />
         <img src="photos/home2.jpeg" alt="Ti’Doc 2" />
         <img src="photos/home3.jpeg" alt="Ti’Doc 3" />
@@ -67,8 +65,7 @@
       </div>
     </section>
 
-    <!-- Réseaux -->
-    <section class="social-section">
+    <section class="social-section social-premium">
       <p class="social-title">Pour en savoir plus sur nous</p>
 
       <div class="social-icons">
