@@ -87,10 +87,16 @@ onAuthStateChanged(auth, async (user) => {
   }
 
   if (avatarBox) {
-    avatarBox.innerHTML = avatarUrl
-      ? `<img src="${avatarUrl}" alt="Avatar utilisateur">`
-      : `<div style="width:100%;height:100%;border-radius:50%;background:#e9f7fb;"></div>`;
-  }
+  avatarBox.className = "profile-avatar-lg";
+  avatarBox.innerHTML = avatarUrl
+    ? `<img src="${avatarUrl}" alt="Avatar utilisateur">`
+    : `<div style="width:100%;height:100%;opacity:.55;"></div>`;
+}
+
+// badge admin (optionnel)
+const adminBadge = document.getElementById("adminBadge");
+const isAdmin = (user.email || "").toLowerCase() === "tidoc.congres@gmail.com";
+if (adminBadge) adminBadge.style.display = isAdmin ? "inline-flex" : "none";
 });
 
 // ===== Avatar page =====
