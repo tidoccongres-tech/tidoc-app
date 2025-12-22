@@ -1540,3 +1540,31 @@ main.page.blog-page{ padding-top: calc(56px + 12px) !important; }
 .blog-page input[type="time"]{
   line-height: 46px;
 }
+/* ✅ HOME : le fond doit couvrir tout l'écran (sinon le dégradé "s'arrête") */
+.page.home-page{
+  min-height: 100vh;
+  width: 100%;
+}
+
+/* ✅ si tu as une topbar fixe sur HOME aussi : évite que ça passe dessous */
+.page.home-page{
+  padding-top: calc(56px + 12px);
+}
+
+/* ✅ pareil pour toutes les pages avec topbar (tu l'avais déjà sur blog-page) */
+.page.blog-page{
+  padding-top: calc(56px + 12px);
+}
+
+.home-icon-btn{
+  flex: 0 0 auto;
+  width: 48px !important;
+  height: 48px !important;
+  padding: 0 !important;
+}
+.page-top-actions{
+  display:flex;
+  align-items:center;
+  justify-content:flex-start;
+  gap:12px;
+}
