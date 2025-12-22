@@ -1940,3 +1940,32 @@ main.page.blog-page > section.card:first-of-type h2{
   width:22px;
   height:22px;
 }
+/* =========================
+   FIX iOS SAFARI — taps header
+   ========================= */
+.blog-topbar{
+  transform: translate3d(0,0,0);
+  -webkit-transform: translate3d(0,0,0);
+  will-change: transform;
+}
+
+.blog-topbar,
+.blog-topbar *{
+  pointer-events: auto !important;
+}
+
+.blog-topbar::before,
+.blog-topbar::after{
+  pointer-events: none !important;
+}
+
+.profile-wrap{
+  position: relative !important;
+  z-index: 40000 !important;
+}
+
+.profile-btn{
+  position: relative !important;
+  z-index: 40001 !important;
+}
+
