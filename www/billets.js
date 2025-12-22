@@ -291,25 +291,98 @@ function renderResult({ qrText, packKey, holderName, ticketNumber } = {}) {
   const conf = pack ? pack.conferencesAllowed : "—";
   const ws   = pack ? pack.workshopsAllowed : "—";
 
+  const isPremium = (packKey || "").toLowerCase() === "premium";
+
   boxEl.innerHTML = `
   <div style="position:relative; display:flex; flex-direction:column; gap:12px;">
-    <!-- bouton supprimer (même style que posts) -->
+
+    <!-- ✅ BOUTON POUBELLE (remplace Supprimer) -->
     <button
       class="delete-btn"
       id="deleteTicketInlineBtn"
       type="button"
-      style="position:absolute; top:0; right:0;">
-      Supprimer
+      aria-label="Supprimer le billet"
+      title="Supprimer"
+      style="
+        position:absolute;
+        top:0;
+        right:0;
+        width:40px;
+        height:40px;
+        padding:0;
+        border-radius:12px;
+        display:flex;
+        align-items:center;
+        justify-content:center;
+      "
+    >
+      <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true" style="display:block">
+        <path fill="currentColor" d="M9 3h6l1 2h4v2H4V5h4l1-2Zm1 7h2v9h-2v-9Zm4 0h2v9h-2v-9ZM7 10h2v9H7v-9Zm-1 11h12a2 2 0 0 0 2-2V8H4v11a2 2 0 0 0 2 2Z"/>
+      </svg>
     </button>
 
     <div style="font-weight:900; color:var(--tidoc); font-size:15px; margin-bottom:8px;">
       ✅ Billet importé
     </div>
 
-    <div style="border:1px solid var(--line); border-radius:14px; padding:12px;">
-      <div style="font-weight:900; margin-bottom:8px;">QR Code</div>
+    <!-- ✅ QR BOX "MODE PREMIUM" -->
+    <div
+      style="
+        position:relative;
+        border-radius:16px;
+        padding:12px;
+        border: 1px solid ${isPremium ? "rgba(255,215,0,.35)" : "var(--line)"};
+        background: ${isPremium
+          ? "linear-gradient(180deg, rgba(255,215,0,.14), rgba(255,255,255,.90))"
+          : "rgba(255,255,255,.85)"};
+        box-shadow: ${isPremium
+          ? "0 10px 24px rgba(0,0,0,.08)"
+          : "none"};
+        overflow:hidden;
+      "
+    >
+      ${
+        isPremium
+          ? `
+          <div style="
+            position:absolute;
+            top:10px;
+            right:10px;
+            font-size:12px;
+            font-weight:900;
+            padding:6px 10px;
+            border-radius:999px;
+            color:#7a5a00;
+            background:rgba(255,215,0,.35);
+            border:1px solid rgba(255,215,0,.45);
+          ">
+            Premium
+          </div>
+        `
+          : ""
+      }
+
+      <div style="font-weight:900; margin-bottom:8px; display:flex; align-items:center; gap:8px;">
+        QR Code
+        ${
+          isPremium
+            ? `<span style="font-size:12px; opacity:.75;">✨</span>`
+            : ""
+        }
+      </div>
+
       <div style="display:flex; justify-content:center; padding:8px 0;">
-        <div id="qrRender" style="width:220px;height:220px;"></div>
+        <div
+          id="qrRender"
+          style="
+            width:220px;
+            height:220px;
+            border-radius:14px;
+            padding:10px;
+            background:rgba(255,255,255,.92);
+            border:1px solid ${isPremium ? "rgba(255,215,0,.35)" : "var(--line)"};
+          "
+        ></div>
       </div>
     </div>
 
@@ -320,12 +393,13 @@ function renderResult({ qrText, packKey, holderName, ticketNumber } = {}) {
       <div><b>Conférences :</b> ${conf}</div>
       <div><b>Workshops :</b> ${ws}</div>
     </div>
+
   </div>
 `;
 
   const delBtn = boxEl.querySelector("#deleteTicketInlineBtn");
-  delBtn?.addEventListener("click", deleteMyTicketAndUnclaim); 
-  
+  delBtn?.addEventListener("click", deleteMyTicketAndUnclaim);
+
   // QR code affichable si qrcodejs chargé
   const host = boxEl.querySelector("#qrRender");
   if (host && window.QRCode && qrText) {
@@ -335,68 +409,6 @@ function renderResult({ qrText, packKey, holderName, ticketNumber } = {}) {
     host.innerHTML = `<div style="opacity:.7;font-size:12px;text-align:center;padding:18px;">
       (Ajoute qrcodejs pour afficher le QR ici)
     </div>`;
-  }
-}
-
-// ---------- Main ----------
-async function handleFile(file) {
-  if (!file) return;
-  if (!auth.currentUser) { setStatus("🔒 Connecte-toi d’abord."); return; }
-  if (!window.jsQR) { setStatus("❌ jsQR non chargé."); return; }
-
-  setStatus("⏳ Analyse du billet…");
-  boxEl.textContent = "Analyse en cours…";
-
-  const type = (file.type || "").toLowerCase();
-
-  try {
-    let qrText = "";
-    let holderName = "";
-    let ticketNumber = "";
-    let packKey = "";
-
-    if (type.includes("pdf")) {
-      const { pdf, qrText: qr } = await scanPdfForQR(file);
-      qrText = qr || "";
-
-      const meta = await extractMetaFromPdfText(pdf);
-      holderName = meta.holderName || "";
-      ticketNumber = meta.ticketNumber || "";
-      packKey = meta.packKey || "";
-
-    } else if (type.startsWith("image/")) {
-      const canvas = await loadImageToCanvas(file);
-
-      qrText = scanCanvasForQR(canvas);
-
-      setStatus("⏳ Lecture du texte (nom/pack/numéro)…");
-      const crop = cropTopRight(canvas);
-      const ocrText = await ocrCanvas(crop);
-      const meta = parseMetaFromText(ocrText);
-      holderName = meta.holderName || "";
-      ticketNumber = meta.ticketNumber || "";
-      packKey = meta.packKey || "";
-
-    } else {
-      throw new Error("Format non supporté. Choisis un PDF ou une photo.");
-    }
-
-    if (!qrText) throw new Error("QR introuvable. Essaie un zoom sur le QR / PDF original.");
-
-    // lock QR
-    setStatus("⏳ Vérification du billet…");
-    await claimQrOrThrow(qrText);
-
-    // save
-    await saveTicketToFirestore({ qrText, packKey, holderName, ticketNumber });
-
-    setStatus("✅ Billet enregistré");
-    renderResult({ qrText, packKey, holderName, ticketNumber });
-
-  } catch (e) {
-    console.log("ticket error:", e);
-    setStatus("❌ " + (e?.message || String(e)));
-    boxEl.textContent = "Erreur lecture billet.";
   }
 }
 
