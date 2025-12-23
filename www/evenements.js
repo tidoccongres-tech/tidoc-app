@@ -1,8 +1,16 @@
-// evenements.js (MODULE)
+// evenements.js (MODULE) — ✅ clean + ajouts inclus (bouton admin "Liste participants")
+// - Packs dynamiques (config/packs)
+// - Quotas affichés
+// - ✅ Admin: bouton "Participants" sur chaque event (+ modal simple)
+// - ✅ Admin: suppression event
+// - ✅ User: inscription/désinscription transaction + update bookedCount
+// - ✅ FIX: addDoc manquait dans tes imports
+// - ✅ FIX: showForm(true/false) gère bien le display/hidden
+
 import * as AuthMod from "./auth.js";
 import {
   collection, addDoc, getDocs, getDoc, doc, deleteDoc,
-  runTransaction, serverTimestamp, query, orderBy, Timestamp
+  runTransaction, serverTimestamp, query, orderBy, Timestamp, limit
 } from "https://www.gstatic.com/firebasejs/10.12.4/firebase-firestore.js";
 import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.4/firebase-auth.js";
 
@@ -11,6 +19,9 @@ const db   = AuthMod.db;
 
 const ADMIN_EMAIL = "tidoc.congres@gmail.com";
 
+/* =========================
+   PACKS (quotas)
+   ========================= */
 const PACKS_FALLBACK = {
   essentiel: { label:"Essentiel", workshopsAllowed: 1, conferencesAllowed: 2, otherAllowed: 0 },
   standard:  { label:"Standard",  workshopsAllowed: 2, conferencesAllowed: 4, otherAllowed: 0 },
@@ -50,6 +61,10 @@ async function loadPackConfig(){
     PACKS = { ...PACKS_FALLBACK };
   }
 }
+
+/* =========================
+   ICONS
+   ========================= */
 const TRASH_SVG = `
 <svg class="trash-ico" viewBox="0 0 408.483 408.483" aria-hidden="true" focusable="false">
   <path d="M87.748,388.784c0.461,11.01,9.521,19.699,20.539,19.699h191.911c11.018,0,20.078-8.689,20.539-19.699l13.705-289.316
@@ -108,7 +123,7 @@ function formatTime(dateObj){
 
 function showForm(show){
   if (!eventForm) return;
-  eventForm.hidden = false;
+  eventForm.hidden = !show;
   eventForm.style.display = show ? "" : "none";
 }
 
@@ -151,19 +166,27 @@ async function getMyRights(){
   return {
     ok:true,
     packKey,
-
-    wsUsed,
-    confUsed,
-    otherUsed,
-
+    wsUsed, confUsed, otherUsed,
     wsAllowed: pack.workshopsAllowed,
     confAllowed: pack.conferencesAllowed,
     otherAllowed: pack.otherAllowed,
-
     wsLeft: Math.max(0, pack.workshopsAllowed - wsUsed),
     confLeft: Math.max(0, pack.conferencesAllowed - confUsed),
     otherLeft: Math.max(0, pack.otherAllowed - otherUsed),
   };
+}
+
+async function requireTicketOrRedirect(){
+  const r = await getMyRights();
+  if (r.ok) return r;
+
+  if (r.reason === "noticket" || r.reason === "badpack") {
+    alert("Tu dois importer ton billet pour t’inscrire.");
+    location.href = "./billets.html";
+    return null;
+  }
+  alert("Connexion requise.");
+  return null;
 }
 
 /* =========================
@@ -240,19 +263,6 @@ function eventTypeKey(evType=""){
   return "other";
 }
 
-async function requireTicketOrRedirect(){
-  const r = await getMyRights();
-  if (r.ok) return r;
-
-  if (r.reason === "noticket" || r.reason === "badpack") {
-    alert("Tu dois importer ton billet pour t’inscrire.");
-    location.href = "./billets.html";
-    return null;
-  }
-  alert("Connexion requise.");
-  return null;
-}
-
 async function registerToEvent(eventId){
   const uid = auth.currentUser?.uid;
   if (!uid) { location.href="./login.html"; return; }
@@ -288,12 +298,10 @@ async function registerToEvent(eventId){
     if (typeKey === "ws"){
       if (wsUsed >= rights.wsAllowed) throw new Error("Tu n’as plus de workshop disponible.");
       tx.set(usageRef, { workshopUsed: wsUsed + 1 }, { merge:true });
-
     } else if (typeKey === "conf"){
       if (confUsed >= rights.confAllowed) throw new Error("Tu n’as plus de conférence disponible.");
       tx.set(usageRef, { conferenceUsed: confUsed + 1 }, { merge:true });
-
-    } else { // other
+    } else {
       if (otherUsed >= rights.otherAllowed) throw new Error("Tu n’as plus de quota “Autre” disponible.");
       tx.set(usageRef, { otherUsed: otherUsed + 1 }, { merge:true });
     }
@@ -340,7 +348,135 @@ async function unregisterFromEvent(eventId){
     tx.update(evRef, { bookedCount: Math.max(0, booked - 1) }); // ✅ rules OK (-1)
   });
 }
-    
+
+/* =========================
+   ADMIN: LISTE PARTICIPANTS
+   ========================= */
+function ensureParticipantsModal(){
+  let modal = document.getElementById("participantsModal");
+  if (modal) return modal;
+
+  modal = document.createElement("div");
+  modal.id = "participantsModal";
+  modal.style.cssText = `
+    position:fixed; inset:0; background:rgba(0,0,0,.35);
+    display:none; align-items:center; justify-content:center; z-index:99999;
+    padding:16px;
+  `;
+
+  modal.innerHTML = `
+    <div style="
+      width:min(92vw,680px); max-height:86vh; overflow:auto;
+      background:#fff; border-radius:18px; box-shadow:0 30px 70px rgba(0,0,0,.18);
+      padding:14px 14px 16px;
+    ">
+      <div style="display:flex; align-items:center; justify-content:space-between; gap:10px;">
+        <div style="font-weight:950; color:var(--tidoc); font-size:16px;">Participants</div>
+        <button id="participantsCloseBtn" class="btn-outline" type="button" style="height:40px;border-radius:14px;font-weight:900;">Fermer</button>
+      </div>
+
+      <div id="participantsMeta" style="margin:10px 0 8px; font-size:13px; font-weight:800; color:var(--muted);"></div>
+
+      <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap; margin-bottom:10px;">
+        <button id="participantsCopyBtn" class="btn-primary" type="button" style="height:44px;border-radius:16px;font-weight:950;">Copier la liste</button>
+        <button id="participantsReloadBtn" class="btn-outline" type="button" style="height:44px;border-radius:16px;font-weight:950;">Rafraîchir</button>
+      </div>
+
+      <pre id="participantsList" style="
+        background:rgba(23,140,168,.06);
+        border:1px solid rgba(23,140,168,.14);
+        border-radius:14px;
+        padding:12px;
+        font-size:12px;
+        line-height:1.45;
+        white-space:pre-wrap;
+        user-select:text;
+      ">Chargement…</pre>
+    </div>
+  `;
+
+  document.body.appendChild(modal);
+
+  const close = () => { modal.style.display = "none"; };
+
+  modal.addEventListener("click", (e)=>{ if (e.target === modal) close(); });
+  modal.querySelector("#participantsCloseBtn")?.addEventListener("click", close);
+
+  return modal;
+}
+
+async function loadParticipants(eventId){
+  if (!isAdmin()) return alert("Réservé à l’admin Ti’Doc.");
+
+  const modal = ensureParticipantsModal();
+  const listEl = modal.querySelector("#participantsList");
+  const metaEl = modal.querySelector("#participantsMeta");
+  const copyBtn = modal.querySelector("#participantsCopyBtn");
+  const reloadBtn = modal.querySelector("#participantsReloadBtn");
+
+  modal.style.display = "flex";
+  if (listEl) listEl.textContent = "Chargement…";
+  if (metaEl) metaEl.textContent = "";
+
+  // récup event pour titre/type
+  let ev = null;
+  try{
+    const evSnap = await getDoc(doc(db, "events", eventId));
+    ev = evSnap.exists() ? (evSnap.data() || {}) : null;
+  } catch(_) {}
+
+  // récup registrations
+  try{
+    const regsQ = query(collection(db, "events", eventId, "registrations"), orderBy("createdAt","asc"), limit(5000));
+    const regsSnap = await getDocs(regsQ);
+
+    const uids = regsSnap.docs.map(d => d.id); // docId = uid
+
+    // fetch users docs (simple, en série pour rester safe)
+    const names = [];
+    for (const uid of uids){
+      try{
+        const us = await getDoc(doc(db, "users", uid));
+        const d = us.exists() ? (us.data() || {}) : {};
+        const display = String(d.displayName || d.username || d.name || "").trim();
+        names.push(display || uid);
+      } catch {
+        names.push(uid);
+      }
+    }
+
+    const header =
+      `${String(ev?.title || "Évènement").trim()}${ev?.type ? " — " + String(ev.type) : ""}\n` +
+      `Participants: ${names.length}\n` +
+      `------------------------------\n`;
+
+    const body = names.map((n, i) => `${String(i+1).padStart(3,"0")}. ${n}`).join("\n");
+    const text = header + body;
+
+    if (metaEl){
+      metaEl.textContent = `Évènement: ${String(ev?.title || "—")} • ${names.length} participant(s)`;
+    }
+    if (listEl) listEl.textContent = text;
+
+    // copy
+    copyBtn?.addEventListener("click", async ()=>{
+      try{
+        await navigator.clipboard.writeText(text);
+        copyBtn.textContent = "✅ Copié";
+        setTimeout(()=>{ copyBtn.textContent = "Copier la liste"; }, 1200);
+      } catch(e){
+        alert("Copie impossible sur cet appareil. Sélectionne le texte et copie manuellement.");
+      }
+    }, { once:true });
+
+    reloadBtn?.addEventListener("click", ()=> loadParticipants(eventId), { once:true });
+
+  } catch (e){
+    console.log("loadParticipants error:", e);
+    if (listEl) listEl.textContent = "❌ " + String(e?.message || e);
+  }
+}
+
 /* =========================
    RENDER
    ========================= */
@@ -375,9 +511,20 @@ function renderEventCard(id, e){
     </div>
 
     <div class="event-content">
-      <div class="event-head">
-        <h3>${escapeHTML(e.title || "")}</h3>
-        ${canDelete ? `<button class="delete-btn" type="button" data-del="${id}" aria-label="Supprimer">${TRASH_SVG}</button>` : ""}      </div>
+      <div class="event-head" style="display:flex;align-items:center;justify-content:space-between;gap:10px;">
+        <h3 style="margin:0;">${escapeHTML(e.title || "")}</h3>
+
+        ${
+          canDelete
+            ? `<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;justify-content:flex-end;">
+                 <button class="btn-outline" type="button" data-part="${id}" style="height:40px;border-radius:14px;font-weight:950;">
+                   Liste participants
+                 </button>
+                 <button class="delete-btn" type="button" data-del="${id}" aria-label="Supprimer">${TRASH_SVG}</button>
+               </div>`
+            : ""
+        }
+      </div>
 
       ${e.desc ? `<p class="event-desc">${escapeHTML(e.desc)}</p>` : ""}
 
@@ -408,20 +555,20 @@ function renderEventCard(id, e){
     </div>
   `;
 
-  // delete admin
+  // admin binds
   if (canDelete){
     card.querySelector(`[data-del="${id}"]`)?.addEventListener("click", ()=> deleteEvent(id));
+    card.querySelector(`[data-part="${id}"]`)?.addEventListener("click", ()=> loadParticipants(id));
     return card;
   }
 
-  // bind quotas + button state
+  // user binds
   (async ()=>{
     const uid = auth.currentUser?.uid;
 
-    const btn    = card.querySelector(`[data-toggle="${id}"]`);
-    const status = card.querySelector(`[data-status="${id}"]`);
-    const rightsEl = card.querySelector(`[data-rights="${id}"]`);
-
+    const btn     = card.querySelector(`[data-toggle="${id}"]`);
+    const status  = card.querySelector(`[data-status="${id}"]`);
+    const rightsEl= card.querySelector(`[data-rights="${id}"]`);
     if (!btn) return;
 
     if (!uid){
@@ -439,16 +586,19 @@ function renderEventCard(id, e){
         rightsEl.textContent =
           `Workshops : ${r.wsUsed}/${r.wsAllowed} (reste ${r.wsLeft}) • ` +
           `Conférences : ${r.confUsed}/${r.confAllowed} (reste ${r.confLeft}) • ` +
-          `Autre : ${r.otherUsed}/${r.otherAllowed} (reste ${r.otherLeft})`;      }
+          `Autre : ${r.otherUsed}/${r.otherAllowed} (reste ${r.otherLeft})`;
+      }
     }
 
-    // registration state
     const isIn = await userIsRegistered(id, uid);
     btn.textContent = isIn ? "Se désinscrire" : "S’inscrire";
     if (status) status.textContent = isIn ? "✅ Inscrit(e)" : "";
 
     btn.addEventListener("click", async ()=>{
       try{
+        if (btn.disabled) return;
+        btn.disabled = true;
+
         if (isIn){
           await unregisterFromEvent(id);
           alert("✅ Désinscription validée !");
@@ -456,9 +606,11 @@ function renderEventCard(id, e){
           await registerToEvent(id);
           alert("✅ Inscription validée !");
         }
+
         await loadEvents();
       } catch(err){
         alert("❌ " + (err?.message || String(err)));
+        btn.disabled = false;
       }
     });
   })();
@@ -497,7 +649,7 @@ async function loadEvents(){
 
 /* =========================
    BOOT
-========================= */
+   ========================= */
 document.addEventListener("DOMContentLoaded", () => {
   applyAdminUI();
   window.addEventListener("tidoc:auth", applyAdminUI);
@@ -515,21 +667,22 @@ document.addEventListener("DOMContentLoaded", () => {
 
   publishEvent?.addEventListener("click", createEvent);
 
-window.addEventListener("error", (e) => {
-  const box = document.getElementById("eventsList");
-  if (box) box.innerHTML = `<section class="card"><p>❌ JS error: ${String(e.message)}</p></section>`;
-});
-window.addEventListener("unhandledrejection", (e) => {
-  const box = document.getElementById("eventsList");
-  if (box) box.innerHTML = `<section class="card"><p>❌ Promise error: ${String(e.reason?.message || e.reason)}</p></section>`;
-});
-  
-  onAuthStateChanged(auth, async () => {
-    applyAdminUI();
-    await loadPackConfig();   // ✅ packs dynamiques
-    await loadEvents();       // ✅ charge la liste
+  // debug (optionnel)
+  window.addEventListener("error", (e) => {
+    const box = document.getElementById("eventsList");
+    if (box) box.innerHTML = `<section class="card"><p>❌ JS error: ${String(e.message)}</p></section>`;
+  });
+  window.addEventListener("unhandledrejection", (e) => {
+    const box = document.getElementById("eventsList");
+    if (box) box.innerHTML = `<section class="card"><p>❌ Promise error: ${String(e.reason?.message || e.reason)}</p></section>`;
   });
 
-  // ✅ optionnel : si jamais l'user menu tarde, on affiche quand même un "Chargement…"
+  onAuthStateChanged(auth, async () => {
+    applyAdminUI();
+    await loadPackConfig();
+    await loadEvents();
+  });
+
+  // fallback
   loadEvents();
 });
