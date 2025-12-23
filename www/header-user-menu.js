@@ -145,16 +145,24 @@ function buildProfile(left){
   });
 
   if (!window.__TIDOC_MENU_BOUND__) {
-    window.__TIDOC_MENU_BOUND__ = true;
-    document.addEventListener("click", ()=>{
-      const m = document.getElementById("tidocProfileMenu");
-      if (m) closeMenu(m);
-    }, true);
-    document.addEventListener("touchstart", ()=>{
-      const m = document.getElementById("tidocProfileMenu");
-      if (m) closeMenu(m);
-    }, { passive:true, capture:true });
-  }
+  window.__TIDOC_MENU_BOUND__ = true;
+
+  const closeIfOutside = (e) => {
+    const m = document.getElementById("tidocProfileMenu");
+    const wrap = document.getElementById("tidocProfileWrap"); // contient btn + menu
+    if (!m || !wrap) return;
+
+    // ✅ on ferme SEULEMENT si tap/click en dehors
+    if (!wrap.contains(e.target)) closeMenu(m);
+  };
+
+  // ✅ pointerdown = le plus fiable iOS + desktop
+  document.addEventListener("pointerdown", closeIfOutside, true);
+
+  // fallback anciens iOS (rare)
+  document.addEventListener("touchstart", closeIfOutside, { capture: true, passive: true });
+  document.addEventListener("mousedown", closeIfOutside, true);
+}
 
   wrap.appendChild(btn);
   wrap.appendChild(menu);
