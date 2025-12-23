@@ -84,6 +84,13 @@ const boxEl     = document.getElementById("ticketBox");
 
 // Packs (quotas)
 
+const PACKS_FALLBACK = {
+  essentiel: { label: "Essentiel", workshopsAllowed: 1, conferencesAllowed: 2, otherAllowed: 0 },
+  standard:  { label: "Standard",  workshopsAllowed: 2, conferencesAllowed: 4, otherAllowed: 0 },
+  premium:   { label: "Premium",   workshopsAllowed: 3, conferencesAllowed: 7, otherAllowed: 0 },
+  autre:     { label: "Autre",     workshopsAllowed: 0, conferencesAllowed: 0, otherAllowed: 0 },
+};
+
 let PACKS = { ...PACKS_FALLBACK };
 
 function normalizePackConfig(obj){
@@ -270,7 +277,7 @@ function parseMetaFromText(raw = "") {
 
   // holder name = ligne au-dessus de "Pack ..."
   let holderName = "";
-  const idxPack = lines.findIndex(l => /pack\s*(essentiel|standard|premium)/i.test(l));
+  const idxPack = lines.findIndex(l => /pack\s*(essentiel|standard|premium|autre)/i.test(l));
   if (idxPack > 0) {
     for (let j = idxPack - 1; j >= 0; j--) {
       const c = lines[j];
@@ -289,8 +296,8 @@ function parseMetaFromText(raw = "") {
 
   // fallback (si OCR colle tout)
   if (!holderName && idxPack >= 0) {
-    const mSame = lines[idxPack].match(/^(.*?)\s+pack\s*(essentiel|standard|premium)/i);
-    if (mSame) holderName = mSame[1].trim();
+    const mSame = lines[idxPack].match(/^(.*?)\s+pack\s*(essentiel|standard|premium|autre)/i);    
+  if (mSame) holderName = mSame[1].trim();
   }
 
   return { holderName, packKey, ticketNumber, rawText: raw };
@@ -395,8 +402,8 @@ async function deleteMyTicketAndUnclaim() {
 
 // ---------- Render ----------
 function renderResult({ qrText, packKey, holderName, ticketNumber } = {}) {
-  const pack = packKey ? PACKS[packKey] : null;
-  const packLabel = pack ? pack.label : "Non détecté";
+  const key = String(packKey || "").toLowerCase();
+  const pack = PACKS[key] || (key ? { label: key, workshopsAllowed: "—", conferencesAllowed: "—", otherAllowed: "—" } : null);  const packLabel = pack ? pack.label : "Non détecté";
   const conf = pack ? pack.conferencesAllowed : "—";
   const ws   = pack ? pack.workshopsAllowed : "—";
   const other = pack ? pack.otherAllowed : "—";
