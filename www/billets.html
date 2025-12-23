@@ -37,38 +37,35 @@
   <script type="module" src="./header-user-menu.js"></script>
 
   <main class="page blog-page">
-    <section class="card" id="ticketsCard">
-      <h2 style="margin:0 0 6px; color:var(--tidoc);">Mon billet</h2>
+    <section class="card ticket-card" id="ticketsCard">
+  <div class="ticket-head">
+    <h2 class="ticket-title">Mon billet</h2>
 
     <!-- ADMIN ONLY -->
-<button id="adminEditPacksBtn" class="btn-primary" type="button" style="display:none;">
-  Modifier les activités
-</button>
-      
-      <p style="margin:0 0 12px; color:var(--muted); font-size:13px;">
-        Importe ton billet (PDF HelloAsso ou capture). L’app extrait le QR + détecte le pack.
-      </p>
+    <button id="adminEditPacksBtn" class="admin-chip admin-chip-premium" type="button" style="display:none;">
+      ✨ Modifier quotas
+    </button>
+  </div>
 
-      <a class="btn-outline"
-         id="openHelloAssoBtn"
-         href="https://www.helloasso.com/associations/ti-doc/evenements/ti-doc-2026"
-         target="_blank"
-         rel="noopener noreferrer">
-        Acheter mon billet
-      </a>
+  <p class="ticket-sub">
+    Importe ton billet (PDF HelloAsso ou capture). L’app extrait le QR + détecte le pack.
+  </p>
 
-      <div style="height:10px"></div>
+  <div class="ticket-actions">
+    <a class="btn-outline" id="openHelloAssoBtn"
+       href="https://www.helloasso.com/associations/ti-doc/evenements/ti-doc-2026"
+       target="_blank" rel="noopener noreferrer">
+      Acheter mon billet
+    </a>
 
-      <button class="btn-primary" id="uploadTicketBtn" type="button">
-        Importer mon billet
-      </button>
-      
-      <input
-        type="file"
-        id="ticketFileInput"
-        accept="application/pdf,image/*"
-        style="display:none"
-      />
+    <button class="btn-primary" id="uploadTicketBtn" type="button">
+      Importer mon billet
+    </button>
+  </div>
+
+  <input type="file" id="ticketFileInput" accept="application/pdf,image/*" style="display:none" />
+  <p id="ticketStatus" class="ticket-status"></p>
+</section>
 
       <p id="ticketStatus" style="margin:12px 0 0; color:var(--muted); font-size:13px;"></p>
     </section>
