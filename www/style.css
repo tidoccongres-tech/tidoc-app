@@ -1969,3 +1969,40 @@ main.page.blog-page{ padding-top: calc(56px + 12px) !important; }
   box-shadow:0 10px 22px rgba(0,0,0,.06);
   cursor:pointer;
 }
+
+/* même style pour login + settings */
+.field-premium.has-eye input{ padding-right:52px; }
+
+.pw-eye,
+.pw-toggle{
+  position:absolute;
+  right:10px;
+  top:50%;
+  transform:translateY(-50%);
+  width:36px;
+  height:36px;
+  border-radius:14px;
+  border:1px solid rgba(23,140,168,.18);
+  background: rgba(23,140,168,.08);
+  cursor:pointer;
+  box-shadow:0 12px 24px rgba(0,0,0,.06);
+  display:flex;                 /* ⬅️ IMPORTANT pour settings */
+  align-items:center;
+  justify-content:center;
+  color: var(--tidoc);
+  transition: transform .12s ease, filter .12s ease;
+}
+
+.pw-eye:hover,
+.pw-toggle:hover{
+  transform:translateY(-50%) translateY(-1px);
+  filter:brightness(1.02);
+}
+
+.pw-eye svg,
+.pw-toggle svg{
+  width:18px;
+  height:18px;
+  fill: currentColor;
+  display:block;
+}
