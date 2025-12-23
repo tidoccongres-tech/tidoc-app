@@ -1,7 +1,3 @@
-Oui. Je te le réécris entièrement en version clean / sans doublons, en gardant ton style premium (topbar, events premium, forum premium, auth premium, trash premium, etc.).
-
-👉 Copie-colle tel quel ce fichier CSS (il remplace l’ancien) :
-
 /* =========================================================
    Ti'Doc — STYLE CLEAN (NO DUPES)
    ========================================================= */
@@ -1918,5 +1914,3 @@ main, .page, .card{
 }
 body{ padding-top:0; }
 main.page.blog-page{ padding-top: calc(56px + 12px) !important; }
-
-Si tu veux, je peux aussi te faire une version “minifiée” (pour prod) ou te ressortir ça en 2 fichiers : base.css + premium.css (plus simple à maintenir).
