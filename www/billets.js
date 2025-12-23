@@ -83,11 +83,45 @@ const statusEl  = document.getElementById("ticketStatus");
 const boxEl     = document.getElementById("ticketBox");
 
 // Packs (quotas)
-const PACKS = {
-  essentiel: { label: "Essentiel", workshopsAllowed: 1, conferencesAllowed: 2 },
-  standard:  { label: "Standard",  workshopsAllowed: 2, conferencesAllowed: 4 },
-  premium:   { label: "Premium",   workshopsAllowed: 3, conferencesAllowed: 7 },
+const PACKS_FALLBACK = {
+  essentiel: { label: "Essentiel", workshopsAllowed: 1, conferencesAllowed: 2, otherAllowed: 0 },
+  standard:  { label: "Standard",  workshopsAllowed: 2, conferencesAllowed: 4, otherAllowed: 0 },
+  premium:   { label: "Premium",   workshopsAllowed: 3, conferencesAllowed: 7, otherAllowed: 0 },
 };
+
+let PACKS = { ...PACKS_FALLBACK };
+
+function normalizePackConfig(obj){
+  const src = obj && typeof obj === "object" ? obj : {};
+  const out = {};
+
+  for (const k of Object.keys(src)){
+    const v = src[k] || {};
+    out[String(k).toLowerCase()] = {
+      label: String(v.label || k),
+      workshopsAllowed: Number(v.workshopsAllowed ?? 0),
+      conferencesAllowed: Number(v.conferencesAllowed ?? 0),
+      otherAllowed: Number(v.otherAllowed ?? 0),
+    };
+  }
+  return out;
+}
+
+async function loadPackConfig(){
+  try{
+    const snap = await getDoc(doc(db, "config", "packs"));
+    if (!snap.exists()){
+      PACKS = { ...PACKS_FALLBACK };
+      return;
+    }
+    const data = snap.data() || {};
+    const normalized = normalizePackConfig(data);
+    PACKS = Object.keys(normalized).length ? normalized : { ...PACKS_FALLBACK };
+  } catch (e){
+    console.log("loadPackConfig error:", e);
+    PACKS = { ...PACKS_FALLBACK };
+  }
+}
 
 const TRASH_TIDOC_SVG = `
 <svg class="trash-ico" viewBox="0 0 408.483 408.483" aria-hidden="true">
@@ -369,6 +403,7 @@ function renderResult({ qrText, packKey, holderName, ticketNumber } = {}) {
   const packLabel = pack ? pack.label : "Non détecté";
   const conf = pack ? pack.conferencesAllowed : "—";
   const ws   = pack ? pack.workshopsAllowed : "—";
+  const other = pack ? pack.otherAllowed : "—";
 
   boxEl.innerHTML = `
   <div style="position:relative; display:flex; flex-direction:column; gap:12px;">
@@ -404,6 +439,7 @@ function renderResult({ qrText, packKey, holderName, ticketNumber } = {}) {
       <div style="margin-top:8px;"><b>Pack :</b> ${escapeHTML(packLabel)}</div>
       <div><b>Conférences :</b> ${conf}</div>
       <div><b>Workshops :</b> ${ws}</div>
+      <div><b>Autre :</b> ${other}</div>
     </div>
   </div>
   `;
@@ -456,4 +492,7 @@ fileInput?.addEventListener("change", async () => {
 });
 deleteBtn?.addEventListener("click", deleteMyTicketAndUnclaim);
 
-onAuthStateChanged(auth, () => loadSavedTicket());
+onAuthStateChanged(auth, async () => {
+  await loadPackConfig();   // ✅ charge quotas depuis Firestore (sinon fallback)
+  await loadSavedTicket();
+});
