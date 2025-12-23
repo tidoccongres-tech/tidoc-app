@@ -1735,3 +1735,18 @@ main.page.blog-page{ padding-top: calc(56px + 12px) !important; }
   filter: brightness(1.02);
 }
 .home-contact-premium:active{ transform: translateY(0); }
+
+/* === FIX iPhone taps : si un overlay invisible traîne, il ne doit pas capter === */
+#headerUserMenuOverlay,
+.header-overlay,
+.menu-overlay,
+.overlay,
+.menu-backdrop,
+.user-menu-backdrop{
+  pointer-events: none !important;
+}
+
+/* ton menu lui-même doit rester cliquable */
+.profile-menu.open{
+  pointer-events: auto !important;
+}
