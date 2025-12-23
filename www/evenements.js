@@ -307,9 +307,8 @@ async function unregisterFromEvent(eventId){
     }
 
     tx.delete(regRef);
-    tx.set(evRef, { bookedCount: Math.max(0, booked - 1) }, { merge:true });
-  });
-}
+    tx.update(evRef, { bookedCount: Math.max(0, booked - 1) }); // ✅  });
+  }
 
 /* =========================
    RENDER
