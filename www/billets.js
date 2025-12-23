@@ -495,6 +495,140 @@ fileInput?.addEventListener("change", async () => {
 });
 deleteBtn?.addEventListener("click", deleteMyTicketAndUnclaim);
 
+// ======================
+// ADMIN UI (packs editor)
+// ======================
+const ADMIN_EMAIL = "tidoc.congres@gmail.com";
+
+function isAdmin(){
+  if (window.TIDOC_AUTH?.isAdmin) return true;
+  const email = (auth.currentUser?.email || "").toLowerCase();
+  return email === ADMIN_EMAIL.toLowerCase();
+}
+
+const adminBtn   = document.getElementById("adminEditPacksBtn");
+const adminModal = document.getElementById("adminPacksModal");
+const adminForm  = document.getElementById("adminPacksForm");
+const adminMsg   = document.getElementById("adminPacksMsg");
+const adminClose = document.getElementById("adminPacksCloseBtn");
+const adminCancel= document.getElementById("adminPacksCancelBtn");
+const adminSave  = document.getElementById("adminPacksSaveBtn");
+
+function setAdminMsg(t=""){ if (adminMsg) adminMsg.textContent = t; }
+
+function ensureDefaultPacks(packs){
+  // on garantit que ces packs existent dans l’UI (même si le doc Firestore est vide)
+  const base = { ...PACKS_FALLBACK, ...packs };
+  // optionnel: si tu veux un pack "autre" (en tant que pack) :
+  if (!base.autre){
+    base.autre = { label:"Autre", workshopsAllowed:0, conferencesAllowed:0, otherAllowed:0 };
+  }
+  return base;
+}
+
+function renderAdminPacksEditor(){
+  if (!adminForm) return;
+
+  const packs = ensureDefaultPacks(PACKS);
+  adminForm.innerHTML = "";
+
+  Object.keys(packs).forEach((key)=>{
+    const p = packs[key] || {};
+    const row = document.createElement("div");
+    row.style.cssText = "border:1px solid #eee; border-radius:14px; padding:12px;";
+
+    row.innerHTML = `
+      <div style="display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap;">
+        <div style="font-weight:900;">Pack: ${escapeHTML(key)}</div>
+        <div style="display:flex; gap:8px; align-items:center;">
+          <span style="font-size:12px; font-weight:800; opacity:.7;">Label</span>
+          <input data-pack-label="${escapeHTML(key)}" type="text" value="${escapeHTML(p.label || key)}"
+                 style="padding:8px 10px; border:1px solid #ddd; border-radius:10px; min-width:180px;">
+        </div>
+      </div>
+
+      <div style="margin-top:10px; display:flex; gap:10px; flex-wrap:wrap;">
+        <label style="display:flex; gap:8px; align-items:center;">
+          <span style="width:110px; font-weight:800;">Conférences</span>
+          <input data-pack-conf="${escapeHTML(key)}" type="number" min="0" value="${Number(p.conferencesAllowed ?? 0)}"
+                 style="width:90px; padding:8px 10px; border:1px solid #ddd; border-radius:10px;">
+        </label>
+
+        <label style="display:flex; gap:8px; align-items:center;">
+          <span style="width:110px; font-weight:800;">Workshops</span>
+          <input data-pack-ws="${escapeHTML(key)}" type="number" min="0" value="${Number(p.workshopsAllowed ?? 0)}"
+                 style="width:90px; padding:8px 10px; border:1px solid #ddd; border-radius:10px;">
+        </label>
+
+        <label style="display:flex; gap:8px; align-items:center;">
+          <span style="width:110px; font-weight:800;">Autre</span>
+          <input data-pack-other="${escapeHTML(key)}" type="number" min="0" value="${Number(p.otherAllowed ?? 0)}"
+                 style="width:90px; padding:8px 10px; border:1px solid #ddd; border-radius:10px;">
+        </label>
+      </div>
+    `;
+
+    adminForm.appendChild(row);
+  });
+}
+
+function openAdminModal(){
+  if (!isAdmin()) return alert("Réservé à l’admin Ti’Doc.");
+  setAdminMsg("");
+  renderAdminPacksEditor();
+  if (adminModal) adminModal.style.display = "block";
+}
+
+function closeAdminModal(){
+  if (adminModal) adminModal.style.display = "none";
+}
+
+async function saveAdminPacks(){
+  if (!isAdmin()) return;
+  try{
+    setAdminMsg("⏳ Enregistrement…");
+
+    const packs = ensureDefaultPacks(PACKS);
+    const out = {};
+
+    for (const key of Object.keys(packs)){
+      const labelEl = document.querySelector(`[data-pack-label="${CSS.escape(key)}"]`);
+      const confEl  = document.querySelector(`[data-pack-conf="${CSS.escape(key)}"]`);
+      const wsEl    = document.querySelector(`[data-pack-ws="${CSS.escape(key)}"]`);
+      const othEl   = document.querySelector(`[data-pack-other="${CSS.escape(key)}"]`);
+
+      out[key] = {
+        label: String(labelEl?.value || key).trim() || key,
+        conferencesAllowed: Math.max(0, Number(confEl?.value || 0)),
+        workshopsAllowed: Math.max(0, Number(wsEl?.value || 0)),
+        otherAllowed: Math.max(0, Number(othEl?.value || 0)),
+      };
+    }
+
+    // 🔥 écrit dans config/packs
+    await setDoc(doc(db, "config", "packs"), out, { merge:true });
+
+    // recharge local + refresh UI ticket
+    await loadPackConfig();
+    await loadSavedTicket();
+
+    setAdminMsg("✅ Quotas mis à jour !");
+    closeAdminModal();
+  } catch(e){
+    console.log("saveAdminPacks error:", e);
+    setAdminMsg("❌ " + (e?.message || String(e)));
+  }
+}
+
+// binds
+adminBtn?.addEventListener("click", openAdminModal);
+adminClose?.addEventListener("click", closeAdminModal);
+adminCancel?.addEventListener("click", closeAdminModal);
+adminModal?.addEventListener("click", (e)=>{
+  if (e.target === adminModal) closeAdminModal(); // clic hors panneau = ferme
+});
+adminSave?.addEventListener("click", saveAdminPacks);
+
 onAuthStateChanged(auth, async () => {
   await loadPackConfig();   // ✅ charge quotas depuis Firestore (sinon fallback)
   await loadSavedTicket();
