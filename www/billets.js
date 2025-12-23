@@ -1,18 +1,99 @@
 // billets.js (MODULE) — PDF: texte via PDF.js / Image: OCR crop zone droite
+// ✅ Corrections: pas de await global, save 1 seule fois, syncNameFromTicket intégré + refresh header
 
 import { firebaseConfig } from "./firebase-config.js";
 import { initializeApp, getApps, getApp } from "https://www.gstatic.com/firebasejs/10.12.4/firebase-app.js";
 import {
   getFirestore, doc, getDoc, setDoc, deleteDoc, runTransaction, serverTimestamp
 } from "https://www.gstatic.com/firebasejs/10.12.4/firebase-firestore.js";
-import { getAuth, onAuthStateChanged, updateProfile } 
-  from "https://www.gstatic.com/firebasejs/10.12.4/firebase-auth.js";
+import {
+  getAuth, onAuthStateChanged, updateProfile
+} from "https://www.gstatic.com/firebasejs/10.12.4/firebase-auth.js";
 
 const app  = getApps().length ? getApp() : initializeApp(firebaseConfig);
 const db   = getFirestore(app);
 const auth = getAuth(app);
 
-// ---------- MAIN IMPORT HANDLER ----------
+// =====================
+// UI
+// =====================
+const uploadBtn = document.getElementById("uploadTicketBtn");
+const deleteBtn = document.getElementById("deleteTicketBtn");
+const fileInput = document.getElementById("ticketFileInput");
+const statusEl  = document.getElementById("ticketStatus");
+const boxEl     = document.getElementById("ticketBox");
+
+function setStatus(t = "") { if (statusEl) statusEl.textContent = t; }
+function escapeHTML(s = "") {
+  return String(s)
+    .replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;").replaceAll("'", "&#039;");
+}
+
+// =====================
+// PACKS (quotas)
+// =====================
+const PACKS_FALLBACK = {
+  essentiel: { label: "Essentiel", workshopsAllowed: 1, conferencesAllowed: 2, otherAllowed: 0 },
+  standard:  { label: "Standard",  workshopsAllowed: 2, conferencesAllowed: 4, otherAllowed: 0 },
+  premium:   { label: "Premium",   workshopsAllowed: 3, conferencesAllowed: 7, otherAllowed: 0 },
+  autre:     { label: "Autre",     workshopsAllowed: 0, conferencesAllowed: 0, otherAllowed: 0 },
+};
+
+let PACKS = { ...PACKS_FALLBACK };
+
+function normalizePackConfig(obj){
+  const src = obj && typeof obj === "object" ? obj : {};
+  const out = {};
+  for (const k of Object.keys(src)){
+    const v = src[k] || {};
+    out[String(k).toLowerCase()] = {
+      label: String(v.label || k),
+      workshopsAllowed: Number(v.workshopsAllowed ?? 0),
+      conferencesAllowed: Number(v.conferencesAllowed ?? 0),
+      otherAllowed: Number(v.otherAllowed ?? 0),
+    };
+  }
+  return out;
+}
+
+async function loadPackConfig(){
+  try{
+    const snap = await getDoc(doc(db, "config", "packs"));
+    if (!snap.exists()){
+      PACKS = { ...PACKS_FALLBACK };
+      return;
+    }
+    const data = snap.data() || {};
+    const normalized = normalizePackConfig(data);
+    PACKS = Object.keys(normalized).length ? normalized : { ...PACKS_FALLBACK };
+  } catch (e){
+    console.log("loadPackConfig error:", e);
+    PACKS = { ...PACKS_FALLBACK };
+  }
+}
+
+// =====================
+// ICONS
+// =====================
+const TRASH_TIDOC_SVG = `
+<svg class="trash-ico" viewBox="0 0 408.483 408.483" aria-hidden="true">
+  <g><g>
+    <path d="M87.748,388.784c0.461,11.01,9.521,19.699,20.539,19.699h191.911c11.018,0,20.078-8.689,20.539-19.699l13.705-289.316
+      H74.043L87.748,388.784z M247.655,171.329c0-4.61,3.738-8.349,8.35-8.349h13.355c4.609,0,8.35,3.738,8.35,8.349v165.293
+      c0,4.611-3.738,8.349-8.35,8.349h-13.355c-4.61,0-8.35-3.736-8.35-8.349V171.329z M189.216,171.329
+      c0-4.61,3.738-8.349,8.349-8.349h13.355c4.609,0,8.349,3.738,8.349,8.349v165.293c0,4.611-3.737,8.349-8.349,8.349h-13.355
+      c-4.61,0-8.349-3.736-8.349-8.349V171.329L189.216,171.329z M130.775,171.329c0-4.61,3.738-8.349,8.349-8.349h13.356
+      c4.61,0,8.349,3.738,8.349,8.349v165.293c0,4.611-3.738,8.349-8.349,8.349h-13.356c-4.61,0-8.349-3.736-8.349-8.349V171.329z"/>
+    <path d="M343.567,21.043h-88.535V4.305c0-2.377-1.927-4.305-4.305-4.305h-92.971c-2.377,0-4.304,1.928-4.304,4.305v16.737H64.916
+      c-7.125,0-12.9,5.776-12.9,12.901V74.47h304.451V33.944C356.467,26.819,350.692,21.043,343.567,21.043z"/>
+  </g></g>
+</svg>
+`;
+
+// =====================
+// MAIN IMPORT HANDLER
+// =====================
 async function handleFile(file) {
   if (!file) return;
 
@@ -56,15 +137,16 @@ async function handleFile(file) {
       throw new Error("Format non supporté (PDF ou image uniquement).");
     }
 
-    if (!qrText) {
-      throw new Error("QR Code non détecté sur le billet.");
-    }
+    if (!qrText) throw new Error("QR Code non détecté sur le billet.");
 
     // 🔐 anti-double billet
     await claimQrOrThrow(qrText);
 
     // 💾 sauvegarde Firestore
     await saveTicketToFirestore({ qrText, packKey, holderName, ticketNumber });
+
+    // ✅ sync nom billet -> profil (auth + users/{uid}) + refresh header
+    await syncNameFromTicket(holderName);
 
     // 🎨 affichage immédiat
     renderResult({ qrText, packKey, holderName, ticketNumber });
@@ -76,79 +158,9 @@ async function handleFile(file) {
   }
 }
 
-// UI
-const uploadBtn = document.getElementById("uploadTicketBtn");
-const deleteBtn = document.getElementById("deleteTicketBtn");
-const fileInput = document.getElementById("ticketFileInput");
-const statusEl  = document.getElementById("ticketStatus");
-const boxEl     = document.getElementById("ticketBox");
-
-// Packs (quotas)
-
-const PACKS_FALLBACK = {
-  essentiel: { label: "Essentiel", workshopsAllowed: 1, conferencesAllowed: 2, otherAllowed: 0 },
-  standard:  { label: "Standard",  workshopsAllowed: 2, conferencesAllowed: 4, otherAllowed: 0 },
-  premium:   { label: "Premium",   workshopsAllowed: 3, conferencesAllowed: 7, otherAllowed: 0 },
-  autre:     { label: "Autre",     workshopsAllowed: 0, conferencesAllowed: 0, otherAllowed: 0 },
-};
-
-let PACKS = { ...PACKS_FALLBACK };
-
-function normalizePackConfig(obj){
-  const src = obj && typeof obj === "object" ? obj : {};
-  const out = {};
-
-  for (const k of Object.keys(src)){
-    const v = src[k] || {};
-    out[String(k).toLowerCase()] = {
-      label: String(v.label || k),
-      workshopsAllowed: Number(v.workshopsAllowed ?? 0),
-      conferencesAllowed: Number(v.conferencesAllowed ?? 0),
-      otherAllowed: Number(v.otherAllowed ?? 0),
-    };
-  }
-  return out;
-}
-
-async function loadPackConfig(){
-  try{
-    const snap = await getDoc(doc(db, "config", "packs"));
-    if (!snap.exists()){
-      PACKS = { ...PACKS_FALLBACK };
-      return;
-    }
-    const data = snap.data() || {};
-    const normalized = normalizePackConfig(data);
-    PACKS = Object.keys(normalized).length ? normalized : { ...PACKS_FALLBACK };
-  } catch (e){
-    console.log("loadPackConfig error:", e);
-    PACKS = { ...PACKS_FALLBACK };
-  }
-}
-
-const TRASH_TIDOC_SVG = `
-<svg class="trash-ico" viewBox="0 0 408.483 408.483" aria-hidden="true">
-  <g><g>
-    <path d="M87.748,388.784c0.461,11.01,9.521,19.699,20.539,19.699h191.911c11.018,0,20.078-8.689,20.539-19.699l13.705-289.316
-      H74.043L87.748,388.784z M247.655,171.329c0-4.61,3.738-8.349,8.35-8.349h13.355c4.609,0,8.35,3.738,8.35,8.349v165.293
-      c0,4.611-3.738,8.349-8.35,8.349h-13.355c-4.61,0-8.35-3.736-8.35-8.349V171.329z M189.216,171.329
-      c0-4.61,3.738-8.349,8.349-8.349h13.355c4.609,0,8.349,3.738,8.349,8.349v165.293c0,4.611-3.737,8.349-8.349,8.349h-13.355
-      c-4.61,0-8.349-3.736-8.349-8.349V171.329L189.216,171.329z M130.775,171.329c0-4.61,3.738-8.349,8.349-8.349h13.356
-      c4.61,0,8.349,3.738,8.349,8.349v165.293c0,4.611-3.738,8.349-8.349,8.349h-13.356c-4.61,0-8.349-3.736-8.349-8.349V171.329z"/>
-    <path d="M343.567,21.043h-88.535V4.305c0-2.377-1.927-4.305-4.305-4.305h-92.971c-2.377,0-4.304,1.928-4.304,4.305v16.737H64.916
-      c-7.125,0-12.9,5.776-12.9,12.901V74.47h304.451V33.944C356.467,26.819,350.692,21.043,343.567,21.043z"/>
-  </g></g>
-</svg>
-`;
-
-function setStatus(t = "") { if (statusEl) statusEl.textContent = t; }
-function escapeHTML(s = "") {
-  return String(s)
-    .replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;").replaceAll("'", "&#039;");
-}
-
-// ---------- QR scan (jsQR) ----------
+// =====================
+// QR scan (jsQR)
+// =====================
 function scanCanvasForQR(canvas) {
   try {
     const ctx = canvas.getContext("2d", { willReadFrequently: true });
@@ -195,11 +207,12 @@ async function scanPdfForQR(file) {
     if (qr2) return { pdf, qrText: qr2 };
   }
 
-  // on renvoie quand même le pdf pour lire le texte
   return { pdf, qrText: "" };
 }
 
-// ---------- PDF TEXT extraction (fiable pour Nom/Pack/N° billet) ----------
+// =====================
+// PDF TEXT extraction
+// =====================
 async function extractMetaFromPdfText(pdf) {
   const page = await pdf.getPage(1);
   const tc = await page.getTextContent();
@@ -207,7 +220,9 @@ async function extractMetaFromPdfText(pdf) {
   return parseMetaFromText(text);
 }
 
-// ---------- OCR crop (image) pour Nom/Pack/N° billet ----------
+// =====================
+// OCR crop (image)
+// =====================
 async function loadImageToCanvas(fileOrBlob) {
   const url = URL.createObjectURL(fileOrBlob);
   try {
@@ -255,7 +270,9 @@ async function ocrCanvas(canvas) {
   return data?.text || "";
 }
 
-// ---------- Parsing commun (PDF texte / OCR texte) ----------
+// =====================
+// Parsing (PDF texte / OCR texte)
+// =====================
 function parseMetaFromText(raw = "") {
   const lines = String(raw).split(/\r?\n/).map(l => l.replace(/\s+/g, " ").trim()).filter(Boolean);
   const full = lines.join(" ");
@@ -297,14 +314,16 @@ function parseMetaFromText(raw = "") {
 
   // fallback (si OCR colle tout)
   if (!holderName && idxPack >= 0) {
-    const mSame = lines[idxPack].match(/^(.*?)\s+pack\s*(essentiel|standard|premium|autre)/i);    
-  if (mSame) holderName = mSame[1].trim();
+    const mSame = lines[idxPack].match(/^(.*?)\s+pack\s*(essentiel|standard|premium|autre)/i);
+    if (mSame) holderName = mSame[1].trim();
   }
 
   return { holderName, packKey, ticketNumber, rawText: raw };
 }
 
-// ---------- SHA256 / Lock QR ----------
+// =====================
+// SHA256 / Lock QR
+// =====================
 async function sha256Hex(str) {
   const data = new TextEncoder().encode(str);
   const hash = await crypto.subtle.digest("SHA-256", data);
@@ -339,12 +358,15 @@ async function claimQrOrThrow(qrText) {
   return qrHash;
 }
 
+// =====================
+// Sync Nom billet -> profil
+// =====================
 async function syncNameFromTicket(holderName){
   const u = auth.currentUser;
   const name = String(holderName || "").trim();
   if (!u || !name) return;
 
-  // 1) Auth profile (pour afficher partout)
+  // 1) Auth profile (affichage partout)
   try { await updateProfile(u, { displayName: name }); } catch(_) {}
 
   // 2) Firestore users/{uid}
@@ -354,8 +376,17 @@ async function syncNameFromTicket(holderName){
       updatedAt: serverTimestamp()
     }, { merge:true });
   } catch(_) {}
+
+  // 3) Cache + refresh header sans reload
+  try{
+    localStorage.setItem("tidoc_name", name);
+    window.dispatchEvent(new CustomEvent("tidoc:auth", { detail: { displayName: name }}));
+  } catch(_) {}
 }
-// ---------- Save ----------
+
+// =====================
+// Save Ticket
+// =====================
 async function saveTicketToFirestore({ qrText, packKey, holderName, ticketNumber }) {
   const u = auth.currentUser;
   if (!u) throw new Error("Connexion requise.");
@@ -371,23 +402,20 @@ async function saveTicketToFirestore({ qrText, packKey, holderName, ticketNumber
     updatedAt: serverTimestamp()
   }, { merge: true });
 }
-await saveTicketToFirestore({ qrText, packKey, holderName, ticketNumber });
 
-// ✅ sync nom billet -> profil
-await syncNameFromTicket(holderName);
-
-renderResult({ qrText, packKey, holderName, ticketNumber }); 
-// ✅ DELETE ticket + unclaim QR
+// =====================
+// DELETE ticket + unclaim QR
+// =====================
 async function deleteMyTicketAndUnclaim() {
   const u = auth.currentUser;
   if (!u) { setStatus("🔒 Connecte-toi."); return; }
 
   const ok = confirm(
-  "Supprimer ce billet ?\n\n" +
-  "• Le billet sera retiré de ton compte\n" +
-  "• Tu pourras l’importer à nouveau plus tard\n" +
-  "• Cela n’annule PAS ton achat HelloAsso\n\n" +
-  "Confirmer la suppression ?"
+    "Supprimer ce billet ?\n\n" +
+    "• Le billet sera retiré de ton compte\n" +
+    "• Tu pourras l’importer à nouveau plus tard\n" +
+    "• Cela n’annule PAS ton achat HelloAsso\n\n" +
+    "Confirmer la suppression ?"
   );
   if (!ok) return;
 
@@ -400,10 +428,8 @@ async function deleteMyTicketAndUnclaim() {
     const t = snap.exists() ? (snap.data() || {}) : {};
     const qrHash = t.qrHash || "";
 
-    // supprime billet
     await deleteDoc(ticketRef);
 
-    // supprime claim si c’est le même uid
     if (qrHash) {
       const claimRef = doc(db, "qrClaims", qrHash);
       await runTransaction(db, async (tx) => {
@@ -422,57 +448,56 @@ async function deleteMyTicketAndUnclaim() {
   }
 }
 
-// ---------- Render ----------
+// =====================
+// Render
+// =====================
 function renderResult({ qrText, packKey, holderName, ticketNumber } = {}) {
   const key = String(packKey || "").toLowerCase();
-  const pack = PACKS[key] || (key ? { label: key, workshopsAllowed: "—", conferencesAllowed: "—", otherAllowed: "—" } : null);  const packLabel = pack ? pack.label : "Non détecté";
+  const pack = PACKS[key] || (key ? { label: key, workshopsAllowed: "—", conferencesAllowed: "—", otherAllowed: "—" } : null);
+  const packLabel = pack ? pack.label : "Non détecté";
   const conf = pack ? pack.conferencesAllowed : "—";
   const ws   = pack ? pack.workshopsAllowed : "—";
   const other = pack ? pack.otherAllowed : "—";
 
   boxEl.innerHTML = `
-  <div style="position:relative; display:flex; flex-direction:column; gap:12px;">
+    <div style="position:relative; display:flex; flex-direction:column; gap:12px;">
 
-    <!-- ✅ poubelle (au lieu de "Supprimer") -->
-    <button
-      class="delete-btn"
-      id="deleteTicketInlineBtn"
-      type="button"
-      aria-label="Supprimer le billet"
-      title="Supprimer"
-      style="position:absolute; top:0; right:0;"
-   >
-      ${TRASH_TIDOC_SVG}
-   </button>
+      <button
+        class="delete-btn"
+        id="deleteTicketInlineBtn"
+        type="button"
+        aria-label="Supprimer le billet"
+        title="Supprimer"
+        style="position:absolute; top:0; right:0;"
+      >
+        ${TRASH_TIDOC_SVG}
+      </button>
 
-    <div style="font-weight:900; color:var(--tidoc); font-size:15px; margin-bottom:8px;">
-      ✅ Billet importé
-    </div>
+      <div style="font-weight:900; color:var(--tidoc); font-size:15px; margin-bottom:8px;">
+        ✅ Billet importé
+      </div>
 
-    <!-- ✅ QR premium -->
-    <div class="qr-premium">
-      <div class="qr-title">QR Code</div>
+      <div class="qr-premium">
+        <div class="qr-title">QR Code</div>
+        <div class="qr-box">
+          <div id="qrRender" style="width:220px;height:220px;"></div>
+        </div>
+      </div>
 
-      <div class="qr-box">
-        <div id="qrRender" style="width:220px;height:220px;"></div>
+      <div style="border:1px solid var(--line); border-radius:14px; padding:12px;">
+        <div><b>Nom :</b> ${escapeHTML(holderName || "—")}</div>
+        <div><b>N° billet :</b> ${escapeHTML(ticketNumber || "—")}</div>
+        <div style="margin-top:8px;"><b>Pack :</b> ${escapeHTML(packLabel)}</div>
+        <div><b>Conférences :</b> ${conf}</div>
+        <div><b>Workshops :</b> ${ws}</div>
+        <div><b>Autre :</b> ${other}</div>
       </div>
     </div>
-
-    <div style="border:1px solid var(--line); border-radius:14px; padding:12px;">
-      <div><b>Nom :</b> ${escapeHTML(holderName || "—")}</div>
-      <div><b>N° billet :</b> ${escapeHTML(ticketNumber || "—")}</div>
-      <div style="margin-top:8px;"><b>Pack :</b> ${escapeHTML(packLabel)}</div>
-      <div><b>Conférences :</b> ${conf}</div>
-      <div><b>Workshops :</b> ${ws}</div>
-      <div><b>Autre :</b> ${other}</div>
-    </div>
-  </div>
   `;
 
   boxEl.querySelector("#deleteTicketInlineBtn")
     ?.addEventListener("click", deleteMyTicketAndUnclaim);
 
-  // QR code (qrcodejs)
   const host = boxEl.querySelector("#qrRender");
   if (host && window.QRCode && qrText) {
     host.innerHTML = "";
@@ -483,6 +508,10 @@ function renderResult({ qrText, packKey, holderName, ticketNumber } = {}) {
     </div>`;
   }
 }
+
+// =====================
+// Load saved ticket
+// =====================
 async function loadSavedTicket() {
   const u = auth.currentUser;
   if (!u) {
@@ -508,7 +537,9 @@ async function loadSavedTicket() {
   });
 }
 
-// UI
+// =====================
+// UI binds
+// =====================
 uploadBtn?.addEventListener("click", () => fileInput?.click());
 fileInput?.addEventListener("change", async () => {
   const file = fileInput.files?.[0];
@@ -539,9 +570,7 @@ const adminSave  = document.getElementById("adminPacksSaveBtn");
 function setAdminMsg(t=""){ if (adminMsg) adminMsg.textContent = t; }
 
 function ensureDefaultPacks(packs){
-  // on garantit que ces packs existent dans l’UI (même si le doc Firestore est vide)
   const base = { ...PACKS_FALLBACK, ...packs };
-  // optionnel: si tu veux un pack "autre" (en tant que pack) :
   if (!base.autre){
     base.autre = { label:"Autre", workshopsAllowed:0, conferencesAllowed:0, otherAllowed:0 };
   }
@@ -627,10 +656,8 @@ async function saveAdminPacks(){
       };
     }
 
-    // 🔥 écrit dans config/packs
     await setDoc(doc(db, "config", "packs"), out, { merge:true });
 
-    // recharge local + refresh UI ticket
     await loadPackConfig();
     await loadSavedTicket();
 
@@ -642,18 +669,18 @@ async function saveAdminPacks(){
   }
 }
 
-// binds
+// binds admin
 adminBtn?.addEventListener("click", openAdminModal);
 adminClose?.addEventListener("click", closeAdminModal);
 adminCancel?.addEventListener("click", closeAdminModal);
-adminModal?.addEventListener("click", (e)=>{
-  if (e.target === adminModal) closeAdminModal(); // clic hors panneau = ferme
-});
+adminModal?.addEventListener("click", (e)=>{ if (e.target === adminModal) closeAdminModal(); });
 adminSave?.addEventListener("click", saveAdminPacks);
 
+// =====================
+// INIT
+// =====================
 onAuthStateChanged(auth, async () => {
   await loadPackConfig();
   await loadSavedTicket();
-
   if (adminBtn) adminBtn.style.display = isAdmin() ? "inline-flex" : "none";
 });
