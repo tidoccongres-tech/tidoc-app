@@ -13,6 +13,30 @@
 </script>
 
 <body>
+
+<!-- ADMIN ONLY -->
+<button id="adminEditPacksBtn" class="btn-primary" type="button" style="display:none;">
+  Modifier les activités
+</button>
+
+<!-- Petit panneau (modal) -->
+<div id="adminPacksModal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,.55); z-index:9999;">
+  <div style="max-width:720px; margin:8vh auto; background:#fff; border-radius:16px; padding:16px; box-shadow:0 20px 60px rgba(0,0,0,.25);">
+    <div style="display:flex; justify-content:space-between; align-items:center; gap:12px;">
+      <h3 style="margin:0;">Modifier les activités (quotas par pack)</h3>
+      <button id="adminPacksCloseBtn" type="button" class="delete-btn" aria-label="Fermer">✕</button>
+    </div>
+
+    <div id="adminPacksForm" style="margin-top:14px; display:flex; flex-direction:column; gap:12px;"></div>
+
+    <div style="display:flex; gap:10px; justify-content:flex-end; margin-top:14px;">
+      <button id="adminPacksCancelBtn" type="button">Annuler</button>
+      <button id="adminPacksSaveBtn" class="btn-primary" type="button">Enregistrer</button>
+    </div>
+
+    <div id="adminPacksMsg" style="margin-top:10px; font-weight:800; color:#444;"></div>
+  </div>
+</div>
   
   <!-- Topbar -->
   <script type="module" src="./header-user-menu.js"></script>
