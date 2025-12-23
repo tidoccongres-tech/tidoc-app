@@ -270,7 +270,7 @@ async function registerToEvent(eventId){
     }
 
     tx.set(regRef, { uid, createdAt: serverTimestamp() });
-    tx.set(evRef, { bookedCount: booked + 1 }, { merge:true });
+    tx.update(evRef, { bookedCount: booked + 1 }); // ✅ update strict sur bookedCount
   });
 }
 
