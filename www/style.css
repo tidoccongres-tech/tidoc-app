@@ -1602,7 +1602,11 @@ main.page.blog-page{ padding-top: calc(56px + 12px) !important; }
   -webkit-tap-highlight-color: transparent;
 }
 
-/* Annuler (outline premium) */
+/* =========================================================
+   PREMIUM BUTTONS (Forum / Billets / Admin) — CLEAN (NO DUPES)
+   ========================================================= */
+
+/* ===== 1) POST FORM (Forum) ===== */
 .post-form .form-actions .btn-outline{
   border:1px solid rgba(23,140,168,.22);
   background: rgba(255,255,255,.88);
@@ -1610,25 +1614,28 @@ main.page.blog-page{ padding-top: calc(56px + 12px) !important; }
   -webkit-backdrop-filter: blur(10px);
 }
 
-/* Publier (gradient premium) */
 .post-form .form-actions .btn-primary{
   background: linear-gradient(135deg, #178CA8, #1fb5d0);
 }
 
-/* Hover/active */
+.post-form .form-actions .btn-outline,
+.post-form .form-actions .btn-primary{
+  transition: transform .15s ease, box-shadow .15s ease, filter .15s ease, background .15s ease;
+}
+
 .post-form .form-actions .btn-outline:hover,
 .post-form .form-actions .btn-primary:hover{
   transform: translateY(-1px);
   box-shadow:0 18px 34px rgba(0,0,0,.10);
   filter: brightness(1.01);
 }
+
 .post-form .form-actions .btn-outline:active,
 .post-form .form-actions .btn-primary:active{
   transform: translateY(0);
   box-shadow:0 6px 16px rgba(0,0,0,.10);
 }
 
-/* Disabled (quand postInflight=true) */
 .post-form .form-actions button:disabled{
   opacity:.55;
   cursor:not-allowed;
@@ -1636,14 +1643,13 @@ main.page.blog-page{ padding-top: calc(56px + 12px) !important; }
   box-shadow:none !important;
 }
 
-/* ===== BILLETS : look premium comme forum ===== */
-
+/* ===== 2) BILLETS (CTA premium) ===== */
 #ticketsCard .btn-outline,
 #ticketsCard .btn-primary{
   width:100%;
-  height:48px;
-  border-radius:16px;
-  font-weight:900;
+  height:52px;                 /* ✅ unifié (tu avais 48 puis 52) */
+  border-radius:18px;          /* ✅ unifié (tu avais 16 puis 18) */
+  font-weight:950;             /* ✅ unifié (900 puis 950) */
   letter-spacing:.2px;
 }
 
@@ -1655,14 +1661,17 @@ main.page.blog-page{ padding-top: calc(56px + 12px) !important; }
 #ticketsCard .btn-primary:hover{
   transform: translateY(-1px);
   box-shadow:0 18px 34px rgba(23,140,168,.32);
+  filter: brightness(1.02);
 }
-#ticketsCard .btn-primary:active{ transform: translateY(0); }
+#ticketsCard .btn-primary:active{
+  transform: translateY(0);
+}
 
 #ticketsCard .btn-outline{
   border:1px solid rgba(23,140,168,.18);
   background: rgba(255,255,255,.85);
   box-shadow:0 14px 26px rgba(0,0,0,.07);
-  transition: transform .12s ease, box-shadow .12s ease, background .12s ease;
+  transition: transform .12s ease, box-shadow .12s ease, background .12s ease, filter .12s ease;
 }
 #ticketsCard .btn-outline:hover{
   transform: translateY(-1px);
@@ -1670,11 +1679,13 @@ main.page.blog-page{ padding-top: calc(56px + 12px) !important; }
   box-shadow:0 18px 34px rgba(0,0,0,.10);
 }
 
+/* Conteneur billet */
 #ticketBox{
   position:relative;
-  min-height: 64px;
+  min-height:64px;
 }
 
+/* Icône poubelle (utilisée par delete-btn) */
 .delete-btn .trash-ico{
   width:18px;
   height:18px;
@@ -1682,7 +1693,7 @@ main.page.blog-page{ padding-top: calc(56px + 12px) !important; }
   display:block;
 }
 
-/* ✅ Poubelle commentaire (même style que delete post) */
+/* ===== 3) Comment delete (mini bouton) ===== */
 .comment-del{
   width:32px;
   height:32px;
@@ -1693,9 +1704,8 @@ main.page.blog-page{ padding-top: calc(56px + 12px) !important; }
   background:rgba(23,140,168,.10);
   border:1px solid rgba(23,140,168,.20);
   color:var(--tidoc);
-  flex: 0 0 auto;
+  flex:0 0 auto;
 }
-
 .comment-del .trash-ico{
   width:16px;
   height:16px;
@@ -1703,7 +1713,15 @@ main.page.blog-page{ padding-top: calc(56px + 12px) !important; }
   display:block;
 }
 
-/* ✅ Bouton Nous contacter : animation premium */
+/* ===== 4) Shine animation (shared) ===== */
+@keyframes shine{
+  0%   { transform: rotate(25deg) translateX(-70%); opacity:0; }
+  15%  { opacity:.9; }
+  45%  { transform: rotate(25deg) translateX(70%); opacity:0; }
+  100% { opacity:0; }
+}
+
+/* ===== 5) Home contact premium (shine) ===== */
 .home-contact-premium{
   position:relative;
   overflow:hidden;
@@ -1711,7 +1729,6 @@ main.page.blog-page{ padding-top: calc(56px + 12px) !important; }
   box-shadow:0 14px 26px rgba(23,140,168,.25);
   transition: transform .15s ease, box-shadow .15s ease, filter .15s ease;
 }
-
 .home-contact-premium::after{
   content:"";
   position:absolute;
@@ -1721,52 +1738,41 @@ main.page.blog-page{ padding-top: calc(56px + 12px) !important; }
   animation: shine 2.8s ease-in-out infinite;
   pointer-events:none;
 }
-
-@keyframes shine{
-  0%   { transform: rotate(25deg) translateX(-70%); opacity:.0; }
-  15%  { opacity:.85; }
-  45%  { transform: rotate(25deg) translateX(70%); opacity:.0; }
-  100% { opacity:0; }
-}
-
 .home-contact-premium:hover{
   transform: translateY(-1px);
   box-shadow:0 18px 34px rgba(23,140,168,.32);
   filter: brightness(1.02);
 }
-.home-contact-premium:active{ transform: translateY(0); }
+.home-contact-premium:active{
+  transform: translateY(0);
+}
 
-/* === FIX iPhone taps : si un overlay invisible traîne, il ne doit pas capter === */
+/* ===== 6) FIX iPhone taps overlays ===== */
 #headerUserMenuOverlay,
 .header-overlay,
 .menu-overlay,
 .overlay,
 .menu-backdrop,
 .user-menu-backdrop{
-  pointer-events: none !important;
+  pointer-events:none !important;
 }
-
-/* ton menu lui-même doit rester cliquable */
 .profile-menu.open{
-  pointer-events: auto !important;
+  pointer-events:auto !important;
 }
 
-/* ✅ Bouton admin premium + shine */
+/* ===== 7) ADMIN — full premium button (large) ===== */
 .admin-premium{
   width:100%;
   height:48px;
   border-radius:16px;
   font-weight:900;
   letter-spacing:.2px;
-
   position:relative;
   overflow:hidden;
-
   background: linear-gradient(135deg, #178CA8, #1fb5d0);
   box-shadow:0 14px 26px rgba(23,140,168,.25);
   transition: transform .15s ease, box-shadow .15s ease, filter .15s ease;
 }
-
 .admin-premium::after{
   content:"";
   position:absolute;
@@ -1776,20 +1782,22 @@ main.page.blog-page{ padding-top: calc(56px + 12px) !important; }
   animation: shine 2.8s ease-in-out infinite;
   pointer-events:none;
 }
-
 .admin-premium:hover{
   transform: translateY(-1px);
   box-shadow:0 18px 34px rgba(23,140,168,.32);
   filter: brightness(1.02);
 }
-.admin-premium:active{ transform: translateY(0); }
+.admin-premium:active{
+  transform: translateY(0);
+}
 
-/* ===== BILLETS : CARD PREMIUM ===== */
+/* ===== 8) BILLETS — CARD PREMIUM ===== */
 .ticket-card{
-  border-radius: 26px !important;
+  border-radius:26px !important;
   background: linear-gradient(135deg, rgba(23,140,168,.16), rgba(255,255,255,.86)) !important;
-  border: 1px solid rgba(23,140,168,.18) !important;
-  box-shadow: 0 26px 54px rgba(23,140,168,.18), inset 0 1px 0 rgba(255,255,255,.70) !important;
+  border:1px solid rgba(23,140,168,.18) !important;
+  box-shadow:0 26px 54px rgba(23,140,168,.18),
+             inset 0 1px 0 rgba(255,255,255,.70) !important;
 }
 
 .ticket-head{
@@ -1797,22 +1805,22 @@ main.page.blog-page{ padding-top: calc(56px + 12px) !important; }
   align-items:center;
   justify-content:space-between;
   gap:12px;
-  margin-bottom: 8px;
+  margin-bottom:8px;
 }
 
 .ticket-title{
   margin:0;
-  color: var(--tidoc);
-  font-weight: 950;
-  letter-spacing: .2px;
+  color:var(--tidoc);
+  font-weight:950;
+  letter-spacing:.2px;
 }
 
 .ticket-sub{
-  margin: 0 0 14px;
+  margin:0 0 14px;
   color: rgba(31, 75, 86, .75);
-  font-size: 13px;
-  font-weight: 700;
-  line-height: 1.35;
+  font-size:13px;
+  font-weight:700;
+  line-height:1.35;
 }
 
 .ticket-actions{
@@ -1821,23 +1829,21 @@ main.page.blog-page{ padding-top: calc(56px + 12px) !important; }
   gap:12px;
 }
 
-/* CTA un peu plus premium */
-#ticketsCard .btn-outline,
-#ticketsCard .btn-primary{
-  height: 52px;
-  border-radius: 18px;
-  font-weight: 950;
-  letter-spacing: .2px;
+.ticket-status{
+  margin:12px 0 0;
+  color:var(--muted);
+  font-size:13px;
+  font-weight:800;
 }
 
-/* ===== ADMIN CHIP PREMIUM (petit bouton en haut à droite) ===== */
+/* ===== 9) ADMIN CHIP (petit bouton pill) ===== */
 .admin-chip{
   border:none;
   cursor:pointer;
-  padding: 10px 12px;
-  border-radius: 999px;
-  font-weight: 950;
-  font-size: 12px;
+  padding:10px 12px;
+  border-radius:999px;
+  font-weight:950;
+  font-size:12px;
   display:inline-flex;
   align-items:center;
   gap:8px;
@@ -1845,42 +1851,28 @@ main.page.blog-page{ padding-top: calc(56px + 12px) !important; }
 }
 
 .admin-chip-premium{
-  position: relative;
-  overflow: hidden;
+  position:relative;
+  overflow:hidden;
   color:#fff;
   background: linear-gradient(135deg, #178CA8, #1fb5d0);
-  box-shadow: 0 14px 26px rgba(23,140,168,.28);
-  border: 1px solid rgba(255,255,255,.25);
+  box-shadow:0 14px 26px rgba(23,140,168,.28);
+  border:1px solid rgba(255,255,255,.25);
   transition: transform .14s ease, box-shadow .14s ease, filter .14s ease;
 }
 .admin-chip-premium:hover{
   transform: translateY(-1px);
-  box-shadow: 0 18px 34px rgba(23,140,168,.34);
+  box-shadow:0 18px 34px rgba(23,140,168,.34);
   filter: brightness(1.02);
 }
-.admin-chip-premium:active{ transform: translateY(0); }
-
-/* Shine animation */
+.admin-chip-premium:active{
+  transform: translateY(0);
+}
 .admin-chip-premium::after{
   content:"";
   position:absolute;
   inset:-40% -60%;
   background: linear-gradient(90deg, transparent, rgba(255,255,255,.38), transparent);
   transform: rotate(25deg) translateX(-70%);
-  animation: adminShine 2.8s ease-in-out infinite;
+  animation: shine 2.8s ease-in-out infinite;
   pointer-events:none;
-}
-@keyframes adminShine{
-  0%   { transform: rotate(25deg) translateX(-70%); opacity:0; }
-  15%  { opacity:.9; }
-  45%  { transform: rotate(25deg) translateX(70%); opacity:0; }
-  100% { opacity:0; }
-}
-
-/* status en dessous */
-.ticket-status{
-  margin: 12px 0 0;
-  color: var(--muted);
-  font-size: 13px;
-  font-weight: 800;
 }
