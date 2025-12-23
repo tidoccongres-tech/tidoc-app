@@ -1,12 +1,10 @@
 // login.js (MODULE) — Premium Auth (signup/login) + pseudo unique + eye toggle
 
-console.log("✅ login.js chargé");
-console.log("signupBtn", signupBtn, "loginBtn", loginBtn);
-console.log("signupPseudo", signupPseudo, "loginEmailEl", loginEmailEl);
-
 import { auth, db, signupEmail, loginEmail, resetPassword } from "./auth.js";
 import { doc, getDoc } from "https://www.gstatic.com/firebasejs/10.12.4/firebase-firestore.js";
 import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.4/firebase-auth.js";
+
+console.log("✅ login.js chargé");
 
 const LS_NAME = "tidoc_name";
 const ADMIN_EMAIL = "tidoc.congres@gmail.com";
@@ -27,6 +25,9 @@ const signupBtn    = document.getElementById("signupBtn");
 const loginEmailEl = document.getElementById("loginEmail");
 const loginPassEl  = document.getElementById("loginPassword");
 const loginBtn     = document.getElementById("loginBtn");
+
+console.log("signupBtn", signupBtn, "loginBtn", loginBtn);
+console.log("signupPseudo", signupPseudo, "loginEmailEl", loginEmailEl);
 
 // (Optionnel : si tu ajoutes un bouton reset dans ton HTML)
 const resetBtn = document.getElementById("resetBtn");
@@ -272,7 +273,7 @@ resetBtn?.addEventListener("click", async () => {
 
   try {
     setMsg("⏳ Envoi de l’email…");
-    await resetPassword(email, { redirectUrl: location.origin + "/login.html" });
+    await resetPassword(email);
     setMsg("✅ Email de réinitialisation envoyé (check spam aussi).");
   } catch (e) {
     const code = (e?.code || "");
