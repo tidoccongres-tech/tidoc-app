@@ -2007,13 +2007,13 @@ main.page.blog-page{ padding-top: calc(56px + 12px) !important; }
   display:block;
 }
 
-
-/* Panels: un seul visible */
-.auth-panel{ 
-  display:none; 
+/* Panels: gérés par l’attribut hidden (JS) */
+.auth-panel{
+  display:flex;
+  flex-direction:column;
+  gap:12px;
 }
-.auth-panel.active{ 
-  display:flex; 
-  flex-direction:column; 
-  gap:12px; 
+
+.auth-panel[hidden]{
+  display:none !important;
 }
