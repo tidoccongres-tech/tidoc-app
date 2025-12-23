@@ -1,13 +1,15 @@
 // login.js (MODULE) — Premium Auth (signup/login) + pseudo unique + eye toggle
-
 import { auth, db, signupEmail, loginEmail, resetPassword } from "./auth.js";
 import { doc, getDoc } from "https://www.gstatic.com/firebasejs/10.12.4/firebase-firestore.js";
 import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.4/firebase-auth.js";
 
 console.log("✅ login.js chargé");
 
+// =====================
+// Const
+// =====================
 const LS_NAME = "tidoc_name";
-const ADMIN_EMAIL = "tidoc.congres@gmail.com";
+const RESERVED = new Set(["admin", "moderateur", "mod", "support", "tidoc", "tidocteam"]);
 
 // =====================
 // DOM
@@ -18,50 +20,73 @@ const tabs = Array.from(document.querySelectorAll(".auth-tab"));
 const panels = Array.from(document.querySelectorAll(".auth-panel"));
 
 const signupPseudo = document.getElementById("signupPseudo");
-const signupEmail  = document.getElementById("signupEmail");
-const signupPass   = document.getElementById("signupPassword");
-const signupBtn    = document.getElementById("signupBtn");
+const signupEmailEl = document.getElementById("signupEmail");
+const signupPass = document.getElementById("signupPassword");
+const signupBtn = document.getElementById("signupBtn");
 
-const loginEmailEl = document.getElementById("loginEmail");
-const loginPassEl  = document.getElementById("loginPassword");
-const loginBtn     = document.getElementById("loginBtn");
+const loginEmailInput = document.getElementById("loginEmail");
+const loginPassInput = document.getElementById("loginPassword");
+const loginBtn = document.getElementById("loginBtn");
 
-console.log("signupBtn", signupBtn, "loginBtn", loginBtn);
-console.log("signupPseudo", signupPseudo, "loginEmailEl", loginEmailEl);
-
-// (Optionnel : si tu ajoutes un bouton reset dans ton HTML)
 const resetBtn = document.getElementById("resetBtn");
+
+// Hint pseudo (si pas dans HTML on le crée)
+function ensurePseudoHint() {
+  let el = document.getElementById("signupPseudoHint");
+  if (el) return el;
+
+  el = document.createElement("div");
+  el.id = "signupPseudoHint";
+  el.className = "auth-hint";
+  const wrap = signupPseudo?.closest(".field-premium");
+  if (wrap) wrap.insertAdjacentElement("afterend", el);
+  return el;
+}
+const pseudoHint = ensurePseudoHint();
 
 // =====================
 // Helpers UI
 // =====================
-function setMsg(t = "") { if (msg) msg.textContent = t; }
+function setMsg(t = "") {
+  if (!msg) return;
+  msg.textContent = t;
+}
 
-function setTab(which) {
-  tabs.forEach(btn => btn.classList.toggle("active", btn.dataset.tab === which));
-  panels.forEach(p => {
-    const on = p.dataset.panel === which;
-    p.style.display = on ? "" : "none";
+function setTab(which = "signup") {
+  // tabs
+  tabs.forEach((btn) => {
+    const active = btn.dataset.tab === which;
+    btn.classList.toggle("active", active);
+    btn.setAttribute("aria-selected", active ? "true" : "false");
   });
+
+  // panels (hidden est + fiable que display:none)
+  panels.forEach((p) => {
+    const on = p.dataset.panel === which;
+    p.hidden = !on;
+  });
+
   setMsg("");
 }
 
-tabs.forEach(btn => {
+tabs.forEach((btn) => {
   btn.addEventListener("click", () => setTab(btn.dataset.tab || "signup"));
 });
 
 // =====================
-// Redirect si déjà connecté (avec lock)
+// Redirect si déjà connecté (safe)
 // =====================
-let authRedirectLock = false;
+let alreadyRedirected = false;
 
 onAuthStateChanged(auth, (u) => {
-  if (authRedirectLock) return;
-  if (u) window.location.href = "./index.html";
+  if (!u) return;
+  if (alreadyRedirected) return;
+  alreadyRedirected = true;
+  window.location.replace("./index.html");
 });
 
 // =====================
-// Username unique LIVE
+// Username unique LIVE (anti-race conditions)
 // =====================
 function normalizeUsername(v = "") {
   return v
@@ -71,11 +96,8 @@ function normalizeUsername(v = "") {
     .replace(/[^a-z0-9._-]/g, "");
 }
 
-const RESERVED = new Set(["admin", "moderateur", "mod", "support", "tidoc", "tidocteam"]);
-let nameCheckTimer = null;
-
 async function checkUsername(norm) {
-  if (!norm) return { ok: true, norm: "" };
+  if (!norm) return { ok: true, norm: "", msg: "" };
   if (norm.length < 3) return { ok: false, norm, msg: "❌ Pseudo trop court (min 3)." };
   if (RESERVED.has(norm)) return { ok: false, norm, msg: "❌ Ce pseudo est réservé." };
 
@@ -85,52 +107,40 @@ async function checkUsername(norm) {
     return { ok: true, norm, msg: "✅ Pseudo disponible." };
   } catch (e) {
     console.log("checkUsername error:", e);
-    // on n'empêche pas le signup si réseau KO
+    // si réseau KO, on n'empêche pas totalement
     return { ok: true, norm, msg: "⚠️ Vérif impossible (réseau)." };
   }
 }
 
-// Affichage petit feedback sous le champ (optionnel si tu as une zone dédiée)
-function ensurePseudoHint() {
-  let el = document.getElementById("signupPseudoHint");
-  if (el) return el;
-
-  // crée une ligne de hint juste après le champ pseudo (le field-premium)
-  el = document.createElement("div");
-  el.id = "signupPseudoHint";
-  el.className = "auth-hint";
-
-  const wrap = signupPseudo?.closest(".field-premium");
-  if (wrap) wrap.insertAdjacentElement("afterend", el);
-
-  return el;
-}
-
-const pseudoHint = document.getElementById("signupPseudoHint");
+let nameCheckTimer = null;
+let nameCheckReqId = 0;
 
 async function checkUsernameLive() {
-  if (!signupPseudo) return { ok: true, norm: "" };
+  if (!signupPseudo) return;
 
   const raw = signupPseudo.value || "";
   const norm = normalizeUsername(raw);
 
+  // vide => pas de blocage
   if (!norm) {
-    if (pseudoHint) pseudoHint.textContent = "";
-    signupBtn && (signupBtn.disabled = false);
-    return { ok: true, norm: "" };
+    pseudoHint.textContent = "";
+    if (signupBtn) signupBtn.disabled = false;
+    return;
   }
 
-  signupBtn && (signupBtn.disabled = true);
-  if (pseudoHint) pseudoHint.textContent = "⏳ Vérification…";
-  // ✅ sécurité: ne jamais rester bloqué disabled au chargement
-  if (signupBtn) signupBtn.disabled = false;
-  
+  // marque une requête (pour ignorer les réponses anciennes)
+  const reqId = ++nameCheckReqId;
+
+  if (signupBtn) signupBtn.disabled = true;
+  pseudoHint.textContent = "⏳ Vérification…";
+
   const r = await checkUsername(norm);
 
-  if (pseudoHint) pseudoHint.textContent = r.msg || "";
-  if (signupBtn) signupBtn.disabled = !r.ok;
+  // si une autre requête est partie entre-temps, on ignore
+  if (reqId !== nameCheckReqId) return;
 
-  return r;
+  pseudoHint.textContent = r.msg || "";
+  if (signupBtn) signupBtn.disabled = !r.ok;
 }
 
 signupPseudo?.addEventListener("input", () => {
@@ -162,7 +172,7 @@ function initEyeButtons() {
     if (!input) return;
 
     btn.innerHTML = EYE_OPEN;
-    btn.classList.add("ready"); // ✅ ICI
+    btn.classList.add("ready");
 
     btn.addEventListener("click", (e) => {
       e.preventDefault();
@@ -186,52 +196,45 @@ initEyeButtons();
 // Actions
 // =====================
 signupBtn?.addEventListener("click", async () => {
-  authRedirectLock = true;
-
   try {
     setMsg("");
 
     const displayName = (signupPseudo?.value || "").trim();
-    const email = (signupEmail?.value || "").trim();
+    const email = (signupEmailEl?.value || "").trim();
     const password = signupPass?.value || "";
 
     if (!displayName || !email || !password) {
       setMsg("❌ Remplis pseudo, email et mot de passe.");
-      authRedirectLock = false;
       return;
     }
 
-    const emailOk = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
-    if (!emailOk) {
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
       setMsg("❌ Adresse email invalide.");
-      authRedirectLock = false;
       return;
     }
 
     if (password.length < 6) {
       setMsg("❌ Mot de passe trop court (min 6 caractères).");
-      authRedirectLock = false;
       return;
     }
 
     setMsg("⏳ Création du compte…");
+    if (signupBtn) signupBtn.disabled = true;
 
     const norm = normalizeUsername(displayName);
     const r = await checkUsername(norm);
     if (!r.ok) {
       setMsg(r.msg || "❌ Pseudo invalide.");
-      authRedirectLock = false;
+      if (signupBtn) signupBtn.disabled = false;
       return;
     }
 
     await signupEmail({ email, password, displayName });
 
     localStorage.setItem(LS_NAME, displayName);
-    window.dispatchEvent(new CustomEvent("tidoc:auth"));
-    window.location.href = "./index.html";
+    alreadyRedirected = true;
+    window.location.replace("./index.html");
   } catch (e) {
-    authRedirectLock = false;
-
     const code = (e?.code || "").toLowerCase();
     const m = (e?.message || "").toLowerCase();
 
@@ -240,43 +243,51 @@ signupBtn?.addEventListener("click", async () => {
     } else {
       setMsg("Erreur: " + (e?.message || String(e)));
     }
+  } finally {
+    if (signupBtn) signupBtn.disabled = false;
   }
 });
 
 loginBtn?.addEventListener("click", async () => {
-  authRedirectLock = true;
-
   try {
     setMsg("⏳ Connexion…");
+    if (loginBtn) loginBtn.disabled = true;
 
-    const email = (loginEmailEl?.value || "").trim();
-    const password = loginPassEl?.value || "";
+    const email = (loginEmailInput?.value || "").trim();
+    const password = loginPassInput?.value || "";
+
+    if (!email || !password) {
+      setMsg("❌ Mets ton email et ton mot de passe.");
+      return;
+    }
 
     await loginEmail({ email, password });
 
-    alert("✅ Login OK → je redirige vers index.html");
-    window.location.assign("./index.html");
+    alreadyRedirected = true;
+    window.location.replace("./index.html");
   } catch (e) {
-    authRedirectLock = false;
-
-    const text = "❌ LOGIN ERROR:\n" + (e?.code || "") + "\n" + (e?.message || String(e));
-    setMsg(text);
-    alert(text); // <<<<< IMPORTANT
+    const code = e?.code || "";
+    const message = e?.message || String(e);
+    setMsg(`❌ Connexion impossible.\n${code ? "(" + code + ") " : ""}${message}`);
+  } finally {
+    if (loginBtn) loginBtn.disabled = false;
   }
 });
 
-// Reset (optionnel)
-// Ajoute un bouton dans ton HTML si tu veux : <button id="resetBtn" ...>Mot de passe oublié</button>
+// Reset
 resetBtn?.addEventListener("click", async () => {
-  const email = (loginEmailEl?.value || "").trim();
-  if (!email) { setMsg("Mets ton email d’abord."); return; }
+  const email = (loginEmailInput?.value || "").trim();
+  if (!email) {
+    setMsg("Mets ton email d’abord.");
+    return;
+  }
 
   try {
     setMsg("⏳ Envoi de l’email…");
     await resetPassword(email);
     setMsg("✅ Email de réinitialisation envoyé (check spam aussi).");
   } catch (e) {
-    const code = (e?.code || "");
+    const code = e?.code || "";
     if (code === "auth/user-not-found") setMsg("❌ Aucun compte avec cet email.");
     else if (code === "auth/invalid-email") setMsg("❌ Email invalide.");
     else if (code === "auth/too-many-requests") setMsg("⏳ Trop de tentatives, réessaie plus tard.");
@@ -284,13 +295,13 @@ resetBtn?.addEventListener("click", async () => {
   }
 });
 
-// Bonus UX: Entrée = submit
+// Bonus UX: Entrée = action
 signupPass?.addEventListener("keydown", (e) => {
   if (e.key === "Enter") signupBtn?.click();
 });
-loginPassEl?.addEventListener("keydown", (e) => {
+loginPassInput?.addEventListener("keydown", (e) => {
   if (e.key === "Enter") loginBtn?.click();
 });
 
-// Par défaut on reste sur signup
+// Default
 setTab("signup");
