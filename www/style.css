@@ -1,8 +1,21 @@
+/* =========================
+   VARIABLES (UNIQUE)
+   ========================= */
 :root{
   --tidoc:#178CA8;
+  --tidoc2:#1fb5d0;
+
   --bg:#ffffff;
-  --muted:#5aaec0;
+
+  --muted:#5aaec0;            /* texte secondaire */
+  --muted2: rgba(31,75,86,.72); /* variante premium */
+
   --line:#eaeaea;
+
+  /* champs date/time/select premium */
+  --field-bg: rgba(255,255,255,.92);
+  --field-border: rgba(23,140,168,.18);
+  --field-shadow: 0 10px 22px rgba(0,0,0,.06);
 }
 
 /* ===== RESET / BASE ===== */
