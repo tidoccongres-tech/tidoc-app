@@ -2666,3 +2666,30 @@ main.page.blog-page{ padding-top: calc(56px + 12px) !important; }
   position: relative;
   z-index: 2;
 }
+
+/* ========= FIX CLICS AUTH ========= */
+
+/* rien au-dessus ne doit intercepter le tap */
+.auth-card::after,
+.auth-logo,
+.auth-logo * {
+  pointer-events: none !important;
+}
+
+/* s'assure que le contenu cliquable est au-dessus */
+.auth-tabs,
+.auth-tab,
+.auth-panel,
+.auth-cta,
+.auth-reset,
+.field-premium,
+#authMsg {
+  position: relative !important;
+  z-index: 10 !important;
+}
+
+/* au cas où un overlay invisible existe */
+.auth-card {
+  position: relative !important;
+  z-index: 1 !important;
+}
