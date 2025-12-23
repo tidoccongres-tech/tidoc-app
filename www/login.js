@@ -89,11 +89,15 @@ async function checkUsername(norm) {
 function ensurePseudoHint() {
   let el = document.getElementById("signupPseudoHint");
   if (el) return el;
-  // crée une ligne de hint juste sous le champ pseudo
+
+  // crée une ligne de hint juste après le champ pseudo (le field-premium)
   el = document.createElement("div");
   el.id = "signupPseudoHint";
-  el.style.cssText = "margin-top:-10px;margin-bottom:10px;font-size:13px;opacity:.75;";
-  signupPseudo?.parentElement?.insertAdjacentElement("afterend", el);
+  el.className = "auth-hint";
+
+  const wrap = signupPseudo?.closest(".field-premium");
+  if (wrap) wrap.insertAdjacentElement("afterend", el);
+
   return el;
 }
 
@@ -151,6 +155,7 @@ function initEyeButtons() {
     if (!input) return;
 
     btn.innerHTML = EYE_OPEN;
+    btn.classList.add("ready"); // ✅ ICI
 
     btn.addEventListener("click", (e) => {
       e.preventDefault();
