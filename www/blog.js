@@ -131,6 +131,17 @@ function canDeletePost(p) {
   return isAdminUser() || (p.authorUid && p.authorUid === uid);
 }
 
+function canDeleteComment(c) {
+  const uid = currentUserId();
+  if (!uid) return false;
+  return isAdminUser() || (c.authorUid && c.authorUid === uid);
+}
+
+async function deleteComment(postId, commentId) {
+  if (!confirm("Supprimer ce commentaire ?")) return;
+  await deleteDoc(doc(db, "posts", postId, "comments", commentId));
+}
+
 function isAdminEmail(email = "") {
   return email.toLowerCase() === "tidoc.congres@gmail.com";
 }
@@ -259,23 +270,47 @@ async function loadComments(postId, postData, containerEl) {
   containerEl.innerHTML = "";
 
   for (const d of snap.docs) {
-    const c = d.data();
+    const c = d.data() || {};
+    const commentId = d.id;
 
     const fallbackName = (c.authorName || "").trim() || displayNameFrom(c.authorEmail || "");
     const prettyName = await getNameByUid(c.authorUid, fallbackName);
 
+    const delOk = canDeleteComment(c);
+
     const row = document.createElement("div");
     row.className = "comment";
+
     row.innerHTML = `
       <div class="comment-row">
-        <div>
+        <div style="min-width:0;">
           <div class="comment-author">
             ${escapeHTML(prettyName)}${isAdminEmail(c.authorEmail) ? `<span class="crown-inline">${CROWN_GRAY_SVG}</span>` : ""}
           </div>
           <div class="comment-text">${escapeHTML(c.text || "")}</div>
         </div>
+
+        ${delOk ? `
+          <button class="comment-del" type="button" aria-label="Supprimer le commentaire" title="Supprimer"
+                  data-cdel="${postId}::${commentId}">
+            ${TRASH_TIDOC_SVG}
+          </button>
+        ` : ""}
       </div>
     `;
+
+    if (delOk) {
+      row.querySelector(`[data-cdel="${postId}::${commentId}"]`)?.addEventListener("click", async () => {
+        try {
+          await deleteComment(postId, commentId);
+          await loadComments(postId, postData, containerEl); // refresh
+        } catch (err) {
+          console.error("deleteComment error:", err);
+          alert("Impossible de supprimer : " + (err?.message || String(err)));
+        }
+      });
+    }
+
     containerEl.appendChild(row);
   }
 }
