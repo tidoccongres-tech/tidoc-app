@@ -1,5 +1,8 @@
 // login.js (MODULE) — Premium Auth (signup/login) + pseudo unique + eye toggle
+
 console.log("✅ login.js chargé");
+console.log("signupBtn", signupBtn, "loginBtn", loginBtn);
+console.log("signupPseudo", signupPseudo, "loginEmailEl", loginEmailEl);
 
 import { auth, db, signupEmail, loginEmail, resetPassword } from "./auth.js";
 import { doc, getDoc } from "https://www.gstatic.com/firebasejs/10.12.4/firebase-firestore.js";
