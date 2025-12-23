@@ -83,11 +83,6 @@ const statusEl  = document.getElementById("ticketStatus");
 const boxEl     = document.getElementById("ticketBox");
 
 // Packs (quotas)
-const PACKS_FALLBACK = {
-  essentiel: { label: "Essentiel", workshopsAllowed: 1, conferencesAllowed: 2, otherAllowed: 0 },
-  standard:  { label: "Standard",  workshopsAllowed: 2, conferencesAllowed: 4, otherAllowed: 0 },
-  premium:   { label: "Premium",   workshopsAllowed: 3, conferencesAllowed: 7, otherAllowed: 0 },
-};
 
 let PACKS = { ...PACKS_FALLBACK };
 
@@ -259,12 +254,13 @@ function parseMetaFromText(raw = "") {
 
   // pack
   let packKey = "";
-  const mp = full.match(/pack\s*(essentiel|standard|premium)/i);
+  const mp = full.match(/pack\s*(essentiel|standard|premium|autre)/i);
   if (mp) {
     const v = mp[1].toLowerCase();
     if (v.startsWith("ess")) packKey = "essentiel";
     else if (v.startsWith("sta")) packKey = "standard";
     else if (v.startsWith("pre")) packKey = "premium";
+    else if (v.startsWith("aut")) packKey = "autre";
   }
 
   // ticket number
