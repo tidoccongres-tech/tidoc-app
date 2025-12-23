@@ -2594,3 +2594,23 @@ main.page.blog-page{ padding-top: calc(56px + 12px) !important; }
   font-weight:900;
   color: rgba(31,75,86,.70);
 }
+
+.auth-card{
+  overflow: visible !important;   /* ✅ pour ne plus couper le logo */
+  padding-top: 44px;              /* ✅ laisse de la place au logo */
+}
+
+.auth-logo{
+  margin: 0 auto 12px !important; /* ✅ plus de marge négative */
+  position: absolute;
+  top: -28px;
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+.pw-eye{
+  display:none; /* ✅ caché par défaut */
+}
+.pw-eye.ready{
+  display:flex; /* ✅ réapparait quand l’icône est en place */
+}
