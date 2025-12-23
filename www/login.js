@@ -254,14 +254,14 @@ loginBtn?.addEventListener("click", async () => {
 
     await loginEmail({ email, password });
 
-    const dn = (auth.currentUser?.displayName || "").trim();
-    if (dn) localStorage.setItem(LS_NAME, dn);
-
-    window.dispatchEvent(new CustomEvent("tidoc:auth"));
-    window.location.href = "./index.html";
+    alert("✅ Login OK → je redirige vers index.html");
+    window.location.assign("./index.html");
   } catch (e) {
     authRedirectLock = false;
-    setMsg("Erreur: " + (e?.message || String(e)));
+
+    const text = "❌ LOGIN ERROR:\n" + (e?.code || "") + "\n" + (e?.message || String(e));
+    setMsg(text);
+    alert(text); // <<<<< IMPORTANT
   }
 });
 
