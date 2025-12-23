@@ -1,29 +1,13 @@
 // evenements.js (MODULE)
-import { firebaseConfig } from "./firebase-config.js";
-import { initializeApp, getApps, getApp } from "https://www.gstatic.com/firebasejs/10.12.4/firebase-app.js";
+import * as AuthMod from "./auth.js";
 import {
-  getFirestore,
-  collection,
-  addDoc,
-  setDoc,          // ✅ AJOUTE ÇA
-  getDocs,
-  getDoc,
-  doc,
-  deleteDoc,
-  runTransaction,
-  serverTimestamp,
-  query,
-  orderBy,
-  Timestamp,
+  collection, addDoc, getDocs, getDoc, doc, deleteDoc,
+  runTransaction, serverTimestamp, query, orderBy, Timestamp
 } from "https://www.gstatic.com/firebasejs/10.12.4/firebase-firestore.js";
-import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.4/firebase-auth.js";
+import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.4/firebase-auth.js";
 
-/* =========================
-   INIT
-   ========================= */
-const app  = getApps().length ? getApp() : initializeApp(firebaseConfig);
-const db   = getFirestore(app);
-const auth = getAuth(app);
+const auth = AuthMod.auth;
+const db   = AuthMod.db;
 
 const ADMIN_EMAIL = "tidoc.congres@gmail.com";
 
