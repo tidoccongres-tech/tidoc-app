@@ -14,11 +14,6 @@
 
 <body>
 
-<!-- ADMIN ONLY -->
-<button id="adminEditPacksBtn" class="btn-primary" type="button" style="display:none;">
-  Modifier les activités
-</button>
-
 <!-- Petit panneau (modal) -->
 <div id="adminPacksModal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,.55); z-index:9999;">
   <div style="max-width:720px; margin:8vh auto; background:#fff; border-radius:16px; padding:16px; box-shadow:0 20px 60px rgba(0,0,0,.25);">
@@ -45,6 +40,11 @@
     <section class="card" id="ticketsCard">
       <h2 style="margin:0 0 6px; color:var(--tidoc);">Mon billet</h2>
 
+    <!-- ADMIN ONLY -->
+<button id="adminEditPacksBtn" class="btn-primary" type="button" style="display:none;">
+  Modifier les activités
+</button>
+      
       <p style="margin:0 0 12px; color:var(--muted); font-size:13px;">
         Importe ton billet (PDF HelloAsso ou capture). L’app extrait le QR + détecte le pack.
       </p>
