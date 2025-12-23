@@ -513,27 +513,30 @@ async function loadEvents(){
 
 /* =========================
    BOOT
-   ========================= */
-document.addEventListener("DOMContentLoaded", ()=>{
+========================= */
+document.addEventListener("DOMContentLoaded", () => {
   applyAdminUI();
   window.addEventListener("tidoc:auth", applyAdminUI);
 
-  openEventForm?.addEventListener("click", ()=>{
+  openEventForm?.addEventListener("click", () => {
     if (!isAdmin()) return alert("Réservé à l’admin Ti’Doc.");
     showForm(true);
     document.getElementById("eventDate")?.focus();
   });
 
-  cancelEvent?.addEventListener("click", ()=>{
+  cancelEvent?.addEventListener("click", () => {
     clearForm();
     showForm(false);
   });
 
   publishEvent?.addEventListener("click", createEvent);
 
-  onAuthStateChanged(auth, async ()=>{
-  applyAdminUI();
-  await loadPackConfig();  // ✅ packs dynamiques
-  await loadEvents();
+  onAuthStateChanged(auth, async () => {
+    applyAdminUI();
+    await loadPackConfig();   // ✅ packs dynamiques
+    await loadEvents();       // ✅ charge la liste
   });
 
+  // ✅ optionnel : si jamais l'user menu tarde, on affiche quand même un "Chargement…"
+  loadEvents();
+});
