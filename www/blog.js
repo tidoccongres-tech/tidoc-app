@@ -1,4 +1,4 @@
-// blog.js (MODULE)
+// blog.js (MODULE) — premium UI intégré
 
 import { firebaseConfig } from "./firebase-config.js";
 import { initializeApp, getApps, getApp } from "https://www.gstatic.com/firebasejs/10.12.4/firebase-app.js";
@@ -14,7 +14,6 @@ import {
   doc,
   setDoc,
   getDoc,
-  limit,
 } from "https://www.gstatic.com/firebasejs/10.12.4/firebase-firestore.js";
 import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.4/firebase-auth.js";
 
@@ -40,40 +39,21 @@ form?.addEventListener("submit", (e) => e.preventDefault());
 let postInflight = false;
 const commentInflight = new Set(); // postId en cours d'envoi
 
-// ===== Helpers =====
-
+/* =========================
+   HELPERS
+   ========================= */
 function showMsg(t = "") {
   if (postMsg) postMsg.textContent = t;
 }
 
 function requireLogin(actionText = "faire ça") {
   if (!auth.currentUser) {
-    alert(
-      "Connexion requise 🔒\n\n" +
-      "Pour " + actionText + ", connecte-toi."
-    );
+    alert("Connexion requise 🔒\n\n" + "Pour " + actionText + ", connecte-toi.");
     return false;
   }
   return true;
 }
 
-const nameCache = new Map();
-
-async function getNameByUid(uid, fallback = "Utilisateur") {
-  if (!uid) return fallback;
-  if (nameCache.has(uid)) return nameCache.get(uid);
-
-  try {
-    const snap = await getDoc(doc(db, "users", uid));
-    const d = snap.exists() ? (snap.data() || {}) : {};
-    const n = (d.displayName || d.username || "").trim();
-    const finalName = n || fallback;
-    nameCache.set(uid, finalName);
-    return finalName;
-  } catch {
-    return fallback;
-  }
-}
 function escapeHTML(s = "") {
   return String(s)
     .replaceAll("&", "&amp;")
@@ -95,10 +75,7 @@ function fmtDate(ts) {
 
 function currentUserId() { return auth.currentUser?.uid || ""; }
 function currentUserEmail() { return (auth.currentUser?.email || "").toLowerCase(); }
-
-function isAdminUser() {
-  return currentUserEmail() === "tidoc.congres@gmail.com";
-}
+function isAdminUser() { return currentUserEmail() === "tidoc.congres@gmail.com"; }
 
 function displayNameFrom(email = "") {
   const e = (email || "").trim();
@@ -137,13 +114,13 @@ function canDeleteComment(c) {
   return isAdminUser() || (c.authorUid && c.authorUid === uid);
 }
 
+function isAdminEmail(email = "") {
+  return email.toLowerCase() === "tidoc.congres@gmail.com";
+}
+
 async function deleteComment(postId, commentId) {
   if (!confirm("Supprimer ce commentaire ?")) return;
   await deleteDoc(doc(db, "posts", postId, "comments", commentId));
-}
-
-function isAdminEmail(email = "") {
-  return email.toLowerCase() === "tidoc.congres@gmail.com";
 }
 
 async function getPostData(postId){
@@ -151,11 +128,32 @@ async function getPostData(postId){
   return snap.exists() ? (snap.data() || null) : null;
 }
 
-// ===== Notifications helpers =====
+/* =========================
+   USERS NAMES CACHE
+   ========================= */
+const nameCache = new Map();
+async function getNameByUid(uid, fallback = "Utilisateur") {
+  if (!uid) return fallback;
+  if (nameCache.has(uid)) return nameCache.get(uid);
+
+  try {
+    const snap = await getDoc(doc(db, "users", uid));
+    const d = snap.exists() ? (snap.data() || {}) : {};
+    const n = (d.displayName || d.username || "").trim();
+    const finalName = n || fallback;
+    nameCache.set(uid, finalName);
+    return finalName;
+  } catch {
+    return fallback;
+  }
+}
+
+/* =========================
+   NOTIFS
+   ========================= */
 function shouldNotify(toUid) {
   const fromUid = currentUserId();
   if (!fromUid || !toUid) return false;
-  // ✅ évite les auto-notifs (si tu veux les autoriser, supprime cette ligne)
   return fromUid !== toUid;
 }
 
@@ -178,7 +176,9 @@ async function createNotif({ toUid, type, text, postId }) {
   });
 }
 
-// ===== LIKE SVG =====
+/* =========================
+   SVG
+   ========================= */
 const HEART_SVG = `
 <svg viewBox="0 0 16 16" class="heart-icon" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
   <path d="M1.24264 8.24264L8 15L14.7574 8.24264C15.553 7.44699 16 6.36786 16 5.24264V5.05234C16 2.8143 14.1857 1 11.9477 1C10.7166 1 9.55233 1.55959 8.78331 2.52086L8 3.5L7.21669 2.52086C6.44767 1.55959 5.28338 1 4.05234 1C1.8143 1 0 2.8143 0 5.05234V5.24264C0 6.36786 0.44699 7.44699 1.24264 8.24264Z"/>
@@ -195,22 +195,22 @@ const CROWN_GRAY_SVG = `
 
 const TRASH_TIDOC_SVG = `
 <svg class="trash-ico" viewBox="0 0 408.483 408.483" aria-hidden="true">
-  <g>
-    <g>
-      <path d="M87.748,388.784c0.461,11.01,9.521,19.699,20.539,19.699h191.911c11.018,0,20.078-8.689,20.539-19.699l13.705-289.316
-        H74.043L87.748,388.784z M247.655,171.329c0-4.61,3.738-8.349,8.35-8.349h13.355c4.609,0,8.35,3.738,8.35,8.349v165.293
-        c0,4.611-3.738,8.349-8.35,8.349h-13.355c-4.61,0-8.35-3.736-8.35-8.349V171.329z M189.216,171.329
-        c0-4.61,3.738-8.349,8.349-8.349h13.355c4.609,0,8.349,3.738,8.349,8.349v165.293c0,4.611-3.737,8.349-8.349,8.349h-13.355
-        c-4.61,0-8.349-3.736-8.349-8.349V171.329L189.216,171.329z M130.775,171.329c0-4.61,3.738-8.349,8.349-8.349h13.356
-        c4.61,0,8.349,3.738,8.349,8.349v165.293c0,4.611-3.738,8.349-8.349,8.349h-13.356c-4.61,0-8.349-3.736-8.349-8.349V171.329z"/>
-      <path d="M343.567,21.043h-88.535V4.305c0-2.377-1.927-4.305-4.305-4.305h-92.971c-2.377,0-4.304,1.928-4.304,4.305v16.737H64.916
-        c-7.125,0-12.9,5.776-12.9,12.901V74.47h304.451V33.944C356.467,26.819,350.692,21.043,343.567,21.043z"/>
-    </g>
-  </g>
+  <g><g>
+    <path d="M87.748,388.784c0.461,11.01,9.521,19.699,20.539,19.699h191.911c11.018,0,20.078-8.689,20.539-19.699l13.705-289.316
+      H74.043L87.748,388.784z M247.655,171.329c0-4.61,3.738-8.349,8.35-8.349h13.355c4.609,0,8.35,3.738,8.35,8.349v165.293
+      c0,4.611-3.738,8.349-8.35,8.349h-13.355c-4.61,0-8.35-3.736-8.35-8.349V171.329z M189.216,171.329
+      c0-4.61,3.738-8.349,8.349-8.349h13.355c4.609,0,8.349,3.738,8.349,8.349v165.293c0,4.611-3.737,8.349-8.349,8.349h-13.355
+      c-4.61,0-8.349-3.736-8.349-8.349V171.329L189.216,171.329z M130.775,171.329c0-4.61,3.738-8.349,8.349-8.349h13.356
+      c4.61,0,8.349,3.738,8.349,8.349v165.293c0,4.611-3.738,8.349-8.349,8.349h-13.356c-4.61,0-8.349-3.736-8.349-8.349V171.329z"/>
+    <path d="M343.567,21.043h-88.535V4.305c0-2.377-1.927-4.305-4.305-4.305h-92.971c-2.377,0-4.304,1.928-4.304,4.305v16.737H64.916
+      c-7.125,0-12.9,5.776-12.9,12.901V74.47h304.451V33.944C356.467,26.819,350.692,21.043,343.567,21.043z"/>
+  </g></g>
 </svg>
 `;
 
-// ===== Likes =====
+/* =========================
+   LIKES
+   ========================= */
 async function getLikesCount(postId) {
   const snap = await getDocs(collection(db, "posts", postId, "likes"));
   return snap.size;
@@ -255,7 +255,9 @@ async function toggleLike(postId) {
   await loadPosts();
 }
 
-// ===== Comments =====
+/* =========================
+   COMMENTS
+   ========================= */
 async function loadComments(postId, postData, containerEl) {
   containerEl.innerHTML = `<div style="opacity:.7;font-size:13px;">Chargement des commentaires…</div>`;
 
@@ -303,7 +305,7 @@ async function loadComments(postId, postData, containerEl) {
       row.querySelector(`[data-cdel="${postId}::${commentId}"]`)?.addEventListener("click", async () => {
         try {
           await deleteComment(postId, commentId);
-          await loadComments(postId, postData, containerEl); // refresh
+          await loadComments(postId, postData, containerEl);
         } catch (err) {
           console.error("deleteComment error:", err);
           alert("Impossible de supprimer : " + (err?.message || String(err)));
@@ -336,7 +338,7 @@ async function addComment(postId, postData, inputEl, commentsWrap, sendBtn) {
       createdAt: serverTimestamp()
     });
 
-    // ✅ UNE SEULE notif au propriétaire du post (si pas soi-même)
+    // ✅ notif unique au propriétaire du post (si pas soi-même)
     try {
       const p = postData || await getPostData(postId);
       const toUid = p?.authorUid || "";
@@ -350,7 +352,7 @@ async function addComment(postId, postData, inputEl, commentsWrap, sendBtn) {
       }
     } catch (_) {}
 
-    inputEl.value = "";
+    if (inputEl) inputEl.value = "";
     await loadComments(postId, postData, commentsWrap);
   } finally {
     commentInflight.delete(postId);
@@ -358,7 +360,9 @@ async function addComment(postId, postData, inputEl, commentsWrap, sendBtn) {
   }
 }
 
-// ===== Form =====
+/* =========================
+   FORM
+   ========================= */
 function showForm(show) {
   if (!form) return;
   form.style.display = show ? "block" : "none";
@@ -370,7 +374,9 @@ function clearForm() {
   showMsg("");
 }
 
-// ===== Create post =====
+/* =========================
+   CRUD POSTS
+   ========================= */
 async function createPost() {
   if (!requireLogin("publier un post")) return;
 
@@ -398,14 +404,15 @@ async function createPost() {
   await loadPosts();
 }
 
-// ===== Delete post =====
 async function deletePost(postId) {
   if (!confirm("Supprimer ce post ?")) return;
   await deleteDoc(doc(db, "posts", postId));
   await loadPosts();
 }
 
-// ===== Render =====
+/* =========================
+   RENDER
+   ========================= */
 function renderPostCard(postId, p) {
   const delOk = canDeletePost(p);
 
@@ -413,7 +420,7 @@ function renderPostCard(postId, p) {
   card.className = "card post-card";
 
   const author = escapeHTML(bestAuthorName(p));
-  const isAdmin = isAdminEmail(p.authorEmail);
+  const adminBadge = isAdminEmail(p.authorEmail);
 
   card.innerHTML = `
     <div class="post-head">
@@ -423,18 +430,18 @@ function renderPostCard(postId, p) {
         <div class="post-sub">
           <span class="post-author">
             ${author}
-            ${isAdmin ? `<span class="crown-inline">${CROWN_GRAY_SVG}</span>` : ""}
+            ${adminBadge ? `<span class="crown-inline">${CROWN_GRAY_SVG}</span>` : ""}
           </span>
           • ${fmtDate(p.createdAt)}
         </div>
       </div>
 
       ${delOk ? `
-<button class="icon-danger" type="button" data-del="${postId}" aria-label="Supprimer" title="Supprimer">
-  ${TRASH_TIDOC_SVG}
-</button>` : ""}    
-
-</div>
+        <button class="delete-btn" type="button" data-del="${postId}" aria-label="Supprimer" title="Supprimer">
+          ${TRASH_TIDOC_SVG}
+        </button>
+      ` : ""}
+    </div>
 
     <div class="post-body">${escapeHTML(p.text || "")}</div>
 
@@ -445,7 +452,7 @@ function renderPostCard(postId, p) {
       <span class="like-count" data-likecount="${postId}">…</span>
 
       <button class="btn-premium btn-premium-outline" type="button" data-togglecomments="${postId}">
-       Commentaires
+        Commentaires
       </button>
     </div>
 
@@ -454,17 +461,22 @@ function renderPostCard(postId, p) {
 
       <div class="comment-form" style="margin-top:10px;">
         <input type="text" placeholder="Écrire un commentaire…" data-cinput="${postId}" />
-        <button class="btn-primary" type="button" data-csend="${postId}" style="height:40px;">Envoyer</button>
+        <button class="btn-premium btn-premium-primary" type="button" data-csend="${postId}">
+          Envoyer
+        </button>
       </div>
     </div>
   `;
 
+  // delete
   if (delOk) {
     card.querySelector(`[data-del="${postId}"]`)?.addEventListener("click", () => deletePost(postId));
   }
 
+  // like
   card.querySelector(`[data-like="${postId}"]`)?.addEventListener("click", () => toggleLike(postId));
 
+  // init likes
   (async () => {
     const count = await getLikesCount(postId);
     const liked = await isLikedByMe(postId);
@@ -475,6 +487,7 @@ function renderPostCard(postId, p) {
     if (btn) btn.classList.toggle("liked", liked);
   })();
 
+  // comments toggle
   const wrap = card.querySelector(`[data-commentswrap="${postId}"]`);
   const list = card.querySelector(`[data-commentslist="${postId}"]`);
   const toggleBtn = card.querySelector(`[data-togglecomments="${postId}"]`);
@@ -485,6 +498,7 @@ function renderPostCard(postId, p) {
     if (!open) await loadComments(postId, p, list);
   });
 
+  // comment send
   const uid = currentUserId();
   const input = card.querySelector(`[data-cinput="${postId}"]`);
   const sendBtn = card.querySelector(`[data-csend="${postId}"]`);
@@ -523,7 +537,9 @@ async function loadPosts() {
   snap.forEach((d) => postsRoot.appendChild(renderPostCard(d.id, d.data())));
 }
 
-// ===== Boot =====
+/* =========================
+   BOOT
+   ========================= */
 
 // bouton créer post
 createBtn?.addEventListener("click", (e) => {
@@ -544,7 +560,7 @@ cancelBtn?.addEventListener("click", (e) => {
   showForm(false);
 });
 
-// publier
+// publier (anti-doublon)
 submitBtn?.addEventListener("click", async (e) => {
   e.preventDefault();
   e.stopPropagation();
