@@ -1914,3 +1914,11 @@ main, .page, .card{
 }
 body{ padding-top:0; }
 main.page.blog-page{ padding-top: calc(56px + 12px) !important; }
+
+.btn-premium{
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  width:100%;
+}
+.btn-premium-primary{ ... }
