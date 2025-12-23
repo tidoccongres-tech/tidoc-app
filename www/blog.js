@@ -430,7 +430,7 @@ function renderPostCard(postId, p) {
       </div>
 
       ${delOk ? `
-<button class="delete-btn" type="button" data-del="${postId}" aria-label="Supprimer" title="Supprimer">
+<button class="icon-danger" type="button" data-del="${postId}" aria-label="Supprimer" title="Supprimer">
   ${TRASH_TIDOC_SVG}
 </button>` : ""}    
 
@@ -523,7 +523,6 @@ async function loadPosts() {
   snap.forEach((d) => postsRoot.appendChild(renderPostCard(d.id, d.data())));
 }
 
-// ===== Boot =====
 // ===== Boot =====
 
 // bouton créer post
