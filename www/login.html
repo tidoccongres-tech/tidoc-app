@@ -2,97 +2,120 @@
 <html lang="fr">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <title>Ti’Doc – Connexion</title>
 
-  <link rel="stylesheet" href="style.css?v=1000" />
   <meta name="theme-color" content="#178CA8" />
+  <link rel="stylesheet" href="style.css?v=1000" />
 </head>
 
 <body class="auth-page">
-  <main class="auth-wrap">
-    <section class="auth-card">
+  <main class="auth-wrap" role="main">
+    <section class="auth-card" aria-label="Connexion Ti’Doc">
 
-      <div class="auth-logo">
-        <!-- change si tu veux -->
-        <img src="./icons/icon-512.png" alt="Ti'Doc" />
+      <!-- Logo (ne doit pas bloquer les taps : géré en CSS via pointer-events:none) -->
+      <div class="auth-logo" aria-hidden="true">
+        <img src="./icons/icon-512.png" alt="" />
       </div>
 
       <h1 class="auth-title">Ti’Doc</h1>
       <p class="auth-sub">Crée ton compte ou connecte-toi pour accéder à l’application.</p>
 
-      <div class="auth-tabs">
-        <button class="auth-tab active" type="button" data-tab="signup">Créer un compte</button>
-        <button class="auth-tab" type="button" data-tab="login">Se connecter</button>
+      <!-- Tabs (accessibles + pas de submit) -->
+      <div class="auth-tabs" role="tablist" aria-label="Choix connexion / inscription">
+        <button
+          class="auth-tab active"
+          type="button"
+          id="tab-signup"
+          role="tab"
+          aria-selected="true"
+          aria-controls="panel-signup"
+          data-tab="signup">
+          Créer un compte
+        </button>
+
+        <button
+          class="auth-tab"
+          type="button"
+          id="tab-login"
+          role="tab"
+          aria-selected="false"
+          aria-controls="panel-login"
+          data-tab="login">
+          Se connecter
+        </button>
       </div>
 
       <!-- SIGNUP -->
-      <div class="auth-panel" data-panel="signup">
+      <section
+        class="auth-panel"
+        id="panel-signup"
+        role="tabpanel"
+        aria-labelledby="tab-signup"
+        data-panel="signup">
 
         <div class="field-premium">
-          <input id="signupPseudo" type="text" placeholder=" " autocomplete="username" />
+          <input id="signupPseudo" name="signupPseudo" type="text" placeholder=" " autocomplete="username" />
           <label for="signupPseudo">Pseudo (ex : TiDoc26)</label>
-          <span class="field-line"></span>
         </div>
 
-        <!-- (optionnel) le JS crée aussi un hint s’il n’existe pas,
-             mais tu peux le laisser ici pour maîtriser le style -->
-        <div id="signupPseudoHint" class="auth-hint"></div>
+        <div id="signupPseudoHint" class="auth-hint" aria-live="polite"></div>
 
         <div class="field-premium">
-          <input id="signupEmail" type="email" placeholder=" " autocomplete="email" inputmode="email" />
+          <input id="signupEmail" name="signupEmail" type="email" placeholder=" " autocomplete="email" inputmode="email" />
           <label for="signupEmail">Email</label>
-          <span class="field-line"></span>
         </div>
 
         <div class="field-premium has-eye">
-          <input id="signupPassword" type="password" placeholder=" " autocomplete="new-password" />
+          <input id="signupPassword" name="signupPassword" type="password" placeholder=" " autocomplete="new-password" minlength="6" />
           <label for="signupPassword">Mot de passe (6+)</label>
-          <button class="pw-eye" type="button" data-target="signupPassword" aria-label="Afficher"></button>
-          <span class="field-line"></span>
+          <button class="pw-eye" type="button" data-target="signupPassword" aria-label="Afficher / masquer le mot de passe"></button>
         </div>
 
         <button class="btn-premium btn-premium-primary auth-cta" id="signupBtn" type="button">
           Créer mon compte
         </button>
 
-        <div class="auth-foot">
+        <p class="auth-foot">
           En créant un compte, tu acceptes les règles de Ti’Doc (anti-spam, respect, etc.).
-        </div>
-      </div>
+        </p>
+      </section>
 
       <!-- LOGIN -->
-      <div class="auth-panel" data-panel="login" style="display:none;">
+      <section
+        class="auth-panel"
+        id="panel-login"
+        role="tabpanel"
+        aria-labelledby="tab-login"
+        data-panel="login"
+        hidden>
 
         <div class="field-premium">
-          <input id="loginEmail" type="email" placeholder=" " autocomplete="email" inputmode="email" />
+          <input id="loginEmail" name="loginEmail" type="email" placeholder=" " autocomplete="email" inputmode="email" />
           <label for="loginEmail">Email</label>
-          <span class="field-line"></span>
         </div>
 
         <div class="field-premium has-eye">
-          <input id="loginPassword" type="password" placeholder=" " autocomplete="current-password" />
+          <input id="loginPassword" name="loginPassword" type="password" placeholder=" " autocomplete="current-password" />
           <label for="loginPassword">Mot de passe</label>
-          <button class="pw-eye" type="button" data-target="loginPassword" aria-label="Afficher"></button>
-          <span class="field-line"></span>
+          <button class="pw-eye" type="button" data-target="loginPassword" aria-label="Afficher / masquer le mot de passe"></button>
         </div>
 
         <button class="btn-premium btn-premium-primary auth-cta" id="loginBtn" type="button">
           Se connecter
         </button>
 
-        <!-- Optionnel : si tu as activé le reset dans login.js -->
         <button class="btn-premium btn-premium-outline auth-reset" id="resetBtn" type="button">
           Mot de passe oublié
         </button>
+      </section>
 
-      </div>
-
-      <div id="authMsg" class="auth-msg"></div>
+      <!-- Messages -->
+      <div id="authMsg" class="auth-msg" role="status" aria-live="polite"></div>
     </section>
   </main>
 
-  <!-- ✅ Un seul JS -->
+  <!-- ✅ Un seul script -->
   <script type="module" src="./login.js?v=1000"></script>
 </body>
 </html>
