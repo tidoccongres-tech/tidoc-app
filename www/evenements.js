@@ -515,6 +515,15 @@ document.addEventListener("DOMContentLoaded", () => {
 
   publishEvent?.addEventListener("click", createEvent);
 
+window.addEventListener("error", (e) => {
+  const box = document.getElementById("eventsList");
+  if (box) box.innerHTML = `<section class="card"><p>❌ JS error: ${String(e.message)}</p></section>`;
+});
+window.addEventListener("unhandledrejection", (e) => {
+  const box = document.getElementById("eventsList");
+  if (box) box.innerHTML = `<section class="card"><p>❌ Promise error: ${String(e.reason?.message || e.reason)}</p></section>`;
+});
+  
   onAuthStateChanged(auth, async () => {
     applyAdminUI();
     await loadPackConfig();   // ✅ packs dynamiques
