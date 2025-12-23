@@ -2649,3 +2649,20 @@ main.page.blog-page{ padding-top: calc(56px + 12px) !important; }
 /* ✅ Eye : caché tant que JS n’a pas injecté le SVG */
 .pw-eye{ display:none; }
 .pw-eye.ready{ display:flex; }
+
+/* ✅ AUTH : garantir que rien ne bloque les taps (iOS/Safari) */
+.auth-card::after{
+  z-index: 0 !important;
+}
+.auth-card > *{
+  position: relative;
+  z-index: 1;
+}
+.auth-tabs,
+.auth-tab,
+.auth-panel,
+.auth-cta,
+.auth-reset{
+  position: relative;
+  z-index: 2;
+}
