@@ -102,7 +102,7 @@ function ensurePseudoHint() {
   return el;
 }
 
-const pseudoHint = signupPseudo ? ensurePseudoHint() : null;
+const pseudoHint = document.getElementById("signupPseudoHint");
 
 async function checkUsernameLive() {
   if (!signupPseudo) return { ok: true, norm: "" };
@@ -118,7 +118,9 @@ async function checkUsernameLive() {
 
   signupBtn && (signupBtn.disabled = true);
   if (pseudoHint) pseudoHint.textContent = "⏳ Vérification…";
-
+  // ✅ sécurité: ne jamais rester bloqué disabled au chargement
+  if (signupBtn) signupBtn.disabled = false;
+  
   const r = await checkUsername(norm);
 
   if (pseudoHint) pseudoHint.textContent = r.msg || "";
