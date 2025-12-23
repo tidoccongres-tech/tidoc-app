@@ -440,22 +440,27 @@ function renderEventCard(id, e){
 async function loadEvents(){
   if (!eventsList) return;
 
-  eventsList.innerHTML = `<section class="card"><p>Chargement…</p></section>`;
+  try {
+    eventsList.innerHTML = `<section class="card"><p>Chargement…</p></section>`;
 
-  const qy = query(collection(db, "events"), orderBy("startAt", "asc"));
-  const snap = await getDocs(qy);
+    const qy = query(collection(db, "events"), orderBy("startAt", "asc"));
+    const snap = await getDocs(qy);
 
-  eventsList.innerHTML = "";
+    eventsList.innerHTML = "";
 
-  if (snap.empty){
-    eventsList.innerHTML = `<section class="card"><p>Aucun évènement pour l’instant.</p></section>`;
-    return;
+    if (snap.empty){
+      eventsList.innerHTML = `<section class="card"><p>Aucun évènement pour l’instant.</p></section>`;
+      return;
+    }
+
+    snap.forEach((d)=>{
+      const card = renderEventCard(d.id, d.data());
+      if (card) eventsList.appendChild(card);
+    });
+  } catch (e) {
+    console.log("loadEvents error:", e);
+    eventsList.innerHTML = `<section class="card"><p>❌ ${escapeHTML(e?.message || String(e))}</p></section>`;
   }
-
-  snap.forEach((d)=>{
-    const card = renderEventCard(d.id, d.data());
-    if (card) eventsList.appendChild(card);
-  });
 }
 
 /* =========================
