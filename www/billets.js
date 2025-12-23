@@ -302,11 +302,9 @@ function renderResult({ qrText, packKey, holderName, ticketNumber } = {}) {
       aria-label="Supprimer le billet"
       title="Supprimer"
       style="position:absolute; top:0; right:0;"
-    >
-      <svg class="trash-ico" viewBox="0 0 24 24" aria-hidden="true">
-        <path d="M9 3h6l1 2h4v2H4V5h4l1-2Zm1 7h2v9h-2v-9Zm4 0h2v9h-2v-9ZM7 10h2v9H7v-9ZM6 7h12l-1 14a2 2 0 0 1-2 2H9a2 2 0 0 1-2-2L6 7Z"/>
-      </svg>
-    </button>
+   >
+      ${TRASH_TIDOC_SVG}
+   </button>
 
     <div style="font-weight:900; color:var(--tidoc); font-size:15px; margin-bottom:8px;">
       ✅ Billet importé
