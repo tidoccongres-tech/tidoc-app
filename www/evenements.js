@@ -278,8 +278,6 @@ async function unregisterFromEvent(eventId){
   const uid = auth.currentUser?.uid;
   if (!uid) { location.href="./login.html"; return; }
 
-  const rights = await getMyRights(); // pas besoin de redirect pour se désinscrire
-  // si pas de billet, on permet quand même la désinscription (au cas où)
   const evRef    = doc(db, "events", eventId);
   const regRef   = doc(db, "events", eventId, "registrations", uid);
   const usageRef = doc(db, "userUsage", uid);
@@ -292,7 +290,7 @@ async function unregisterFromEvent(eventId){
     if (!regSnap.exists()) throw new Error("Tu n’es pas inscrit(e).");
 
     const ev = evSnap.data() || {};
-    const booked = Number(ev.bookedCount || 0);
+    const booked  = Number(ev.bookedCount || 0);
     const typeKey = eventTypeKey(ev.type);
 
     const uSnap = await tx.get(usageRef);
@@ -307,8 +305,9 @@ async function unregisterFromEvent(eventId){
     }
 
     tx.delete(regRef);
-    tx.update(evRef, { bookedCount: Math.max(0, booked - 1) }); // ✅  });
-  }
+    tx.update(evRef, { bookedCount: Math.max(0, booked - 1) }); // ✅ update strict
+  });
+}
 
 /* =========================
    RENDER
