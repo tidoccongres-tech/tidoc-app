@@ -630,6 +630,8 @@ adminModal?.addEventListener("click", (e)=>{
 adminSave?.addEventListener("click", saveAdminPacks);
 
 onAuthStateChanged(auth, async () => {
-  await loadPackConfig();   // ✅ charge quotas depuis Firestore (sinon fallback)
+  await loadPackConfig();
   await loadSavedTicket();
+
+  if (adminBtn) adminBtn.style.display = isAdmin() ? "inline-flex" : "none";
 });
