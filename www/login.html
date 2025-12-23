@@ -4,396 +4,95 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Ti’Doc – Connexion</title>
-  <link rel="stylesheet" href="style.css" />
-  <style>
-    body{
-      margin:0;
-      min-height:100vh;
-      display:flex;
-      align-items:center;
-      justify-content:center;
-      background:#178CA8;
-      animation: pageFade 320ms ease-out both;
-    }
 
-    .box{
-      width:min(420px,92vw);
-      background:#fff;
-      border-radius:16px;
-      padding:20px;
-      padding-top:44px; /* place pour le logo */
-      box-shadow:0 10px 30px rgba(0,0,0,.2);
-      position:relative;
-      animation: cardIn 420ms cubic-bezier(.2,.9,.2,1) both;
-    }
-
-    .auth-logo{
-      position:absolute;
-      top:-28px;
-      left:50%;
-      transform:translateX(-50%);
-      width:56px;height:56px;
-      border-radius:50%;
-      background:#fff;
-      border:1px solid rgba(0,0,0,.08);
-      box-shadow:0 10px 24px rgba(0,0,0,.12);
-      object-fit:cover;
-      animation: logoPop 520ms cubic-bezier(.2,1.2,.2,1) both;
-      animation-delay:120ms;
-    }
-
-    .logo{font-weight:800;font-size:26px;margin-bottom:6px}
-    .sub{opacity:.75;margin-bottom:14px}
-
-    .tabs{display:flex;gap:8px;margin:12px 0}
-    .tab{flex:1;border:1px solid #ddd;border-radius:12px;padding:10px;background:#f6f6f6}
-    .tab.active{border-color:#178CA8;background:#e9f7fb}
-
-    .row{display:flex;flex-direction:column;gap:8px;margin:10px 0}
-    input{padding:12px;border:1px solid #ddd;border-radius:12px;font-size:15px}
-
-    button{padding:12px;border:none;border-radius:12px;background:#178CA8;color:#fff;font-weight:700}
-    .link{background:transparent;color:#178CA8;text-decoration:underline}
-    .small{font-size:13px;opacity:.75}
-
-    @keyframes pageFade{
-      from{opacity:0}
-      to{opacity:1}
-    }
-    @keyframes cardIn{
-      from{opacity:0; transform: translateY(18px) scale(.98);}
-      to{opacity:1; transform: translateY(0) scale(1);}
-    }
-    @keyframes logoPop{
-      0%{transform:translateX(-50%) scale(.7); opacity:0}
-      60%{transform:translateX(-50%) scale(1.08); opacity:1}
-      100%{transform:translateX(-50%) scale(1)}
-    }
-
-    /* ===== Password eye toggle ===== */
-    .pw-wrap{
-      position:relative;
-      width:100%;
-    }
-    .pw-wrap input{
-      width:100%;
-      padding-right:46px; /* place pour l’œil */
-    }
-    .pw-toggle{
-      position:absolute;
-      right:10px;
-      top:50%;
-      transform:translateY(-50%);
-      width:34px;
-      height:34px;
-      border:none;
-      background:transparent;
-      cursor:pointer;
-      opacity:.75;
-      display:flex;
-      align-items:center;
-      justify-content:center;
-      padding:0;
-    }
-    .pw-toggle:hover{ opacity:1; }
-    .pw-toggle svg{
-      width:20px;
-      height:20px;
-      fill:#178CA8; /* couleur Ti’Doc */
-      display:block;
-    }
-  </style>
+  <link rel="stylesheet" href="style.css?v=1000" />
+  <meta name="theme-color" content="#178CA8" />
 </head>
 
-<body>
-  <div class="box">
-    <img class="auth-logo" src="./icons/icon-512.png" alt="Ti'Doc">
+<body class="auth-page">
+  <main class="auth-wrap">
+    <section class="auth-card">
 
-    <div class="logo">Ti’Doc</div>
-    <div class="sub">Crée ton compte ou connecte-toi pour accéder à l’application.</div>
+      <div class="auth-logo">
+        <!-- change si tu veux -->
+        <img src="./icons/icon-512.png" alt="Ti'Doc" />
+      </div>
 
-    <div class="tabs">
-      <button class="tab active" id="tabSignup" type="button">Créer un compte</button>
-      <button class="tab" id="tabLogin" type="button">Se connecter</button>
-    </div>
+      <h1 class="auth-title">Ti’Doc</h1>
+      <p class="auth-sub">Crée ton compte ou connecte-toi pour accéder à l’application.</p>
 
-    <!-- SIGNUP -->
-    <div id="signupPane">
-      <div class="row">
-        <input id="suName" placeholder="Pseudo (ex : TiDoc26)" />
-        <div id="suNameStatus" class="small" style="margin-top:-4px;"></div>
-        <input id="suEmail" placeholder="Email" inputmode="email" />
+      <div class="auth-tabs">
+        <button class="auth-tab active" type="button" data-tab="signup">Créer un compte</button>
+        <button class="auth-tab" type="button" data-tab="login">Se connecter</button>
+      </div>
 
-        <div class="pw-wrap">
-          <input id="suPass" placeholder="Mot de passe (6+)" type="password" />
-          <button class="pw-toggle" type="button" aria-label="Afficher le mot de passe" data-target="suPass"></button>
+      <!-- SIGNUP -->
+      <div class="auth-panel" data-panel="signup">
+
+        <div class="field-premium">
+          <input id="signupPseudo" type="text" placeholder=" " autocomplete="username" />
+          <label for="signupPseudo">Pseudo (ex : TiDoc26)</label>
+          <span class="field-line"></span>
         </div>
 
-        <button id="btnSignup" type="button">Créer mon compte</button>
-        <div class="small">En créant un compte, tu acceptes les règles de Ti’Doc (anti-spam, respect, etc.).</div>
-      </div>
-    </div>
+        <!-- (optionnel) le JS crée aussi un hint s’il n’existe pas,
+             mais tu peux le laisser ici pour maîtriser le style -->
+        <div id="signupPseudoHint" class="auth-hint"></div>
 
-    <!-- LOGIN -->
-    <div id="loginPane" style="display:none;">
-      <div class="row">
-        <input id="liEmail" placeholder="Email" inputmode="email" />
-
-        <div class="pw-wrap">
-          <input id="liPass" placeholder="Mot de passe" type="password" />
-          <button class="pw-toggle" type="button" aria-label="Afficher le mot de passe" data-target="liPass"></button>
+        <div class="field-premium">
+          <input id="signupEmail" type="email" placeholder=" " autocomplete="email" inputmode="email" />
+          <label for="signupEmail">Email</label>
+          <span class="field-line"></span>
         </div>
 
-        <button id="btnLogin" type="button">Se connecter</button>
-        <button id="btnReset" class="link" type="button">Mot de passe oublié</button>
+        <div class="field-premium has-eye">
+          <input id="signupPassword" type="password" placeholder=" " autocomplete="new-password" />
+          <label for="signupPassword">Mot de passe (6+)</label>
+          <button class="pw-eye" type="button" data-target="signupPassword" aria-label="Afficher"></button>
+          <span class="field-line"></span>
+        </div>
+
+        <button class="btn-premium btn-premium-primary auth-cta" id="signupBtn" type="button">
+          Créer mon compte
+        </button>
+
+        <div class="auth-foot">
+          En créant un compte, tu acceptes les règles de Ti’Doc (anti-spam, respect, etc.).
+        </div>
       </div>
-    </div>
 
-    <div id="msg" class="small" style="margin-top:10px;"></div>
-  </div>
+      <!-- LOGIN -->
+      <div class="auth-panel" data-panel="login" style="display:none;">
 
-<script type="module">
-  import { auth, db, signupEmail, loginEmail, resetPassword } from "./auth.js";
-  import { doc, getDoc } from "https://www.gstatic.com/firebasejs/10.12.4/firebase-firestore.js";
-  import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.4/firebase-auth.js";
+        <div class="field-premium">
+          <input id="loginEmail" type="email" placeholder=" " autocomplete="email" inputmode="email" />
+          <label for="loginEmail">Email</label>
+          <span class="field-line"></span>
+        </div>
 
-  const LS_NAME = "tidoc_name";
+        <div class="field-premium has-eye">
+          <input id="loginPassword" type="password" placeholder=" " autocomplete="current-password" />
+          <label for="loginPassword">Mot de passe</label>
+          <button class="pw-eye" type="button" data-target="loginPassword" aria-label="Afficher"></button>
+          <span class="field-line"></span>
+        </div>
 
-  // ===== UI =====
-  const tabSignup   = document.getElementById("tabSignup");
-  const tabLogin    = document.getElementById("tabLogin");
-  const signupPane  = document.getElementById("signupPane");
-  const loginPane   = document.getElementById("loginPane");
-  const msg         = document.getElementById("msg");
+        <button class="btn-premium btn-premium-primary auth-cta" id="loginBtn" type="button">
+          Se connecter
+        </button>
 
-  const suName       = document.getElementById("suName");
-  const suNameStatus = document.getElementById("suNameStatus");
-  const btnSignup    = document.getElementById("btnSignup");
+        <!-- Optionnel : si tu as activé le reset dans login.js -->
+        <button class="btn-premium btn-premium-outline auth-reset" id="resetBtn" type="button">
+          Mot de passe oublié
+        </button>
 
-  // ===== Tabs =====
-  function setTab(which){
-    const s = which === "signup";
-    tabSignup.classList.toggle("active", s);
-    tabLogin.classList.toggle("active", !s);
-    signupPane.style.display = s ? "" : "none";
-    loginPane.style.display = s ? "none" : "";
-    msg.textContent = "";
-  }
-  tabSignup.onclick = () => setTab("signup");
-  tabLogin.onclick  = () => setTab("login");
+      </div>
 
-  // ===== Redirect si déjà connecté =====
-  let authRedirectLock = false;
+      <div id="authMsg" class="auth-msg"></div>
+    </section>
+  </main>
 
-onAuthStateChanged(auth, (u) => {
-  // ✅ si on est en train de faire un signup/login, on ne redirige PAS
-  if (authRedirectLock) return;
-
-  // ✅ sinon, si déjà connecté -> home
-  if (u) window.location.href = "./index.html";
-});
-
-  // ===== Username unique (LIVE) =====
-  function normalizeUsername(v = "") {
-    return v
-      .trim()
-      .toLowerCase()
-      .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
-      .replace(/[^a-z0-9._-]/g, "");
-  }
-
-  const RESERVED = new Set(["admin", "moderateur", "mod", "support", "tidoc", "tidocteam"]);
-  let nameCheckTimer = null;
-
-  async function checkUsernameLive() {
-    const raw = suName.value || "";
-    const norm = normalizeUsername(raw);
-
-    if (!norm) {
-      suNameStatus.textContent = "";
-      btnSignup.disabled = false;
-      return { ok: true, norm: "" };
-    }
-
-    if (norm.length < 3) {
-      suNameStatus.textContent = "❌ Pseudo trop court (min 3).";
-      btnSignup.disabled = true;
-      return { ok: false, norm };
-    }
-
-    if (RESERVED.has(norm)) {
-      suNameStatus.textContent = "❌ Ce pseudo est réservé.";
-      btnSignup.disabled = true;
-      return { ok: false, norm };
-    }
-
-    suNameStatus.textContent = "⏳ Vérification…";
-    btnSignup.disabled = true;
-
-    try {
-      const snap = await getDoc(doc(db, "usernames", norm));
-      if (snap.exists()) {
-        suNameStatus.textContent = "❌ Pseudo déjà pris.";
-        btnSignup.disabled = true;
-        return { ok: false, norm };
-      } else {
-        suNameStatus.textContent = "✅ Pseudo disponible.";
-        btnSignup.disabled = false;
-        return { ok: true, norm };
-      }
-    } catch (e) {
-      console.log("checkUsernameLive error:", e);
-      suNameStatus.textContent = "⚠️ Impossible de vérifier (réseau).";
-      btnSignup.disabled = false;
-      return { ok: true, norm };
-    }
-  }
-
-  suName?.addEventListener("input", () => {
-    clearTimeout(nameCheckTimer);
-    nameCheckTimer = setTimeout(checkUsernameLive, 250);
-  });
-
-  // ===== SIGNUP =====
-  btnSignup.onclick = async () => {
-  authRedirectLock = true;
-    try {
-      msg.textContent = "";
-
-      const displayName = suName.value.trim();
-      const email = document.getElementById("suEmail").value.trim();
-      const password = document.getElementById("suPass").value;
-
-      if (!displayName || !email || !password) {
-        msg.textContent = "❌ Remplis pseudo, email et mot de passe.";
-        authRedirectLock = false;
-        return;
-      }
-
-      const emailOk = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
-      if (!emailOk) {
-        msg.textContent = "❌ Adresse email invalide.";
-        authRedirectLock = false;
-        return;
-      }
-
-      if (password.length < 6) {
-        msg.textContent = "❌ Mot de passe trop court (min 6 caractères).";
-        authRedirectLock = false;
-        return;
-      }
-
-      msg.textContent = "Création du compte…";
-
-      const { ok } = await checkUsernameLive();
-      if (!ok) {
-        authRedirectLock = false;
-        return;
-      }
-      
-      await signupEmail({ email, password, displayName });
-
-      localStorage.setItem(LS_NAME, displayName);
-      window.dispatchEvent(new CustomEvent("tidoc:auth"));
-
-      window.location.href = "./index.html";
-    } catch (e) {
-      authRedirectLock = false;
-      const code = (e?.code || "").toLowerCase();
-      const m = (e?.message || "").toLowerCase();
-
-      if (code === "auth/email-already-in-use" || (m.includes("email") && m.includes("already"))) {
-        msg.textContent = "❌ Email déjà utilisé.";
-      } else if (m.includes("pseudo déjà pris") || m.includes("pseudo déjà")) {
-        msg.textContent = "❌ Pseudo déjà pris.";
-      } else {
-        msg.textContent = "Erreur: " + (e?.message || e);
-      }
-    }
-  };
-
-  // ===== LOGIN =====
-  document.getElementById("btnLogin").onclick = async () => {
-  authRedirectLock = true;
-    try {
-      msg.textContent = "Connexion…";
-      const email = document.getElementById("liEmail").value.trim();
-      const password = document.getElementById("liPass").value;
-     
-      await loginEmail({ email, password });
-      
-      const dn = (auth.currentUser?.displayName || "").trim();
-      if (dn) localStorage.setItem(LS_NAME, dn);
-
-      window.dispatchEvent(new CustomEvent("tidoc:auth"));
-      window.location.href = "./index.html";
-    } catch (e) {
-      authRedirectLock = false;
-      msg.textContent = "Erreur: " + (e?.message || e);
-    }
-  };
-
-  // ===== RESET =====
-  document.getElementById("btnReset").onclick = async () => {
-    const email = document.getElementById("liEmail").value.trim();
-
-    if (!email) { msg.textContent = "Mets ton email d’abord."; return; }
-
-    try {
-      msg.textContent = "Envoi de l’email…";
-      await resetPassword(email, { redirectUrl: location.origin + "/login.html" });
-      msg.textContent = "Email de réinitialisation envoyé ✅ (check spam aussi)";
-    } catch (e) {
-      const code = (e?.code || "");
-      if (code === "auth/user-not-found") msg.textContent = "❌ Aucun compte avec cet email.";
-      else if (code === "auth/invalid-email") msg.textContent = "❌ Email invalide.";
-      else if (code === "auth/too-many-requests") msg.textContent = "⏳ Trop de tentatives, réessaie plus tard.";
-      else msg.textContent = "Erreur: " + (e?.message || e);
-      console.log("reset error:", e);
-    }
-  };
-
-  // ===== Password eye toggle =====
-  const EYE_OPEN = `
-    <svg viewBox="0 0 24 24" aria-hidden="true">
-      <path fill-rule="evenodd" clip-rule="evenodd"
-        d="M6.30147 15.5771C4.77832 14.2684 3.6904 12.7726 3.18002 12C3.6904 11.2274 4.77832 9.73158 6.30147 8.42294C7.87402 7.07185 9.81574 6 12 6C14.1843 6 16.1261 7.07185 17.6986 8.42294C19.2218 9.73158 20.3097 11.2274 20.8201 12C20.3097 12.7726 19.2218 14.2684 17.6986 15.5771C16.1261 16.9282 14.1843 18 12 18C9.81574 18 7.87402 16.9282 6.30147 15.5771ZM12 4C9.14754 4 6.75717 5.39462 4.99812 6.90595C3.23268 8.42276 2.00757 10.1376 1.46387 10.9698C1.05306 11.5985 1.05306 12.4015 1.46387 13.0302C2.00757 13.8624 3.23268 15.5772 4.99812 17.0941C6.75717 18.6054 9.14754 20 12 20C14.8525 20 17.2429 18.6054 19.002 17.0941C20.7674 15.5772 21.9925 13.8624 22.5362 13.0302C22.947 12.4015 22.947 11.5985 22.5362 10.9698C21.9925 10.1376 20.7674 8.42276 19.002 6.90595C17.2429 5.39462 14.8525 4 12 4ZM10 12C10 10.8954 10.8955 10 12 10C13.1046 10 14 10.8954 14 12C14 13.1046 13.1046 14 12 14C10.8955 14 10 13.1046 10 12ZM12 8C9.7909 8 8.00004 9.79086 8.00004 12C8.00004 14.2091 9.7909 16 12 16C14.2092 16 16 14.2091 16 12C16 9.79086 14.2092 8 12 8Z"/>
-    </svg>
-  `;
-
-  const EYE_OFF = `
-    <svg viewBox="0 0 24 24" aria-hidden="true">
-      <path fill-rule="evenodd" clip-rule="evenodd"
-        d="M19.7071 5.70711C20.0976 5.31658 20.0976 4.68342 19.7071 4.29289C19.3166 3.90237 18.6834 3.90237 18.2929 4.29289L14.032 8.55382C13.4365 8.20193 12.7418 8 12 8C9.79086 8 8 9.79086 8 12C8 12.7418 8.20193 13.4365 8.55382 14.032L4.29289 18.2929C3.90237 18.6834 3.90237 19.3166 4.29289 19.7071C4.68342 20.0976 5.31658 20.0976 5.70711 19.7071L9.96803 15.4462C10.5635 15.7981 11.2582 16 12 16C14.2091 16 16 14.2091 16 12C16 11.2582 15.7981 10.5635 15.4462 9.96803L19.7071 5.70711ZM12.518 10.0677C12.3528 10.0236 12.1792 10 12 10C10.8954 10 10 10.8954 10 12C10 12.1792 10.0236 12.3528 10.0677 12.518L12.518 10.0677ZM11.482 13.9323L13.9323 11.482C13.9764 11.6472 14 11.8208 14 12C14 13.1046 13.1046 14 12 14C11.8208 14 11.6472 13.9764 11.482 13.9323ZM15.7651 4.8207C14.6287 4.32049 13.3675 4 12 4C9.14754 4 6.75717 5.39462 4.99812 6.90595C3.23268 8.42276 2.00757 10.1376 1.46387 10.9698C1.05306 11.5985 1.05306 12.4015 1.46387 13.0302C1.92276 13.7326 2.86706 15.0637 4.21194 16.3739L5.62626 14.9596C4.4555 13.8229 3.61144 12.6531 3.18002 12C3.6904 11.2274 4.77832 9.73158 6.30147 8.42294C7.87402 7.07185 9.81574 6 12 6C12.7719 6 13.5135 6.13385 14.2193 6.36658L15.7651 4.8207ZM12 18C11.2282 18 10.4866 17.8661 9.78083 17.6334L8.23496 19.1793C9.37136 19.6795 10.6326 20 12 20C14.8525 20 17.2429 18.6054 19.002 17.0941C20.7674 15.5772 21.9925 13.8624 22.5362 13.0302C22.947 12.4015 22.947 11.5985 22.5362 10.9698C22.0773 10.2674 21.133 8.93627 19.7881 7.62611L18.3738 9.04043C19.5446 10.1771 20.3887 11.3469 20.8201 12C20.3097 12.7726 19.2218 14.2684 17.6986 15.5771C16.1261 16.9282 14.1843 18 12 18Z"/>
-    </svg>
-  `;
-
-  function initPwToggles(){
-    document.querySelectorAll(".pw-toggle").forEach(btn=>{
-      const targetId = btn.getAttribute("data-target");
-      const input = document.getElementById(targetId);
-      if (!input) return;
-
-      btn.innerHTML = EYE_OPEN;
-
-      btn.addEventListener("click", (e)=>{
-        e.preventDefault();
-        e.stopPropagation();
-
-        const isHidden = input.type === "password";
-        input.type = isHidden ? "text" : "password";
-        btn.innerHTML = isHidden ? EYE_OFF : EYE_OPEN;
-
-        input.focus();
-        try {
-          const len = input.value.length;
-          input.setSelectionRange(len, len);
-        } catch(_) {}
-      });
-    });
-  }
-
-  initPwToggles();
-</script>
+  <!-- ✅ Un seul JS -->
+  <script type="module" src="./login.js?v=1000"></script>
 </body>
 </html>
