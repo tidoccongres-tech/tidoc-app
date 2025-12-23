@@ -27,12 +27,45 @@ const auth = getAuth(app);
 
 const ADMIN_EMAIL = "tidoc.congres@gmail.com";
 
-const PACKS = {
-  essentiel: { workshopsAllowed: 1, conferencesAllowed: 2 },
-  standard:  { workshopsAllowed: 2, conferencesAllowed: 4 },
-  premium:   { workshopsAllowed: 3, conferencesAllowed: 7 },
+const PACKS_FALLBACK = {
+  essentiel: { label:"Essentiel", workshopsAllowed: 1, conferencesAllowed: 2, otherAllowed: 0 },
+  standard:  { label:"Standard",  workshopsAllowed: 2, conferencesAllowed: 4, otherAllowed: 0 },
+  premium:   { label:"Premium",   workshopsAllowed: 3, conferencesAllowed: 7, otherAllowed: 0 },
+  autre:     { label:"Autre",     workshopsAllowed: 0, conferencesAllowed: 0, otherAllowed: 0 },
 };
 
+let PACKS = { ...PACKS_FALLBACK };
+
+function normalizePackConfig(obj){
+  const src = obj && typeof obj === "object" ? obj : {};
+  const out = {};
+  for (const k of Object.keys(src)){
+    const v = src[k] || {};
+    out[String(k).toLowerCase()] = {
+      label: String(v.label || k),
+      workshopsAllowed: Number(v.workshopsAllowed ?? 0),
+      conferencesAllowed: Number(v.conferencesAllowed ?? 0),
+      otherAllowed: Number(v.otherAllowed ?? 0),
+    };
+  }
+  return out;
+}
+
+async function loadPackConfig(){
+  try{
+    const snap = await getDoc(doc(db, "config", "packs"));
+    if (!snap.exists()){
+      PACKS = { ...PACKS_FALLBACK };
+      return;
+    }
+    const data = snap.data() || {};
+    const normalized = normalizePackConfig(data);
+    PACKS = Object.keys(normalized).length ? normalized : { ...PACKS_FALLBACK };
+  } catch (e){
+    console.log("loadPackConfig error:", e);
+    PACKS = { ...PACKS_FALLBACK };
+  }
+}
 const TRASH_SVG = `
 <svg class="trash-ico" viewBox="0 0 408.483 408.483" aria-hidden="true" focusable="false">
   <path d="M87.748,388.784c0.461,11.01,9.521,19.699,20.539,19.699h191.911c11.018,0,20.078-8.689,20.539-19.699l13.705-289.316
@@ -126,18 +159,26 @@ async function getMyRights(){
 
   const uSnap = await getDoc(doc(db, "userUsage", uid));
   const usage = uSnap.exists() ? (uSnap.data() || {}) : {};
-  const wsUsed   = Number(usage.workshopUsed || 0);
-  const confUsed = Number(usage.conferenceUsed || 0);
+
+  const wsUsed    = Number(usage.workshopUsed || 0);
+  const confUsed  = Number(usage.conferenceUsed || 0);
+  const otherUsed = Number(usage.otherUsed || 0);
 
   return {
     ok:true,
     packKey,
+
     wsUsed,
     confUsed,
+    otherUsed,
+
     wsAllowed: pack.workshopsAllowed,
     confAllowed: pack.conferencesAllowed,
+    otherAllowed: pack.otherAllowed,
+
     wsLeft: Math.max(0, pack.workshopsAllowed - wsUsed),
     confLeft: Math.max(0, pack.conferencesAllowed - confUsed),
+    otherLeft: Math.max(0, pack.otherAllowed - otherUsed),
   };
 }
 
@@ -256,22 +297,21 @@ async function registerToEvent(eventId){
 
     const uSnap = await tx.get(usageRef);
     const usage = uSnap.exists() ? (uSnap.data() || {}) : {};
-    const wsUsed   = Number(usage.workshopUsed || 0);
-    const confUsed = Number(usage.conferenceUsed || 0);
+    const wsUsed    = Number(usage.workshopUsed || 0);
+    const confUsed  = Number(usage.conferenceUsed || 0);
+    const otherUsed = Number(usage.otherUsed || 0);
 
-    if (typeKey === "ws"){
-      if (wsUsed >= rights.wsAllowed) throw new Error("Tu n’as plus de workshop disponible.");
-      tx.set(usageRef, { workshopUsed: wsUsed + 1 }, { merge:true });
-    } else if (typeKey === "conf"){
-      if (confUsed >= rights.confAllowed) throw new Error("Tu n’as plus de conférence disponible.");
-      tx.set(usageRef, { conferenceUsed: confUsed + 1 }, { merge:true });
-    } else {
-      throw new Error("Type d’évènement non éligible à l’inscription.");
-    }
+if (typeKey === "ws"){
+  if (wsUsed >= rights.wsAllowed) throw new Error("Tu n’as plus de workshop disponible.");
+  tx.set(usageRef, { workshopUsed: wsUsed + 1 }, { merge:true });
 
-    tx.set(regRef, { uid, createdAt: serverTimestamp() });
-    tx.update(evRef, { bookedCount: booked + 1 }); // ✅ update strict sur bookedCount
-  });
+} else if (typeKey === "conf"){
+  if (confUsed >= rights.confAllowed) throw new Error("Tu n’as plus de conférence disponible.");
+  tx.set(usageRef, { conferenceUsed: confUsed + 1 }, { merge:true });
+
+} else { // other
+  if (otherUsed >= rights.otherAllowed) throw new Error("Tu n’as plus de quota “Autre” disponible.");
+  tx.set(usageRef, { otherUsed: otherUsed + 1 }, { merge:true });
 }
 
 async function unregisterFromEvent(eventId){
@@ -295,20 +335,18 @@ async function unregisterFromEvent(eventId){
 
     const uSnap = await tx.get(usageRef);
     const usage = uSnap.exists() ? (uSnap.data() || {}) : {};
-    const wsUsed   = Number(usage.workshopUsed || 0);
-    const confUsed = Number(usage.conferenceUsed || 0);
+    const wsUsed    = Number(usage.workshopUsed || 0);
+const confUsed  = Number(usage.conferenceUsed || 0);
+const otherUsed = Number(usage.otherUsed || 0);
 
-    if (typeKey === "ws"){
-      tx.set(usageRef, { workshopUsed: Math.max(0, wsUsed - 1) }, { merge:true });
-    } else if (typeKey === "conf"){
-      tx.set(usageRef, { conferenceUsed: Math.max(0, confUsed - 1) }, { merge:true });
-    }
-
-    tx.delete(regRef);
-    tx.update(evRef, { bookedCount: Math.max(0, booked - 1) }); // ✅ update strict
-  });
+if (typeKey === "ws"){
+  tx.set(usageRef, { workshopUsed: Math.max(0, wsUsed - 1) }, { merge:true });
+} else if (typeKey === "conf"){
+  tx.set(usageRef, { conferenceUsed: Math.max(0, confUsed - 1) }, { merge:true });
+} else {
+  tx.set(usageRef, { otherUsed: Math.max(0, otherUsed - 1) }, { merge:true });
 }
-
+    
 /* =========================
    RENDER
    ========================= */
@@ -406,8 +444,8 @@ function renderEventCard(id, e){
       else {
         rightsEl.textContent =
           `Workshops : ${r.wsUsed}/${r.wsAllowed} (reste ${r.wsLeft}) • ` +
-          `Conférences : ${r.confUsed}/${r.confAllowed} (reste ${r.confLeft})`;
-      }
+          `Conférences : ${r.confUsed}/${r.confAllowed} (reste ${r.confLeft}) • ` +
+          `Autre : ${r.otherUsed}/${r.otherAllowed} (reste ${r.otherLeft})`;      }
     }
 
     // registration state
@@ -483,10 +521,9 @@ document.addEventListener("DOMContentLoaded", ()=>{
 
   publishEvent?.addEventListener("click", createEvent);
 
-  onAuthStateChanged(auth, ()=>{
-    applyAdminUI();
-    loadEvents();
+  onAuthStateChanged(auth, async ()=>{
+  applyAdminUI();
+  await loadPackConfig();  // ✅ packs dynamiques
+  await loadEvents();
   });
 
-  loadEvents();
-});
