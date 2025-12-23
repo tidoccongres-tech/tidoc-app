@@ -11,6 +11,70 @@ const app  = getApps().length ? getApp() : initializeApp(firebaseConfig);
 const db   = getFirestore(app);
 const auth = getAuth(app);
 
+// ---------- MAIN IMPORT HANDLER ----------
+async function handleFile(file) {
+  if (!file) return;
+
+  try {
+    setStatus("⏳ Analyse du billet…");
+
+    let qrText = "";
+    let packKey = "";
+    let holderName = "";
+    let ticketNumber = "";
+
+    // ===== PDF =====
+    if (file.type === "application/pdf") {
+      const { pdf, qrText: qrFromPdf } = await scanPdfForQR(file);
+      qrText = qrFromPdf || "";
+
+      const meta = await extractMetaFromPdfText(pdf);
+      packKey = meta.packKey || "";
+      holderName = meta.holderName || "";
+      ticketNumber = meta.ticketNumber || "";
+    }
+
+    // ===== IMAGE =====
+    else if (file.type.startsWith("image/")) {
+      const canvas = await loadImageToCanvas(file);
+
+      // 1) QR
+      qrText = scanCanvasForQR(canvas);
+
+      // 2) OCR top-right (pack/nom/num)
+      const crop = cropTopRight(canvas);
+      const text = await ocrCanvas(crop);
+      const meta = parseMetaFromText(text);
+
+      packKey = meta.packKey || "";
+      holderName = meta.holderName || "";
+      ticketNumber = meta.ticketNumber || "";
+    }
+
+    else {
+      throw new Error("Format non supporté (PDF ou image uniquement).");
+    }
+
+    if (!qrText) {
+      throw new Error("QR Code non détecté sur le billet.");
+    }
+
+    // 🔐 anti-double billet
+    await claimQrOrThrow(qrText);
+
+    // 💾 sauvegarde Firestore
+    await saveTicketToFirestore({ qrText, packKey, holderName, ticketNumber });
+
+    // 🎨 affichage immédiat
+    renderResult({ qrText, packKey, holderName, ticketNumber });
+
+    setStatus("✅ Billet importé avec succès");
+  } catch (e) {
+    console.log("handleFile import error:", e);
+    setStatus("❌ " + (e?.message || String(e)));
+  }
+}
+
 // UI
 const uploadBtn = document.getElementById("uploadTicketBtn");
 const deleteBtn = document.getElementById("deleteTicketBtn");
