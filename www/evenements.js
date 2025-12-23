@@ -301,17 +301,22 @@ async function registerToEvent(eventId){
     const confUsed  = Number(usage.conferenceUsed || 0);
     const otherUsed = Number(usage.otherUsed || 0);
 
-if (typeKey === "ws"){
-  if (wsUsed >= rights.wsAllowed) throw new Error("Tu n’as plus de workshop disponible.");
-  tx.set(usageRef, { workshopUsed: wsUsed + 1 }, { merge:true });
+    if (typeKey === "ws"){
+      if (wsUsed >= rights.wsAllowed) throw new Error("Tu n’as plus de workshop disponible.");
+      tx.set(usageRef, { workshopUsed: wsUsed + 1 }, { merge:true });
 
-} else if (typeKey === "conf"){
-  if (confUsed >= rights.confAllowed) throw new Error("Tu n’as plus de conférence disponible.");
-  tx.set(usageRef, { conferenceUsed: confUsed + 1 }, { merge:true });
+    } else if (typeKey === "conf"){
+      if (confUsed >= rights.confAllowed) throw new Error("Tu n’as plus de conférence disponible.");
+      tx.set(usageRef, { conferenceUsed: confUsed + 1 }, { merge:true });
 
-} else { // other
-  if (otherUsed >= rights.otherAllowed) throw new Error("Tu n’as plus de quota “Autre” disponible.");
-  tx.set(usageRef, { otherUsed: otherUsed + 1 }, { merge:true });
+    } else { // other
+      if (otherUsed >= rights.otherAllowed) throw new Error("Tu n’as plus de quota “Autre” disponible.");
+      tx.set(usageRef, { otherUsed: otherUsed + 1 }, { merge:true });
+    }
+
+    tx.set(regRef, { uid, createdAt: serverTimestamp() });
+    tx.update(evRef, { bookedCount: booked + 1 }); // ✅ rules OK (+1)
+  });
 }
 
 async function unregisterFromEvent(eventId){
@@ -336,15 +341,20 @@ async function unregisterFromEvent(eventId){
     const uSnap = await tx.get(usageRef);
     const usage = uSnap.exists() ? (uSnap.data() || {}) : {};
     const wsUsed    = Number(usage.workshopUsed || 0);
-const confUsed  = Number(usage.conferenceUsed || 0);
-const otherUsed = Number(usage.otherUsed || 0);
+    const confUsed  = Number(usage.conferenceUsed || 0);
+    const otherUsed = Number(usage.otherUsed || 0);
 
-if (typeKey === "ws"){
-  tx.set(usageRef, { workshopUsed: Math.max(0, wsUsed - 1) }, { merge:true });
-} else if (typeKey === "conf"){
-  tx.set(usageRef, { conferenceUsed: Math.max(0, confUsed - 1) }, { merge:true });
-} else {
-  tx.set(usageRef, { otherUsed: Math.max(0, otherUsed - 1) }, { merge:true });
+    if (typeKey === "ws"){
+      tx.set(usageRef, { workshopUsed: Math.max(0, wsUsed - 1) }, { merge:true });
+    } else if (typeKey === "conf"){
+      tx.set(usageRef, { conferenceUsed: Math.max(0, confUsed - 1) }, { merge:true });
+    } else {
+      tx.set(usageRef, { otherUsed: Math.max(0, otherUsed - 1) }, { merge:true });
+    }
+
+    tx.delete(regRef);
+    tx.update(evRef, { bookedCount: Math.max(0, booked - 1) }); // ✅ rules OK (-1)
+  });
 }
     
 /* =========================
