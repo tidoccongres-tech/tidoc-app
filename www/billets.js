@@ -339,6 +339,22 @@ async function claimQrOrThrow(qrText) {
   return qrHash;
 }
 
+async function syncNameFromTicket(holderName){
+  const u = auth.currentUser;
+  const name = String(holderName || "").trim();
+  if (!u || !name) return;
+
+  // 1) Auth profile (pour afficher partout)
+  try { await updateProfile(u, { displayName: name }); } catch(_) {}
+
+  // 2) Firestore users/{uid}
+  try{
+    await setDoc(doc(db, "users", u.uid), {
+      displayName: name,
+      updatedAt: serverTimestamp()
+    }, { merge:true });
+  } catch(_) {}
+}
 // ---------- Save ----------
 async function saveTicketToFirestore({ qrText, packKey, holderName, ticketNumber }) {
   const u = auth.currentUser;
@@ -355,7 +371,12 @@ async function saveTicketToFirestore({ qrText, packKey, holderName, ticketNumber
     updatedAt: serverTimestamp()
   }, { merge: true });
 }
+await saveTicketToFirestore({ qrText, packKey, holderName, ticketNumber });
 
+// ✅ sync nom billet -> profil
+await syncNameFromTicket(holderName);
+
+renderResult({ qrText, packKey, holderName, ticketNumber }); 
 // ✅ DELETE ticket + unclaim QR
 async function deleteMyTicketAndUnclaim() {
   const u = auth.currentUser;
