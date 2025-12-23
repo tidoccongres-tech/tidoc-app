@@ -1,15 +1,12 @@
 // login.js (MODULE) — Premium Auth (signup/login) + pseudo unique + eye toggle
+
 import { auth, db, signupEmail, loginEmail, resetPassword } from "./auth.js";
 import { doc, getDoc } from "https://www.gstatic.com/firebasejs/10.12.4/firebase-firestore.js";
 import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.4/firebase-auth.js";
 
 console.log("✅ login.js chargé");
 
-// =====================
-// Const
-// =====================
 const LS_NAME = "tidoc_name";
-const RESERVED = new Set(["admin", "moderateur", "mod", "support", "tidoc", "tidocteam"]);
 
 // =====================
 // DOM
@@ -20,73 +17,51 @@ const tabs = Array.from(document.querySelectorAll(".auth-tab"));
 const panels = Array.from(document.querySelectorAll(".auth-panel"));
 
 const signupPseudo = document.getElementById("signupPseudo");
-const signupEmailEl = document.getElementById("signupEmail");
-const signupPass = document.getElementById("signupPassword");
-const signupBtn = document.getElementById("signupBtn");
+const signupEmailEl  = document.getElementById("signupEmail");
+const signupPass   = document.getElementById("signupPassword");
+const signupBtn    = document.getElementById("signupBtn");
+const pseudoHint   = document.getElementById("signupPseudoHint");
 
-const loginEmailInput = document.getElementById("loginEmail");
-const loginPassInput = document.getElementById("loginPassword");
-const loginBtn = document.getElementById("loginBtn");
-
-const resetBtn = document.getElementById("resetBtn");
-
-// Hint pseudo (si pas dans HTML on le crée)
-function ensurePseudoHint() {
-  let el = document.getElementById("signupPseudoHint");
-  if (el) return el;
-
-  el = document.createElement("div");
-  el.id = "signupPseudoHint";
-  el.className = "auth-hint";
-  const wrap = signupPseudo?.closest(".field-premium");
-  if (wrap) wrap.insertAdjacentElement("afterend", el);
-  return el;
-}
-const pseudoHint = ensurePseudoHint();
+const loginEmailEl = document.getElementById("loginEmail");
+const loginPassEl  = document.getElementById("loginPassword");
+const loginBtn     = document.getElementById("loginBtn");
+const resetBtn     = document.getElementById("resetBtn");
 
 // =====================
 // Helpers UI
 // =====================
-function setMsg(t = "") {
-  if (!msg) return;
-  msg.textContent = t;
-}
+function setMsg(t = "") { if (msg) msg.textContent = t; }
 
-function setTab(which = "signup") {
-  // tabs
-  tabs.forEach((btn) => {
-    const active = btn.dataset.tab === which;
-    btn.classList.toggle("active", active);
-    btn.setAttribute("aria-selected", active ? "true" : "false");
+function setTab(which) {
+  tabs.forEach(btn => {
+    const on = btn.dataset.tab === which;
+    btn.classList.toggle("active", on);
+    btn.setAttribute("aria-selected", on ? "true" : "false");
   });
 
-  // panels (hidden est + fiable que display:none)
-  panels.forEach((p) => {
+  panels.forEach(p => {
     const on = p.dataset.panel === which;
+    // ✅ robust: utilise hidden (et plus style.display)
     p.hidden = !on;
   });
 
   setMsg("");
 }
 
-tabs.forEach((btn) => {
-  btn.addEventListener("click", () => setTab(btn.dataset.tab || "signup"));
-});
+tabs.forEach(btn => btn.addEventListener("click", () => setTab(btn.dataset.tab || "signup")));
 
 // =====================
-// Redirect si déjà connecté (safe)
+// Redirect si déjà connecté
 // =====================
-let alreadyRedirected = false;
+let authRedirectLock = false;
 
 onAuthStateChanged(auth, (u) => {
-  if (!u) return;
-  if (alreadyRedirected) return;
-  alreadyRedirected = true;
-  window.location.replace("./index.html");
+  if (authRedirectLock) return;
+  if (u) window.location.href = "./index.html";
 });
 
 // =====================
-// Username unique LIVE (anti-race conditions)
+// Username unique LIVE
 // =====================
 function normalizeUsername(v = "") {
   return v
@@ -96,8 +71,12 @@ function normalizeUsername(v = "") {
     .replace(/[^a-z0-9._-]/g, "");
 }
 
+const RESERVED = new Set(["admin", "moderateur", "mod", "support", "tidoc", "tidocteam"]);
+let nameCheckTimer = null;
+let lastCheckToken = 0;
+
 async function checkUsername(norm) {
-  if (!norm) return { ok: true, norm: "", msg: "" };
+  if (!norm) return { ok: false, norm, msg: "❌ Pseudo requis." };
   if (norm.length < 3) return { ok: false, norm, msg: "❌ Pseudo trop court (min 3)." };
   if (RESERVED.has(norm)) return { ok: false, norm, msg: "❌ Ce pseudo est réservé." };
 
@@ -107,40 +86,38 @@ async function checkUsername(norm) {
     return { ok: true, norm, msg: "✅ Pseudo disponible." };
   } catch (e) {
     console.log("checkUsername error:", e);
-    // si réseau KO, on n'empêche pas totalement
-    return { ok: true, norm, msg: "⚠️ Vérif impossible (réseau)." };
+    return { ok: true, norm, msg: "⚠️ Vérif impossible (réseau). Tu peux tenter quand même." };
   }
 }
 
-let nameCheckTimer = null;
-let nameCheckReqId = 0;
+function setSignupDisabled(disabled) {
+  if (!signupBtn) return;
+  signupBtn.disabled = !!disabled;
+}
 
 async function checkUsernameLive() {
   if (!signupPseudo) return;
 
-  const raw = signupPseudo.value || "";
-  const norm = normalizeUsername(raw);
+  const token = ++lastCheckToken;
+  const norm = normalizeUsername(signupPseudo.value || "");
 
-  // vide => pas de blocage
   if (!norm) {
-    pseudoHint.textContent = "";
-    if (signupBtn) signupBtn.disabled = false;
+    if (pseudoHint) pseudoHint.textContent = "";
+    setSignupDisabled(false); // champ vide => on laisse cliquer, la validation au submit gère
     return;
   }
 
-  // marque une requête (pour ignorer les réponses anciennes)
-  const reqId = ++nameCheckReqId;
-
-  if (signupBtn) signupBtn.disabled = true;
-  pseudoHint.textContent = "⏳ Vérification…";
+  // disable pendant check
+  setSignupDisabled(true);
+  if (pseudoHint) pseudoHint.textContent = "⏳ Vérification…";
 
   const r = await checkUsername(norm);
 
-  // si une autre requête est partie entre-temps, on ignore
-  if (reqId !== nameCheckReqId) return;
+  // si une nouvelle frappe a eu lieu, on ignore ce résultat
+  if (token !== lastCheckToken) return;
 
-  pseudoHint.textContent = r.msg || "";
-  if (signupBtn) signupBtn.disabled = !r.ok;
+  if (pseudoHint) pseudoHint.textContent = r.msg || "";
+  setSignupDisabled(!r.ok);
 }
 
 signupPseudo?.addEventListener("input", () => {
@@ -149,21 +126,12 @@ signupPseudo?.addEventListener("input", () => {
 });
 
 // =====================
-// Eye toggle (premium)
+// Eye toggle
 // =====================
-const EYE_OPEN = `
-<svg viewBox="0 0 24 24" aria-hidden="true">
-  <path fill-rule="evenodd" clip-rule="evenodd"
-    d="M6.30147 15.5771C4.77832 14.2684 3.6904 12.7726 3.18002 12C3.6904 11.2274 4.77832 9.73158 6.30147 8.42294C7.87402 7.07185 9.81574 6 12 6C14.1843 6 16.1261 7.07185 17.6986 8.42294C19.2218 9.73158 20.3097 11.2274 20.8201 12C20.3097 12.7726 19.2218 14.2684 17.6986 15.5771C16.1261 16.9282 14.1843 18 12 18C9.81574 18 7.87402 16.9282 6.30147 15.5771ZM12 4C9.14754 4 6.75717 5.39462 4.99812 6.90595C3.23268 8.42276 2.00757 10.1376 1.46387 10.9698C1.05306 11.5985 1.05306 12.4015 1.46387 13.0302C2.00757 13.8624 3.23268 15.5772 4.99812 17.0941C6.75717 18.6054 9.14754 20 12 20C14.8525 20 17.2429 18.6054 19.002 17.0941C20.7674 15.5772 21.9925 13.8624 22.5362 13.0302C22.947 12.4015 22.947 11.5985 22.5362 10.9698C21.9925 10.1376 20.7674 8.42276 19.002 6.90595C17.2429 5.39462 14.8525 4 12 4ZM10 12C10 10.8954 10.8955 10 12 10C13.1046 10 14 10.8954 14 12C14 13.1046 13.1046 14 12 14C10.8955 14 10 13.1046 10 12Z"/>
-</svg>
-`;
-
-const EYE_OFF = `
-<svg viewBox="0 0 24 24" aria-hidden="true">
-  <path fill-rule="evenodd" clip-rule="evenodd"
-    d="M19.7071 5.70711C20.0976 5.31658 20.0976 4.68342 19.7071 4.29289C19.3166 3.90237 18.6834 3.90237 18.2929 4.29289L14.032 8.55382C13.4365 8.20193 12.7418 8 12 8C9.79086 8 8 9.79086 8 12C8 12.7418 8.20193 13.4365 8.55382 14.032L4.29289 18.2929C3.90237 18.6834 3.90237 19.3166 4.29289 19.7071C4.68342 20.0976 5.31658 20.0976 5.70711 19.7071L9.96803 15.4462C10.5635 15.7981 11.2582 16 12 16C14.2091 16 16 14.2091 16 12C16 11.2582 15.7981 10.5635 15.4462 9.96803L19.7071 5.70711ZM12.518 10.0677C12.3528 10.0236 12.1792 10 12 10C10.8954 10 10 10.8954 10 12C10 12.1792 10.0236 12.3528 10.0677 12.518L12.518 10.0677ZM11.482 13.9323L13.9323 11.482C13.9764 11.6472 14 11.8208 14 12C14 13.1046 13.1046 14 12 14C11.8208 14 11.6472 13.9764 11.482 13.9323Z"/>
-</svg>
-`;
+const EYE_OPEN = `<svg viewBox="0 0 24 24" aria-hidden="true"><path fill-rule="evenodd" clip-rule="evenodd"
+d="M6.30147 15.5771C4.77832 14.2684 3.6904 12.7726 3.18002 12C3.6904 11.2274 4.77832 9.73158 6.30147 8.42294C7.87402 7.07185 9.81574 6 12 6C14.1843 6 16.1261 7.07185 17.6986 8.42294C19.2218 9.73158 20.3097 11.2274 20.8201 12C20.3097 12.7726 19.2218 14.2684 17.6986 15.5771C16.1261 16.9282 14.1843 18 12 18C9.81574 18 7.87402 16.9282 6.30147 15.5771ZM12 4C9.14754 4 6.75717 5.39462 4.99812 6.90595C3.23268 8.42276 2.00757 10.1376 1.46387 10.9698C1.05306 11.5985 1.05306 12.4015 1.46387 13.0302C2.00757 13.8624 3.23268 15.5772 4.99812 17.0941C6.75717 18.6054 9.14754 20 12 20C14.8525 20 17.2429 18.6054 19.002 17.0941C20.7674 15.5772 21.9925 13.8624 22.5362 13.0302C22.947 12.4015 22.947 11.5985 22.5362 10.9698C21.9925 10.1376 20.7674 8.42276 19.002 6.90595C17.2429 5.39462 14.8525 4 12 4ZM10 12C10 10.8954 10.8955 10 12 10C13.1046 10 14 10.8954 14 12C14 13.1046 13.1046 14 12 14C10.8955 14 10 13.1046 10 12Z"/></svg>`;
+const EYE_OFF = `<svg viewBox="0 0 24 24" aria-hidden="true"><path fill-rule="evenodd" clip-rule="evenodd"
+d="M19.7071 5.70711C20.0976 5.31658 20.0976 4.68342 19.7071 4.29289C19.3166 3.90237 18.6834 3.90237 18.2929 4.29289L14.032 8.55382C13.4365 8.20193 12.7418 8 12 8C9.79086 8 8 9.79086 8 12C8 12.7418 8.20193 13.4365 8.55382 14.032L4.29289 18.2929C3.90237 18.6834 3.90237 19.3166 4.29289 19.7071C4.68342 20.0976 5.31658 20.0976 5.70711 19.7071L9.96803 15.4462C10.5635 15.7981 11.2582 16 12 16C14.2091 16 16 14.2091 16 12C16 11.2582 15.7981 10.5635 15.4462 9.96803L19.7071 5.70711ZM12.518 10.0677C12.3528 10.0236 12.1792 10 12 10C10.8954 10 10 10.8954 10 12C10 12.1792 10.0236 12.3528 10.0677 12.518L12.518 10.0677ZM11.482 13.9323L13.9323 11.482C13.9764 11.6472 14 11.8208 14 12C14 13.1046 13.1046 14 12 14C11.8208 14 11.6472 13.9764 11.482 13.9323Z"/></svg>`;
 
 function initEyeButtons() {
   document.querySelectorAll(".pw-eye").forEach((btn) => {
@@ -196,6 +164,8 @@ initEyeButtons();
 // Actions
 // =====================
 signupBtn?.addEventListener("click", async () => {
+  authRedirectLock = true;
+
   try {
     setMsg("");
 
@@ -205,89 +175,77 @@ signupBtn?.addEventListener("click", async () => {
 
     if (!displayName || !email || !password) {
       setMsg("❌ Remplis pseudo, email et mot de passe.");
+      authRedirectLock = false;
       return;
     }
-
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-      setMsg("❌ Adresse email invalide.");
-      return;
-    }
-
-    if (password.length < 6) {
-      setMsg("❌ Mot de passe trop court (min 6 caractères).");
-      return;
-    }
-
-    setMsg("⏳ Création du compte…");
-    if (signupBtn) signupBtn.disabled = true;
 
     const norm = normalizeUsername(displayName);
     const r = await checkUsername(norm);
     if (!r.ok) {
       setMsg(r.msg || "❌ Pseudo invalide.");
-      if (signupBtn) signupBtn.disabled = false;
+      authRedirectLock = false;
       return;
     }
+
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      setMsg("❌ Adresse email invalide.");
+      authRedirectLock = false;
+      return;
+    }
+    if (password.length < 6) {
+      setMsg("❌ Mot de passe trop court (min 6 caractères).");
+      authRedirectLock = false;
+      return;
+    }
+
+    setMsg("⏳ Création du compte…");
 
     await signupEmail({ email, password, displayName });
 
     localStorage.setItem(LS_NAME, displayName);
-    alreadyRedirected = true;
-    window.location.replace("./index.html");
+    window.location.href = "./index.html";
   } catch (e) {
+    authRedirectLock = false;
     const code = (e?.code || "").toLowerCase();
-    const m = (e?.message || "").toLowerCase();
-
-    if (code === "auth/email-already-in-use" || (m.includes("email") && m.includes("already"))) {
-      setMsg("❌ Email déjà utilisé.");
-    } else {
-      setMsg("Erreur: " + (e?.message || String(e)));
-    }
-  } finally {
-    if (signupBtn) signupBtn.disabled = false;
+    if (code === "auth/email-already-in-use") setMsg("❌ Email déjà utilisé.");
+    else setMsg("Erreur: " + (e?.message || String(e)));
   }
 });
 
 loginBtn?.addEventListener("click", async () => {
+  authRedirectLock = true;
+
   try {
     setMsg("⏳ Connexion…");
-    if (loginBtn) loginBtn.disabled = true;
 
-    const email = (loginEmailInput?.value || "").trim();
-    const password = loginPassInput?.value || "";
-
+    const email = (loginEmailEl?.value || "").trim();
+    const password = loginPassEl?.value || "";
     if (!email || !password) {
       setMsg("❌ Mets ton email et ton mot de passe.");
+      authRedirectLock = false;
       return;
     }
 
     await loginEmail({ email, password });
-
-    alreadyRedirected = true;
-    window.location.replace("./index.html");
+    window.location.href = "./index.html";
   } catch (e) {
+    authRedirectLock = false;
     const code = e?.code || "";
-    const message = e?.message || String(e);
-    setMsg(`❌ Connexion impossible.\n${code ? "(" + code + ") " : ""}${message}`);
-  } finally {
-    if (loginBtn) loginBtn.disabled = false;
+    if (code === "auth/invalid-credential" || code === "auth/wrong-password") setMsg("❌ Identifiants incorrects.");
+    else setMsg("❌ " + (e?.message || String(e)));
   }
 });
 
-// Reset
 resetBtn?.addEventListener("click", async () => {
-  const email = (loginEmailInput?.value || "").trim();
-  if (!email) {
-    setMsg("Mets ton email d’abord.");
-    return;
-  }
+  const email = (loginEmailEl?.value || "").trim();
+  if (!email) { setMsg("Mets ton email d’abord."); return; }
 
   try {
     setMsg("⏳ Envoi de l’email…");
     await resetPassword(email);
     setMsg("✅ Email de réinitialisation envoyé (check spam aussi).");
   } catch (e) {
-    const code = e?.code || "";
+    const code = (e?.code || "");
     if (code === "auth/user-not-found") setMsg("❌ Aucun compte avec cet email.");
     else if (code === "auth/invalid-email") setMsg("❌ Email invalide.");
     else if (code === "auth/too-many-requests") setMsg("⏳ Trop de tentatives, réessaie plus tard.");
@@ -295,13 +253,9 @@ resetBtn?.addEventListener("click", async () => {
   }
 });
 
-// Bonus UX: Entrée = action
-signupPass?.addEventListener("keydown", (e) => {
-  if (e.key === "Enter") signupBtn?.click();
-});
-loginPassInput?.addEventListener("keydown", (e) => {
-  if (e.key === "Enter") loginBtn?.click();
-});
+// Entrée = submit
+signupPass?.addEventListener("keydown", (e) => { if (e.key === "Enter") signupBtn?.click(); });
+loginPassEl?.addEventListener("keydown", (e) => { if (e.key === "Enter") loginBtn?.click(); });
 
 // Default
 setTab("signup");
