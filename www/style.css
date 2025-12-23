@@ -1957,3 +1957,15 @@ main.page.blog-page{ padding-top: calc(56px + 12px) !important; }
   cursor:not-allowed;
   box-shadow:none;
 }
+
+.btn-pill{
+  height:38px;
+  padding:0 14px;
+  border-radius:999px;
+  border:1px solid rgba(23,140,168,.18);
+  background: rgba(255,255,255,.85);
+  color: rgba(31,75,86,.85);
+  font-weight:900;
+  box-shadow:0 10px 22px rgba(0,0,0,.06);
+  cursor:pointer;
+}
