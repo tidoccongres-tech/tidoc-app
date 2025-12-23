@@ -138,12 +138,19 @@ function buildProfile(left){
   btn.addEventListener("touchend", (e)=>{ e.preventDefault(); toggle(e); }, { passive:false });
 
   menu.addEventListener("click", async (e)=>{
-    e.stopPropagation();
-    const act = e.target?.getAttribute?.("data-act");
-    if (act === "settings") { closeMenu(menu); location.href = "./settings.html"; }
-    if (act === "logout") { closeMenu(menu); try{ await logout(); }catch(_){} location.href = "./login.html"; }
-  });
+  e.stopPropagation();
+  const item = e.target.closest?.("[data-act]");
+  const act = item?.getAttribute("data-act");
+  if (!act) return;
 
+  if (act === "settings") { closeMenu(menu); location.href = "./settings.html"; }
+  if (act === "logout") { closeMenu(menu); try{ await logout(); }catch(_){} location.href = "./login.html"; }
+});
+
+["pointerdown","touchstart","mousedown"].forEach(evt=>{
+  menu.addEventListener(evt, (e)=> e.stopPropagation(), { capture:true, passive:false });
+});
+  
   if (!window.__TIDOC_MENU_BOUND__) {
   window.__TIDOC_MENU_BOUND__ = true;
 
