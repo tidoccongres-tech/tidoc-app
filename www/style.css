@@ -1508,13 +1508,6 @@ main.page.blog-page{ padding-top: calc(56px + 12px) !important; }
   border-radius:14px;
 }
 
-/* EVENEMENTS — rendre Date / Time / Select aussi beaux que les inputs */
-:root{
-  --field-bg: rgba(255,255,255,.92);
-  --field-border: rgba(23,140,168,.18);
-  --field-shadow: 0 10px 22px rgba(0,0,0,.06);
-}
-
 /* cible la carte "Nouvel événement" (si tu as une classe, remplace .blog-page par plus précis) */
 .blog-page input[type="date"],
 .blog-page input[type="time"],
@@ -1713,14 +1706,6 @@ main.page.blog-page{ padding-top: calc(56px + 12px) !important; }
   display:block;
 }
 
-/* ===== 4) Shine animation (shared) ===== */
-@keyframes shine{
-  0%   { transform: rotate(25deg) translateX(-70%); opacity:0; }
-  15%  { opacity:.9; }
-  45%  { transform: rotate(25deg) translateX(70%); opacity:0; }
-  100% { opacity:0; }
-}
-
 /* ===== 5) Home contact premium (shine) ===== */
 .home-contact-premium{
   position:relative;
@@ -1881,15 +1866,6 @@ main.page.blog-page{ padding-top: calc(56px + 12px) !important; }
    EVENTS PREMIUM (Ti'Doc)
    ========================= */
 
-:root{
-  --tidoc: #178CA8;
-  --tidoc2:#1fb5d0;
-  --glass: rgba(255,255,255,.78);
-  --glass2: rgba(255,255,255,.92);
-  --line: rgba(23,140,168,.16);
-  --muted: rgba(31,75,86,.72);
-}
-
 /* Container list */
 #eventsList{
   display:flex;
@@ -2004,43 +1980,6 @@ main.page.blog-page{ padding-top: calc(56px + 12px) !important; }
   font-weight:900;
 }
 .event-place:hover{ text-decoration:underline; }
-
-/* =========================
-   PREMIUM BUTTONS (shine)
-   ========================= */
-
-.btn-premium{
-  height:46px;
-  border-radius:16px;
-  font-weight:950;
-  letter-spacing:.2px;
-  border:none;
-  cursor:pointer;
-  position:relative;
-  overflow:hidden;
-  display:inline-flex;
-  align-items:center;
-  justify-content:center;
-  gap:8px;
-  padding:0 14px;
-  white-space:nowrap;
-}
-
-.btn-premium::after{
-  content:"";
-  position:absolute;
-  inset:-40% -60%;
-  background: linear-gradient(90deg, transparent, rgba(255,255,255,.38), transparent);
-  transform: rotate(25deg) translateX(-60%);
-  animation: btnShine 2.8s ease-in-out infinite;
-  pointer-events:none;
-}
-@keyframes btnShine{
-  0%   { transform: rotate(25deg) translateX(-70%); opacity:0; }
-  15%  { opacity:.9; }
-  45%  { transform: rotate(25deg) translateX(70%); opacity:0; }
-  100% { opacity:0; }
-}
 
 .btn-premium-primary{
   color:#fff;
