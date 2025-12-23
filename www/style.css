@@ -2006,3 +2006,14 @@ main.page.blog-page{ padding-top: calc(56px + 12px) !important; }
   fill: currentColor;
   display:block;
 }
+
+
+/* Panels: un seul visible */
+.auth-panel{ 
+  display:none; 
+}
+.auth-panel.active{ 
+  display:flex; 
+  flex-direction:column; 
+  gap:12px; 
+}
