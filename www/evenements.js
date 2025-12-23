@@ -515,15 +515,17 @@ function renderEventCard(id, e){
         <h3 style="margin:0;">${escapeHTML(e.title || "")}</h3>
 
         ${
-          canDelete
-            ? `<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;justify-content:flex-end;">
-                 <button class="btn-outline" type="button" data-part="${id}" style="height:40px;border-radius:14px;font-weight:950;">
-                   Liste participants
-                 </button>
-                 <button class="delete-btn" type="button" data-del="${id}" aria-label="Supprimer">${TRASH_SVG}</button>
-               </div>`
-            : ""
-        }
+  canDelete ? `
+    <div class="event-actions">
+      <button class="btn-premium btn-premium-outline" type="button" data-part="${id}">
+        Liste participants
+      </button>
+      <button class="icon-danger" type="button" data-del="${id}" aria-label="Supprimer">
+        ${TRASH_SVG}
+      </button>
+    </div>
+  ` : ""
+}
       </div>
 
       ${e.desc ? `<p class="event-desc">${escapeHTML(e.desc)}</p>` : ""}
@@ -540,18 +542,17 @@ function renderEventCard(id, e){
       </div>
 
       ${
-        !canDelete
-          ? `
-        <div style="margin-top:10px;display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
-          <button class="btn-primary event-add" type="button" data-toggle="${id}">…</button>
-          <span data-status="${id}" style="font-size:12px;color:var(--muted);font-weight:800;"></span>
-        </div>
-        <div style="margin-top:8px;">
-          <span data-rights="${id}" style="font-size:12px;color:var(--muted);font-weight:700;"></span>
-        </div>
-          `
-          : ""
-      }
+  !canDelete ? `
+    <div class="event-actions">
+      <button class="btn-premium btn-premium-primary" type="button" data-toggle="${id}">
+        …
+      </button>
+      <span class="event-status" data-status="${id}"></span>
+    </div>
+
+    <div class="event-rights" data-rights="${id}"></div>
+  ` : ""
+}
     </div>
   `;
 
