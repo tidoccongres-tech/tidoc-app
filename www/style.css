@@ -1826,7 +1826,6 @@ main.page.blog-page > section.card:first-of-type h2{ letter-spacing:.2px; }
   box-shadow:0 18px 34px rgba(0,0,0,.08);
 }
 
-.auth-panel{ display:flex; flex-direction:column; gap:12px; }
 
 .field-premium{ position:relative; }
 .field-premium input{
@@ -1866,28 +1865,6 @@ main.page.blog-page > section.card:first-of-type h2{ letter-spacing:.2px; }
   color: rgba(23,140,168,.85);
 }
 
-.field-premium.has-eye input{ padding-right:52px; }
-.pw-eye{
-  position:absolute;
-  right:10px;
-  top:50%;
-  transform:translateY(-50%);
-  width:36px;
-  height:36px;
-  border-radius:14px;
-  border:1px solid rgba(23,140,168,.18);
-  background: rgba(23,140,168,.08);
-  cursor:pointer;
-  box-shadow:0 12px 24px rgba(0,0,0,.06);
-  display:none; /* ✅ caché tant que JS pas prêt */
-  align-items:center;
-  justify-content:center;
-  color: var(--tidoc);
-  transition: transform .12s ease, filter .12s ease;
-}
-.pw-eye.ready{ display:flex; }
-.pw-eye:hover{ transform:translateY(-50%) translateY(-1px); filter:brightness(1.02); }
-.pw-eye svg{ width:18px; height:18px; fill: currentColor; display:block; }
 
 .auth-cta{ width:100%; height:48px; border-radius:16px; }
 .auth-reset{ width:100%; height:46px; border-radius:16px; }
@@ -1970,11 +1947,26 @@ main.page.blog-page{ padding-top: calc(56px + 12px) !important; }
   cursor:pointer;
 }
 
-/* même style pour login + settings */
-.field-premium.has-eye input{ padding-right:52px; }
+/* =========================
+   AUTH PANELS (gérés par hidden via JS)
+   ========================= */
+.auth-panel{
+  display:flex;
+  flex-direction:column;
+  gap:12px;
+}
+.auth-panel[hidden]{
+  display:none !important;
+}
 
-.pw-eye,
-.pw-toggle{
+/* =========================
+   SINGLE EYE TOGGLE (login + settings)
+   ========================= */
+.field-premium.has-eye input{
+  padding-right:52px;
+}
+
+.pw-eye{
   position:absolute;
   right:10px;
   top:50%;
@@ -1986,34 +1978,25 @@ main.page.blog-page{ padding-top: calc(56px + 12px) !important; }
   background: rgba(23,140,168,.08);
   cursor:pointer;
   box-shadow:0 12px 24px rgba(0,0,0,.06);
-  display:flex;                 /* ⬅️ IMPORTANT pour settings */
+  display:none;              /* caché tant que JS n’a pas mis .ready */
   align-items:center;
   justify-content:center;
   color: var(--tidoc);
   transition: transform .12s ease, filter .12s ease;
 }
 
-.pw-eye:hover,
-.pw-toggle:hover{
+.pw-eye.ready{
+  display:flex;
+}
+
+.pw-eye:hover{
   transform:translateY(-50%) translateY(-1px);
   filter:brightness(1.02);
 }
 
-.pw-eye svg,
-.pw-toggle svg{
+.pw-eye svg{
   width:18px;
   height:18px;
   fill: currentColor;
   display:block;
-}
-
-/* Panels: gérés par l’attribut hidden (JS) */
-.auth-panel{
-  display:flex;
-  flex-direction:column;
-  gap:12px;
-}
-
-.auth-panel[hidden]{
-  display:none !important;
 }
