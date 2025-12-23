@@ -1681,3 +1681,24 @@ main.page.blog-page{ padding-top: calc(56px + 12px) !important; }
   fill:currentColor;
   display:block;
 }
+
+/* ✅ Poubelle commentaire (même style que delete post) */
+.comment-del{
+  width:32px;
+  height:32px;
+  border-radius:12px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  background:rgba(23,140,168,.10);
+  border:1px solid rgba(23,140,168,.20);
+  color:var(--tidoc);
+  flex: 0 0 auto;
+}
+
+.comment-del .trash-ico{
+  width:16px;
+  height:16px;
+  fill:currentColor;
+  display:block;
+}
