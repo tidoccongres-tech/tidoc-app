@@ -444,8 +444,8 @@ function renderPostCard(postId, p) {
       </button>
       <span class="like-count" data-likecount="${postId}">…</span>
 
-      <button class="btn-outline" type="button" data-togglecomments="${postId}">
-        Commentaires
+      <button class="btn-premium btn-premium-outline" type="button" data-togglecomments="${postId}">
+       Commentaires
       </button>
     </div>
 
