@@ -174,8 +174,6 @@ async function loadNotifs(){
 // =========================
 // GALERIE PICKER
 // =========================
-async function openGalleryPicker(onPick){
-  const snap = await getDocs(collection(db, "gallery"));
 
   const overlay = document.createElement("div");
   overlay.style.position = "fixed";
