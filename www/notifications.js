@@ -16,7 +16,7 @@ import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.4/f
 
 // ===== Cloudinary (newsletter uploads) =====
 const CLOUD_NAME = "dctwkkvn1";
-const UPLOAD_PRESET_NEWSLETTER = "tidoc_newsletter"; // ou "tidoc_galerie"
+const UPLOAD_PRESET_NEWSLETTER = "tidoc_galerie";
 
 async function uploadToCloudinary(file, folder = "tidoc/newsletter") {
   if (!file) throw new Error("Aucun fichier.");
