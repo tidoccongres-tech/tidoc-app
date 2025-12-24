@@ -348,7 +348,7 @@ function openNewsletterModal(){
   urlEl.addEventListener("input", refreshPreview);
 
   const imgInput = overlay.querySelector("#nlPickImageFile");
-const logoInput = overlay.querySelector("#nlPickLogoFile");
+  const logoInput = overlay.querySelector("#nlPickLogoFile");
 
 overlay.querySelector("#pickImage").onclick = () => imgInput.click();
 overlay.querySelector("#pickLogo").onclick = () => logoInput.click();
@@ -359,12 +359,16 @@ imgInput.addEventListener("change", async () => {
 
   try {
     picked.textContent = "Upload image…";
+    overlay.querySelector("#pickImage").disabled = true;
+    overlay.querySelector("#pickLogo").disabled = true;
     const up = await uploadToCloudinary(file, "tidoc/newsletter/image");
     imageUrl = up.secureUrl;
     refreshPreview();
   } catch (e) {
     alert(e?.message || e);
   } finally {
+    overlay.querySelector("#pickImage").disabled = false;
+    overlay.querySelector("#pickLogo").disabled = false;
     imgInput.value = ""; // permet de re-sélectionner la même photo
   }
 });
