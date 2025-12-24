@@ -2049,3 +2049,48 @@ main.page.blog-page{ padding-top: calc(56px + 12px) !important; }
   cursor:not-allowed;
   box-shadow:none;
 }
+
+/* =========================
+   GALLERY — CLEAN GRID
+   ========================= */
+.gallery-grid{
+  margin-top:12px;
+  display:grid;
+  grid-template-columns:repeat(2, 1fr);
+  gap:12px;
+}
+
+@media (min-width:900px){
+  .gallery-grid{ grid-template-columns:repeat(3, 1fr); }
+}
+
+.gallery-item{
+  position:relative;
+  border-radius:22px;
+  overflow:hidden;
+  border:1px solid rgba(23,140,168,.14);
+  background:#fff;
+  box-shadow:0 22px 44px rgba(0,0,0,.08);
+}
+
+.gallery-item a{ display:block; }
+
+.gallery-item img{
+  width:100%;
+  aspect-ratio: 4 / 3;   /* ✅ rendu régulier */
+  height:auto;
+  object-fit:cover;
+  display:block;
+}
+
+/* ✅ bouton delete propre (override des anciens styles) */
+.gallery-item .gallery-del{
+  position:absolute;
+  top:10px;
+  right:10px;
+  padding:0;
+  width:44px;
+  height:44px;
+  border-radius:16px;
+  z-index:30;
+}
