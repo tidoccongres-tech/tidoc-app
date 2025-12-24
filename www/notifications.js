@@ -115,6 +115,13 @@ async function loadNotifs(){
     const canDeleteNewsletter = admin && (n.type === "newsletter");
 
     card.innerHTML = `
+      ${n.logoUrl ? `
+  <div style="margin-top:10px;display:flex;align-items:center;gap:10px;">
+    <img src="${n.logoUrl}" alt="logo"
+      style="width:28px;height:28px;border-radius:8px;object-fit:cover">
+    <span style="font-size:12px;color:var(--muted);font-weight:800">Ti’Doc</span>
+  </div>
+` : ""}
       ${canDeleteNewsletter ? `
         <button
           type="button"
