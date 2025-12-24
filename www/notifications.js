@@ -172,47 +172,6 @@ async function loadNotifs(){
 }
 
 // =========================
-// GALERIE PICKER
-// =========================
-
-  const overlay = document.createElement("div");
-  overlay.style.position = "fixed";
-  overlay.style.inset = "0";
-  overlay.style.background = "rgba(0,0,0,.45)";
-  overlay.style.display = "flex";
-  overlay.style.alignItems = "center";
-  overlay.style.justifyContent = "center";
-  overlay.style.zIndex = "10000";
-
-  overlay.innerHTML = `
-    <div class="card" style="width:min(520px,95vw);max-height:80vh;overflow:auto;">
-      <h3>Choisir une image</h3>
-      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;">
-        ${snap.docs.map(d=>{
-          const img = d.data();
-          return `
-            <img src="${img.url}"
-              data-url="${img.url}"
-              style="width:100%;aspect-ratio:1/1;object-fit:cover;border-radius:10px;cursor:pointer">
-          `;
-        }).join("")}
-      </div>
-    </div>
-  `;
-
-  overlay.onclick = (e)=>{
-    const url = e.target?.dataset?.url;
-    if (url){
-      onPick(url);
-      overlay.remove();
-    }
-    if (e.target === overlay) overlay.remove();
-  };
-
-  document.body.appendChild(overlay);
-}
-
-// =========================
 // NEWSLETTER MODAL
 // =========================
 function openNewsletterModal(){
