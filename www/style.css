@@ -2128,3 +2128,34 @@ main.page.blog-page{ padding-top: calc(56px + 12px) !important; }
 /* animation simple */
 .icon-pill:hover, .pill-btn:hover{ transform:translateY(-1px); }
 .icon-pill:active, .pill-btn:active{ transform:scale(.98); }
+
+.comment-row{
+  display:flex;
+  gap:10px;
+  align-items:center;
+  margin-top:12px;
+}
+
+.comment-input{
+  flex:1;
+  height:44px;
+  padding:0 14px;
+  border-radius:14px;
+  border:1px solid rgba(0,0,0,.08);
+  background:rgba(255,255,255,.7);
+}
+
+.comment-send{
+  height:44px;
+  padding:0 16px;           /* <- plus petit */
+  border-radius:14px;
+  border:0;
+  background:var(--tidoc);
+  color:white;
+  font-weight:800;
+  cursor:pointer;
+  transition:transform .15s ease, filter .15s ease;
+}
+
+.comment-send:hover{ filter:brightness(1.03); transform:translateY(-1px); }
+.comment-send:active{ transform:scale(.98); }
