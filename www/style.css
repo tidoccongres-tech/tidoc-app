@@ -2000,3 +2000,52 @@ main.page.blog-page{ padding-top: calc(56px + 12px) !important; }
   fill: currentColor;
   display:block;
 }
+
+/* =========================
+   SETTINGS — PASSWORD EYE (SECURITY)
+   ========================= */
+.pw-wrap{
+  position:relative;
+}
+
+.pw-wrap .sec-input{
+  padding-right:52px; /* place pour l’œil */
+}
+
+.pw-toggle{
+  position:absolute;
+  right:10px;
+  top:50%;
+  transform:translateY(-50%);
+  width:36px;
+  height:36px;
+  border-radius:14px;
+  border:1px solid rgba(23,140,168,.18);
+  background: rgba(23,140,168,.08);
+  cursor:pointer;
+  box-shadow:0 12px 24px rgba(0,0,0,.06);
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  color: var(--tidoc);
+  padding:0;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.pw-toggle:hover{
+  transform:translateY(-50%) translateY(-1px);
+  filter:brightness(1.02);
+}
+
+.pw-toggle svg{
+  width:18px;
+  height:18px;
+  fill: currentColor;
+  display:block;
+}
+
+.pw-toggle:disabled{
+  opacity:.45;
+  cursor:not-allowed;
+  box-shadow:none;
+}
