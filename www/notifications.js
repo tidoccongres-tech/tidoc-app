@@ -14,6 +14,35 @@ import {
 } from "https://www.gstatic.com/firebasejs/10.12.4/firebase-firestore.js";
 import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.4/firebase-auth.js";
 
+// ===== Cloudinary (newsletter uploads) =====
+const CLOUD_NAME = "dctwkkvn1";
+const UPLOAD_PRESET_NEWSLETTER = "tidoc_newsletter"; // ou "tidoc_galerie"
+
+async function uploadToCloudinary(file, folder = "tidoc/newsletter") {
+  if (!file) throw new Error("Aucun fichier.");
+
+  const url = `https://api.cloudinary.com/v1_1/${CLOUD_NAME}/image/upload`;
+  const fd = new FormData();
+  fd.append("file", file);
+  fd.append("upload_preset", UPLOAD_PRESET_NEWSLETTER);
+  fd.append("folder", folder);
+
+  const res = await fetch(url, { method: "POST", body: fd });
+  const data = await res.json();
+
+  if (!res.ok || !data?.secure_url) {
+    console.log("Cloudinary upload error:", data);
+    throw new Error(data?.error?.message || "Upload Cloudinary impossible.");
+  }
+
+  return {
+    secureUrl: data.secure_url,
+    publicId: data.public_id,
+    width: data.width || null,
+    height: data.height || null,
+  };
+}
+
 requireAuthOrRedirect("./login.html");
 
 const root = document.getElementById("notifRoot");
@@ -226,6 +255,8 @@ function openNewsletterModal(){
           <button class="btn-outline" type="button" id="pickImage">Choisir image</button>
           <button class="btn-outline" type="button" id="pickLogo">Choisir logo</button>
           <div id="nlPicked" style="font-size:13px;color:var(--muted)"></div>
+          <input id="nlPickImageFile" type="file" accept="image/*" style="display:none" />
+          <input id="nlPickLogoFile"  type="file" accept="image/*" style="display:none" />
         </div>
 
         <div class="preview-card">
@@ -311,11 +342,43 @@ function openNewsletterModal(){
   labEl.addEventListener("input", refreshPreview);
   urlEl.addEventListener("input", refreshPreview);
 
-  overlay.querySelector("#pickImage").onclick = () =>
-    openGalleryPicker((url) => { imageUrl = url; refreshPreview(); });
+  const imgInput = overlay.querySelector("#nlPickImageFile");
+const logoInput = overlay.querySelector("#nlPickLogoFile");
 
-  overlay.querySelector("#pickLogo").onclick = () =>
-    openGalleryPicker((url) => { logoUrl = url; refreshPreview(); });
+overlay.querySelector("#pickImage").onclick = () => imgInput.click();
+overlay.querySelector("#pickLogo").onclick = () => logoInput.click();
+
+imgInput.addEventListener("change", async () => {
+  const file = imgInput.files?.[0];
+  if (!file) return;
+
+  try {
+    picked.textContent = "Upload image…";
+    const up = await uploadToCloudinary(file, "tidoc/newsletter/image");
+    imageUrl = up.secureUrl;
+    refreshPreview();
+  } catch (e) {
+    alert(e?.message || e);
+  } finally {
+    imgInput.value = ""; // permet de re-sélectionner la même photo
+  }
+});
+
+logoInput.addEventListener("change", async () => {
+  const file = logoInput.files?.[0];
+  if (!file) return;
+
+  try {
+    picked.textContent = "Upload logo…";
+    const up = await uploadToCloudinary(file, "tidoc/newsletter/logo");
+    logoUrl = up.secureUrl;
+    refreshPreview();
+  } catch (e) {
+    alert(e?.message || e);
+  } finally {
+    logoInput.value = "";
+  }
+});
 
   overlay.querySelector("#nlSend").onclick = async () => {
     const nlMsg = overlay.querySelector("#nlMsg");
