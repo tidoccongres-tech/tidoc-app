@@ -312,23 +312,24 @@ function openNewsletterModal(){
 overlay.querySelector("#pickImage").onclick = () => imgInput.click();
 overlay.querySelector("#pickLogo").onclick = () => logoInput.click();
 
-imgInput.addEventListener("change", async () => {
-  const file = imgInput.files?.[0];
+logoInput.addEventListener("change", async () => {
+  const file = logoInput.files?.[0];
   if (!file) return;
 
   try {
-    picked.textContent = "Upload image…";
+    picked.textContent = "Upload logo…";
     overlay.querySelector("#pickImage").disabled = true;
     overlay.querySelector("#pickLogo").disabled = true;
-    const up = await uploadToCloudinary(file, "tidoc/newsletter/image");
-    imageUrl = up.secureUrl;
+
+    const up = await uploadToCloudinary(file, "tidoc/newsletter/logo");
+    logoUrl = up.secureUrl;
     refreshPreview();
   } catch (e) {
     alert(e?.message || e);
   } finally {
     overlay.querySelector("#pickImage").disabled = false;
     overlay.querySelector("#pickLogo").disabled = false;
-    imgInput.value = ""; // permet de re-sélectionner la même photo
+    logoInput.value = "";
   }
 });
 
