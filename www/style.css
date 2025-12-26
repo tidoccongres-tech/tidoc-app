@@ -2231,3 +2231,99 @@ main.page.blog-page{ padding-top: calc(56px + 12px) !important; }
   margin-top:10px;
   color:#1d3d44;
 }
+
+/* =========================
+   EVENT FORM (clean & responsive)
+========================= */
+
+.event-form{
+  padding:18px;
+}
+
+.event-form h2{
+  font-size:30px;
+  letter-spacing:-.02em;
+}
+
+.event-form .field{
+  display:flex;
+  flex-direction:column;
+  gap:8px;
+  margin-top:12px;
+}
+
+.event-form .field > span{
+  font-weight:900;
+  color:#0b3a44;
+  opacity:.9;
+}
+
+.event-form input,
+.event-form select,
+.event-form textarea{
+  width:100%;
+  min-height:46px;
+  padding:12px 14px;
+  border-radius:16px;
+  border:1px solid rgba(0,0,0,.08);
+  background:rgba(255,255,255,.7);
+  outline:none;
+}
+
+.event-form textarea{
+  min-height:110px;
+  resize:vertical;
+}
+
+.event-form input:focus,
+.event-form select:focus,
+.event-form textarea:focus{
+  border-color: rgba(23,140,168,.55);
+  box-shadow: 0 0 0 4px rgba(23,140,168,.10);
+}
+
+/* 2 colonnes (début/fin) */
+.event-row-2{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:12px;
+}
+
+/* 3 colonnes (titre/lieu/type) — tu n’as pas ça dans ton HTML actuel,
+   mais je te mets la classe au cas où tu l’ajoutes */
+.event-row-3{
+  display:grid;
+  grid-template-columns:1fr 1fr 1fr;
+  gap:12px;
+}
+
+/* rangée capacité + type, pratique si tu veux */
+.event-row-2b{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:12px;
+}
+
+/* actions */
+.event-form .form-actions{
+  display:flex;
+  justify-content:flex-end;
+  gap:12px;
+  margin-top:16px;
+}
+
+.event-form .btn-outline,
+.event-form .btn-primary{
+  min-height:46px;
+  padding:0 18px;
+  border-radius:16px;
+  font-weight:900;
+}
+
+@media (max-width: 520px){
+  .event-row-2,
+  .event-row-3,
+  .event-row-2b{
+    grid-template-columns:1fr;
+  }
+}
