@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Ti’Doc — MedUs</title>
+  <title>Ti’Doc — Ti’Truant</title>
 
   <link rel="stylesheet" href="./style.css?v=999" />
   <meta name="theme-color" content="#178CA8">
@@ -11,47 +11,80 @@
 
 <body>
 
-  <!-- Topbar -->
   <script type="module" src="./header-user-menu.js?v=999"></script>
 
   <main class="page blog-page">
+
+    <!-- CARD: Lobby actions -->
     <section class="card game-wrap">
       <div>
-        <h1 class="game-title">🩺 MedUs</h1>
-        <p class="game-sub">Un mini-jeu social (version médecine) – V1 Lobby</p>
+        <h1 class="game-title">🧢 Ti’Truant</h1>
+        <p class="game-sub">V2 : Lobby + Map + Déplacements (salle → salle)</p>
       </div>
 
-      <div class="game-row">
+      <div class="row" style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end">
         <button class="btn-primary" id="btnCreateRoom" type="button">Créer une partie</button>
 
-        <div class="game-field" style="flex:2">
-          <label for="joinCode">Code de partie</label>
+        <div class="field" style="flex:2;min-width:220px">
+          <label style="display:block;font-weight:900;color:var(--muted);font-size:12px;margin-bottom:6px">Code de partie</label>
           <input id="joinCode" placeholder="Ex: A7K2F1" maxlength="10" />
         </div>
 
         <button class="btn-outline" id="btnJoinRoom" type="button">Rejoindre</button>
       </div>
 
-      <div id="gameMsg" class="game-msg"></div>
+      <div id="gameMsg" class="hint" style="margin-top:10px;font-weight:800;color:var(--muted)"></div>
     </section>
 
+    <!-- CARD: Lobby -->
     <section class="card" id="lobbyCard" style="display:none;margin-top:12px;">
       <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap">
         <div style="display:flex;flex-direction:column;gap:6px">
-          <div class="lobby-pill">👥 Lobby</div>
-          <div>Code : <span class="room-code" id="roomCodeText">—</span></div>
+          <div class="pill">👥 Lobby</div>
+          <div>Code : <span class="code" id="roomCodeText">—</span></div>
+          <div class="hint" id="roomStatusText">Statut : —</div>
         </div>
 
-        <div class="lobby-actions">
+        <div class="game-actions" style="display:flex;gap:10px;flex-wrap:wrap">
           <button class="btn-outline" id="btnCopyCode" type="button">Copier le code</button>
           <button class="btn-primary" id="btnStartGame" type="button">Lancer la partie</button>
           <button class="btn-outline" id="btnLeaveRoom" type="button">Quitter</button>
         </div>
       </div>
 
-      <div class="game-msg" style="margin-top:10px;">Astuce : partage le code aux autres participants.</div>
+      <div class="hint" style="margin-top:10px">Astuce : partage le code aux autres participants.</div>
 
-      <div id="playersList" class="players-list"></div>
+      <div class="lobby-list" id="playersList" style="margin-top:10px"></div>
+    </section>
+
+    <!-- CARD: Map / déplacement -->
+    <section class="card" id="mapCard" style="display:none;margin-top:12px;">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;flex-wrap:wrap">
+        <div>
+          <div class="pill">🗺️ Carte</div>
+          <div style="margin-top:6px;font-weight:950;color:var(--tidoc);font-size:16px">
+            📍 Salle : <span id="myRoomText">—</span>
+          </div>
+          <div class="hint" id="myRoleHint" style="margin-top:6px">Rôle : tirage au sort plus tard (V3)</div>
+        </div>
+
+        <button class="btn-outline" id="btnToggleMap" type="button">Afficher / Masquer</button>
+      </div>
+
+      <!-- mini carte cliquable -->
+      <div id="mapGrid" style="
+        margin-top:12px;
+        display:grid;
+        grid-template-columns:repeat(3, 1fr);
+        gap:10px;
+      "></div>
+
+      <div class="hint" style="margin-top:10px">
+        Clique une salle adjacente pour t’y déplacer. (Cooldown anti-spam inclus)
+      </div>
+
+      <div style="margin-top:12px;font-weight:950;color:#0e5f71">👀 Présents dans ta salle :</div>
+      <div id="roomPlayersHere" class="hint" style="margin-top:6px">—</div>
     </section>
 
   </main>
