@@ -58,18 +58,19 @@
     </section>
 
     <!-- CARD: Map / déplacement -->
-    <section class="card lobby-card-premium" id="mapCard" 
-      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;flex-wrap:wrap">
-        <div>
-          <div class="pill">🗺️ Carte</div>
-          <div style="margin-top:6px;font-weight:950;color:var(--tidoc);font-size:16px">
-            📍 Salle : <span id="myRoomText">—</span>
-          </div>
-          <div class="hint" id="myRoleHint" style="margin-top:6px">Rôle : tirage au sort plus tard (V3)</div>
-        </div>
+    <section class="card" id="mapCard">
+  <canvas id="gameCanvas" width="900" height="520"></canvas>
 
-        <button class="btn-outline" id="btnToggleMap" type="button">Afficher / Masquer</button>
-      </div>
+  <div id="joystick" class="joy">
+    <div class="joy-base"></div>
+    <div class="joy-stick"></div>
+  </div>
+
+  <div class="hud">
+    <div>Salle : <span id="myRoomText">—</span></div>
+  </div>
+</section>
+        
 
       <!-- mini carte cliquable -->
       <div id="mapGrid" style="
