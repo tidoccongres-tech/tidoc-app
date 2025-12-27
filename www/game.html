@@ -16,25 +16,33 @@
   <main class="page blog-page">
 
     <!-- CARD: Lobby actions -->
-    <section class="card game-wrap game-card-premium">
-      <div class="pill-premium">🧢 Ti’Truant</div>
-<h1 class="game-title-premium">Ti’Truant</h1>
-<p class="game-sub-premium">V2 : Lobby + Map + Déplacements (salle → salle)</p>
+    <section class="card" id="mapCard" style="display:none;margin-top:12px;">
+
+  <div class="map-top">
+    <div>
+      <div class="pill">🗺️ Hôpital</div>
+      <div class="hint" style="margin-top:6px">
+        📍 Salle : <span id="myRoomText">—</span>
+      </div>
     </div>
 
-      <div class="game-grid">
-        <button class="btn-primary" id="btnCreateRoom" type="button">Créer une partie</button>
+    <button class="btn-outline" id="btnLeaveRoom" type="button">Quitter</button>
+  </div>
 
-        <div class="game-field-premium">
-  <label for="joinCode">Code de partie</label>
-  <input id="joinCode" placeholder="Ex: A7K2F1" maxlength="10" />
-</div>
+  <div class="map-stage">
+    <canvas id="gameCanvas" width="900" height="520"></canvas>
 
-        <button class="btn-outline" id="btnJoinRoom" type="button">Rejoindre</button>
-      </div>
+    <!-- Joystick -->
+    <div id="joy" class="joy">
+      <div class="joy-base"></div>
+      <div class="joy-stick"></div>
+    </div>
 
-      <div id="gameMsg" class="game-msg-premium"></div>
-    </section>
+    <!-- HUD petite info -->
+    <div id="hud" class="hud"></div>
+  </div>
+
+</section>
 
     <!-- CARD: Lobby -->
     <section class="card lobby-card-premium" id="lobbyCard" 
