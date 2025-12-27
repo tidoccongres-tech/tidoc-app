@@ -28,6 +28,15 @@ let unsubRoom = null;
 
 function msg(t=""){ if (gameMsg) gameMsg.textContent = t; }
 
+function escapeHTML(s=""){
+  return String(s)
+    .replaceAll("&","&amp;")
+    .replaceAll("<","&lt;")
+    .replaceAll(">","&gt;")
+    .replaceAll('"',"&quot;")
+    .replaceAll("'","&#039;");
+}
+
 function safeName(u){
   const n = (u?.displayName || "").trim();
   if (n) return n;
@@ -51,40 +60,36 @@ function cleanupSubs(){
 }
 
 function showLobby(show){
+  if (!lobbyCard) return;
   lobbyCard.style.display = show ? "" : "none";
 }
 
 function renderPlayers(players){
+  if (!playersList) return;
   playersList.innerHTML = "";
+
   if (!players.length){
-    playersList.innerHTML = `<div class="hint">Aucun joueur pour l’instant.</div>`;
+    playersList.innerHTML = `<div class="game-msg">Aucun joueur pour l’instant.</div>`;
     return;
   }
+
   players.forEach(p=>{
     const div = document.createElement("div");
-    div.className = "player";
+    div.className = "player-row";
     div.innerHTML = `
-      <div>
-        <strong>${escapeHTML(p.name || "Joueur")}</strong>
-        <div class="badge">${p.isHost ? "Hôte" : "Participant"}</div>
+      <div style="display:flex;flex-direction:column;gap:4px;min-width:0">
+        <div style="font-weight:950;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">
+          ${escapeHTML(p.name || "Joueur")}
+        </div>
+        <div class="player-badge">${p.isHost ? "Hôte" : "Participant"}</div>
       </div>
-      <div class="badge">${p.status || ""}</div>
+      <div class="player-badge">${escapeHTML(p.status || "")}</div>
     `;
     playersList.appendChild(div);
   });
 }
 
-function escapeHTML(s=""){
-  return String(s)
-    .replaceAll("&","&amp;")
-    .replaceAll("<","&lt;")
-    .replaceAll(">","&gt;")
-    .replaceAll('"',"&quot;")
-    .replaceAll("'","&#039;");
-}
-
 // =======================
-// Firestore structure
 // rooms/{roomId}
 // rooms/{roomId}/players/{uid}
 // =======================
@@ -95,7 +100,6 @@ async function createRoom(){
 
   const roomId = genCode(6);
 
-  // room doc
   await setDoc(doc(db, "rooms", roomId), {
     roomId,
     createdAt: serverTimestamp(),
@@ -103,7 +107,6 @@ async function createRoom(){
     status: "lobby", // lobby | playing | ended
   });
 
-  // player doc
   await setDoc(doc(db, "rooms", roomId, "players", u.uid), {
     uid: u.uid,
     name: safeName(u),
@@ -151,9 +154,8 @@ async function enterRoom(roomId){
   currentRoomId = roomId;
 
   showLobby(true);
-  roomCodeText.textContent = roomId;
+  if (roomCodeText) roomCodeText.textContent = roomId;
 
-  // listen room
   unsubRoom = onSnapshot(doc(db, "rooms", roomId), (snap)=>{
     if (!snap.exists()){
       msg("❌ La partie a été supprimée.");
@@ -167,10 +169,9 @@ async function enterRoom(roomId){
     }
   });
 
-  // listen players
   unsubPlayers = onSnapshot(collection(db, "rooms", roomId, "players"), (snap)=>{
     const players = snap.docs.map(d=>d.data());
-    players.sort((a,b)=> (b.isHost?1:0) - (a.isHost?1:0));
+    players.sort((a,b)=> (b.isHost === true) - (a.isHost === true));
     renderPlayers(players);
   });
 
@@ -181,7 +182,6 @@ async function startGame(){
   const u = auth.currentUser;
   if (!u || !currentRoomId) return;
 
-  // check host
   const roomSnap = await getDoc(doc(db, "rooms", currentRoomId));
   const room = roomSnap.exists() ? (roomSnap.data() || {}) : {};
   if (room.hostUid !== u.uid){
@@ -199,6 +199,7 @@ async function startGame(){
 
 async function leaveRoom(silent=false){
   const u = auth.currentUser;
+
   if (!currentRoomId || !u) {
     cleanupSubs();
     currentRoomId = null;
@@ -236,7 +237,7 @@ btnJoinRoom?.addEventListener("click", async ()=>{
   try{
     msg("Connexion…");
     btnJoinRoom.disabled = true;
-    await joinRoom(joinCode.value);
+    await joinRoom(joinCode?.value);
   } catch(e){
     console.log(e);
     msg("❌ " + (e?.message || e));
