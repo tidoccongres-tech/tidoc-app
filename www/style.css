@@ -444,10 +444,14 @@ svg{ max-width:none; height:auto; }
 .home-contact-btn{ width:100%; }
 
 .home-quick{
-  margin-top:14px;
   display:grid;
-  grid-template-columns:repeat(3, 1fr);
+  grid-template-columns:repeat(2, 1fr);
   gap:12px;
+}
+
+.home-tile-game{
+  border:1px solid rgba(23,140,168,.28);
+  box-shadow: 0 22px 44px rgba(23,140,168,.12), inset 0 1px 0 rgba(255,255,255,.75);
 }
 
 .home-tile-premium{
