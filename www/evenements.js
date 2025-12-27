@@ -11,7 +11,7 @@ import * as AuthMod from "./auth.js";
 import {
   collection, addDoc, getDocs, getDoc, doc, deleteDoc,
   runTransaction, serverTimestamp, query, orderBy, Timestamp, limit,
-  setDoc
+  setDoc,writeBatch
 } from "https://www.gstatic.com/firebasejs/10.12.4/firebase-firestore.js";
 import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.4/firebase-auth.js";
 
@@ -242,41 +242,11 @@ async function createEvent(){
 }
 
 async function deleteEventAndCleanup(eventId){
-  // 1) récupérer l’event (pour savoir son type)
-  const evSnap = await getDoc(doc(db, "events", eventId));
-  if (!evSnap.exists()) return;
-
-  const ev = evSnap.data() || {};
-  const typeKey = eventTypeKey(ev.type);
-
-  // 2) récupérer toutes les inscriptions
+  // 1) supprimer toutes les inscriptions
   const regsSnap = await getDocs(collection(db, "events", eventId, "registrations"));
-  const uids = regsSnap.docs.map(d => d.id); // docId = uid
-
-  // 3) supprimer toutes les inscriptions
   await Promise.all(regsSnap.docs.map(d => deleteDoc(d.ref)));
 
-  // 4) remettre les quotas pour chaque user (userUsage)
-  // (on décrémente selon le type de l'event)
-  await Promise.all(uids.map(async (uid)=>{
-    const usageRef = doc(db, "userUsage", uid);
-    const uSnap = await getDoc(usageRef);
-    const usage = uSnap.exists() ? (uSnap.data() || {}) : {};
-
-    const wsUsed    = Number(usage.workshopUsed || 0);
-    const confUsed  = Number(usage.conferenceUsed || 0);
-    const otherUsed = Number(usage.otherUsed || 0);
-
-    if (typeKey === "ws"){
-      await setDoc(usageRef, { workshopUsed: Math.max(0, wsUsed - 1) }, { merge:true });
-    } else if (typeKey === "conf"){
-      await setDoc(usageRef, { conferenceUsed: Math.max(0, confUsed - 1) }, { merge:true });
-    } else {
-      await setDoc(usageRef, { otherUsed: Math.max(0, otherUsed - 1) }, { merge:true });
-    }
-  }));
-
-  // 5) supprimer l’event
+  // 2) supprimer l’event
   await deleteDoc(doc(db, "events", eventId));
 }
 
