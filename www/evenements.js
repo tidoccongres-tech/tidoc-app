@@ -7,8 +7,6 @@
 // - ✅ FIX: addDoc manquait dans tes imports
 // - ✅ FIX: showForm(true/false) gère bien le display/hidden
 
-
-
 import * as AuthMod from "./auth.js";
 import {
   collection, addDoc, getDocs, getDoc, doc, deleteDoc,
