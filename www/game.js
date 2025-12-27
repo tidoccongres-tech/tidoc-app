@@ -32,6 +32,14 @@ const myRoomText    = document.getElementById("myRoomText");
 const mapGrid       = document.getElementById("mapGrid");
 const roomPlayersHere = document.getElementById("roomPlayersHere");
 
+const canvas = document.getElementById("gameCanvas");
+const hud    = document.getElementById("hud");
+const joy    = document.getElementById("joy");
+const joyStick = joy?.querySelector(".joy-stick");
+
+let ctx = null;
+if (canvas) ctx = canvas.getContext("2d");
+
 // state
 let currentRoomId = null;
 let unsubPlayers = null;
@@ -42,6 +50,10 @@ let myRoom = "hall";         // salle actuelle
 let lastMoveAt = 0;          // anti spam
 const MOVE_COOLDOWN_MS = 1200;
 
+let myPos = { x: 180, y: 260 };
+let myVel = { x: 0, y: 0 };
+let lastNetSyncAt = 0;
+const NET_SYNC_MS = 120; // ~8 updates/sec
 // =======================
 // MAP (compacte + symétrique)
 // =======================
@@ -176,6 +188,97 @@ function renderPlayersHere(players){
     return;
   }
   roomPlayersHere.textContent = here.map(p => p.name || "Joueur").join(", ");
+}
+
+function setupJoystick(){
+  if (!joy || !joyStick) return;
+
+  let active = false;
+  let center = { x: 0, y: 0 };
+  const max = 40; // amplitude du stick
+
+  function setStick(dx, dy){
+    const dist = Math.hypot(dx, dy);
+    const k = dist > max ? (max / dist) : 1;
+    const sx = dx * k;
+    const sy = dy * k;
+
+    joyStick.style.transform = `translate(calc(-50% + ${sx}px), calc(-50% + ${sy}px))`;
+
+    // vitesse normalisée (-1..1)
+    myVel.x = (sx / max) * 3.2;
+    myVel.y = (sy / max) * 3.2;
+  }
+
+  function reset(){
+    joyStick.style.transform = "translate(-50%,-50%)";
+    myVel.x = 0;
+    myVel.y = 0;
+  }
+
+  function onDown(e){
+    active = true;
+    const r = joy.getBoundingClientRect();
+    center.x = r.left + r.width/2;
+    center.y = r.top + r.height/2;
+    onMove(e);
+  }
+  function onMove(e){
+    if (!active) return;
+    const t = e.touches ? e.touches[0] : e;
+    setStick(t.clientX - center.x, t.clientY - center.y);
+  }
+  function onUp(){
+    active = false;
+    reset();
+  }
+
+  joy.addEventListener("touchstart", onDown, { passive:false });
+  window.addEventListener("touchmove", onMove, { passive:false });
+  window.addEventListener("touchend", onUp);
+
+  joy.addEventListener("mousedown", onDown);
+  window.addEventListener("mousemove", onMove);
+  window.addEventListener("mouseup", onUp);
+}
+
+function clamp(v, a, b){ return Math.max(a, Math.min(b, v)); }
+
+function gameLoop(){
+  if (!ctx || !canvas) return;
+
+  // move
+  myPos.x += myVel.x;
+  myPos.y += myVel.y;
+
+  myPos.x = clamp(myPos.x, 20, canvas.width - 20);
+  myPos.y = clamp(myPos.y, 20, canvas.height - 20);
+
+  // draw bg
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+
+  // (V3.1) Map simple: rectangles de zones (plus tard on met ton image)
+  ctx.globalAlpha = 0.10;
+  ctx.fillRect(80,80,220,140);
+  ctx.fillRect(320,80,220,140);
+  ctx.fillRect(560,80,220,140);
+  ctx.globalAlpha = 1;
+
+  // player
+  ctx.fillStyle = "#178CA8";
+  ctx.beginPath();
+  ctx.arc(myPos.x, myPos.y, 18, 0, Math.PI*2);
+  ctx.fill();
+
+  // pseudo
+  ctx.fillStyle = "rgba(15,55,66,.9)";
+  ctx.font = "900 14px system-ui";
+  ctx.fillText("Moi", myPos.x - 14, myPos.y - 26);
+
+  // hud
+  if (hud) hud.textContent = `x:${myPos.x.toFixed(0)} y:${myPos.y.toFixed(0)}`;
+
+  requestAnimationFrame(gameLoop);
 }
 
 // =======================
