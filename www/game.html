@@ -7,7 +7,6 @@
 
   <link rel="stylesheet" href="./style.css?v=999" />
   <meta name="theme-color" content="#178CA8">
-
 </head>
 
 <body>
@@ -22,41 +21,40 @@
         <p class="game-sub">Un mini-jeu social (version médecine) – V1 Lobby</p>
       </div>
 
-      <div class="row">
+      <div class="game-row">
         <button class="btn-primary" id="btnCreateRoom" type="button">Créer une partie</button>
 
-        <div class="field" style="flex:2;min-width:220px">
-          <label style="display:block;font-weight:900;color:var(--muted);font-size:12px;margin-bottom:6px">Code de partie</label>
+        <div class="game-field" style="flex:2">
+          <label for="joinCode">Code de partie</label>
           <input id="joinCode" placeholder="Ex: A7K2F1" maxlength="10" />
         </div>
+
         <button class="btn-outline" id="btnJoinRoom" type="button">Rejoindre</button>
       </div>
 
-      <div id="gameMsg" class="hint"></div>
+      <div id="gameMsg" class="game-msg"></div>
     </section>
 
     <section class="card" id="lobbyCard" style="display:none;margin-top:12px;">
       <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap">
         <div style="display:flex;flex-direction:column;gap:6px">
-          <div class="pill">👥 Lobby</div>
-          <div>Code : <span class="code" id="roomCodeText">—</span></div>
+          <div class="lobby-pill">👥 Lobby</div>
+          <div>Code : <span class="room-code" id="roomCodeText">—</span></div>
         </div>
 
-        <div class="game-actions">
+        <div class="lobby-actions">
           <button class="btn-outline" id="btnCopyCode" type="button">Copier le code</button>
           <button class="btn-primary" id="btnStartGame" type="button">Lancer la partie</button>
           <button class="btn-outline" id="btnLeaveRoom" type="button">Quitter</button>
         </div>
       </div>
 
-      <div class="hint">Astuce : partage le code aux autres participants.</div>
+      <div class="game-msg" style="margin-top:10px;">Astuce : partage le code aux autres participants.</div>
 
-      <div class="lobby-list" id="playersList"></div>
+      <div id="playersList" class="players-list"></div>
     </section>
 
   </main>
-
-  <!-- Tabbar (optionnel : si tu veux ajouter un onglet “Jeu”, je te le ferai) -->
 
   <script type="module" src="./auth.js"></script>
   <script type="module" src="./game.js?v=999"></script>
