@@ -16,24 +16,24 @@
   <main class="page blog-page">
 
     <!-- CARD: Lobby actions -->
-    <section class="card game-wrap">
-      <div>
-        <h1 class="game-title">🧢 Ti’Truant</h1>
-        <p class="game-sub">V2 : Lobby + Map + Déplacements (salle → salle)</p>
-      </div>
+    <section class="card game-wrap game-card-premium">
+      <div class="pill-premium">🧢 Ti’Truant</div>
+<h1 class="game-title-premium">Ti’Truant</h1>
+<p class="game-sub-premium">V2 : Lobby + Map + Déplacements (salle → salle)</p>
+    </div>
 
-      <div class="row" style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end">
+      <div class="game-grid">
         <button class="btn-primary" id="btnCreateRoom" type="button">Créer une partie</button>
 
-        <div class="field" style="flex:2;min-width:220px">
-          <label style="display:block;font-weight:900;color:var(--muted);font-size:12px;margin-bottom:6px">Code de partie</label>
-          <input id="joinCode" placeholder="Ex: A7K2F1" maxlength="10" />
-        </div>
+        <div class="game-field-premium">
+  <label for="joinCode">Code de partie</label>
+  <input id="joinCode" placeholder="Ex: A7K2F1" maxlength="10" />
+</div>
 
         <button class="btn-outline" id="btnJoinRoom" type="button">Rejoindre</button>
       </div>
 
-      <div id="gameMsg" class="hint" style="margin-top:10px;font-weight:800;color:var(--muted)"></div>
+      <div id="gameMsg" class="game-msg-premium"></div>
     </section>
 
     <!-- CARD: Lobby -->
@@ -47,8 +47,8 @@
 
         <div class="game-actions" style="display:flex;gap:10px;flex-wrap:wrap">
           <button class="btn-outline" id="btnCopyCode" type="button">Copier le code</button>
-          <button class="btn-primary" id="btnStartGame" type="button">Lancer la partie</button>
-          <button class="btn-outline" id="btnLeaveRoom" type="button">Quitter</button>
+          <button class="btn-primary game-btn-premium" id="btnCreateRoom" type="button">Créer une partie</button>
+          <button class="btn-outline game-btn-outline-premium" id="btnJoinRoom" type="button">Rejoindre</button>
         </div>
       </div>
 
