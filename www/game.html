@@ -5,17 +5,20 @@
   <meta name="viewport" content="width=device-width,initial-scale=1.0">
   <title>Ti'Doc — Ti'Truant</title>
 
-  <link rel="stylesheet" href="./style.css">
-  <link rel="stylesheet" href="./game.css">
+  <!-- tu peux garder style.css si tu veux la topbar etc -->
+  <link rel="stylesheet" href="./style.css?v=999">
+  <link rel="stylesheet" href="./game.css?v=999">
 </head>
+
 <body>
+  <script type="module" src="./header-user-menu.js?v=999"></script>
 
   <main class="page blog-page">
 
-    <!-- ÉCRAN 1 : MENU -->
+    <!-- ÉCRAN 1 : MENU (ton PNG dessiné) -->
     <section id="screenMenu" class="card game-menu-card">
-      <div class="menu-stage" id="menuStage">
-        <img src="./assets/menu-portrait.png" alt="Menu Ti'Truant" class="menu-img" />
+      <div class="menu-stage">
+        <img src="./assets/menu-portrait.png" alt="Menu Ti'Truant" class="menu-img">
 
         <!-- zones cliquables -->
         <button id="btnCreate" class="menu-hotspot hs-create" aria-label="Créer une partie"></button>
@@ -24,13 +27,14 @@
       </div>
     </section>
 
-    <!-- ÉCRAN 2 : LOBBY -->
+    <!-- ÉCRAN 2 : LOBBY Firebase -->
     <section id="screenLobby" class="card lobby-card-premium" style="display:none;">
       <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap">
         <div style="display:flex;flex-direction:column;gap:6px">
           <div class="pill">👥 Lobby</div>
           <div>Code : <span class="code" id="roomCodeText">—</span></div>
           <div class="hint" id="roomStatusText">Statut : —</div>
+          <div class="hint" id="gameMsg" style="margin-top:6px"></div>
         </div>
 
         <div style="display:flex;gap:10px;flex-wrap:wrap">
@@ -45,6 +49,7 @@
 
   </main>
 
-  <script type="module" src="./game.js"></script>
+  <script type="module" src="./auth.js"></script>
+  <script type="module" src="./game.js?v=999"></script>
 </body>
 </html>
