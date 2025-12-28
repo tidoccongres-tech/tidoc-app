@@ -15,53 +15,40 @@ const btnCreate = document.getElementById("btnCreate");
 const btnJoin   = document.getElementById("btnJoin");
 const btnHome   = document.getElementById("btnHome");
 
+const screenMenu  = document.getElementById("screenMenu");
+const screenLobby = document.getElementById("screenLobby");
+
+function showScreen(which){
+  if (which === "menu"){
+    screenMenu.style.display = "";
+    screenLobby.style.display = "none";
+  } else if (which === "lobby") {
+    screenMenu.style.display = "none";
+    screenLobby.style.display = "";
+  }
+}
+
+// Boutons menu
+const btnCreate = document.getElementById("btnCreate");
+const btnJoin   = document.getElementById("btnJoin");
+const btnHome   = document.getElementById("btnHome");
+
+// Actions
 btnCreate?.addEventListener("click", async ()=>{
   showScreen("lobby");
-  await createRoom(); // ta fonction existante
+  await createRoom();
 });
 
 btnJoin?.addEventListener("click", async ()=>{
   const code = prompt("Entre le code de la partie :");
   if (!code) return;
   showScreen("lobby");
-  await joinRoom(code);
+  await joinRoom(code.trim().toUpperCase());
 });
 
 btnHome?.addEventListener("click", ()=>{
   window.location.href = "./index.html";
-});const btnCreate = document.getElementById("btnCreate");
-const btnJoin   = document.getElementById("btnJoin");
-const btnHome   = document.getElementById("btnHome");
-const mode = sessionStorage.getItem("gameMode");
-const code = sessionStorage.getItem("gameCode");
+});
 
-if (mode === "create") {
-  console.log("Création automatique de partie");
-  createRoom(); // ta fonction existante
-}
-
-if (mode === "join" && code) {
-  console.log("Connexion automatique à", code);
-  joinRoom(code); // ta fonction existante
-}
-
-sessionStorage.removeItem("gameMode");
-sessionStorage.removeItem("gameCode");
-
-btnCreate.onclick = () => {
-  sessionStorage.setItem("gameMode", "create");
-  sessionStorage.removeItem("gameCode");
-  window.location.href = "./game.html";
-};
-
-btnJoin.onclick = () => {
-  const code = prompt("Entre le code de la partie :");
-  if (!code) return;
-  sessionStorage.setItem("gameMode", "join");
-  sessionStorage.setItem("gameCode", code.trim().toUpperCase());
-  window.location.href = "./game.html";
-};
-
-btnHome.onclick = () => {
-  window.location.href = "./index.html";
-};
+// Au chargement on affiche le menu
+showScreen("menu");
