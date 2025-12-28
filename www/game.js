@@ -1,6 +1,19 @@
 const btnCreate = document.getElementById("btnCreate");
 const btnJoin   = document.getElementById("btnJoin");
 const btnHome   = document.getElementById("btnHome");
+const mode = sessionStorage.getItem("gameMode");
+const code = sessionStorage.getItem("gameCode");
+
+if (mode === "create") {
+  console.log("Création automatique de partie");
+  createRoom(); // ta fonction existante
+}
+
+if (mode === "join" && code) {
+  console.log("Connexion automatique à", code);
+  joinRoom(code); // ta fonction existante
+}
+
 
 btnCreate.onclick = () => {
   sessionStorage.setItem("gameMode", "create");
