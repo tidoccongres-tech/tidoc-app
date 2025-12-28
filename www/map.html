@@ -2,21 +2,28 @@
 <html lang="fr">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Ti’Truant — Map</title>
-  <link rel="stylesheet" href="./map.css" />
+  <meta name="viewport" content="width=device-width,initial-scale=1.0" />
+  <title>Ti’Doc — Map</title>
+  <link rel="stylesheet" href="./style.css?v=999" />
+  <link rel="stylesheet" href="./map.css?v=999" />
   <meta name="theme-color" content="#178CA8">
 </head>
-<body>
 
-  <canvas id="game"></canvas>
+<body class="map-body">
+  <script type="module" src="./header-user-menu.js?v=999"></script>
 
-  <!-- Joystick mobile -->
-  <div id="joy">
-    <div class="base"></div>
-    <div class="stick"></div>
-  </div>
+  <main class="map-root">
+    <canvas id="gameCanvas"></canvas>
 
-  <script type="module" src="./map-scene.js"></script>
+    <!-- mini HUD -->
+    <div class="hud">
+      <div class="hud-pill">👥 <span id="hudPlayers">0</span></div>
+      <div class="hud-pill">📍 <span id="hudRoom">—</span></div>
+      <button class="hud-btn" id="btnBack">Lobby</button>
+    </div>
+  </main>
+
+  <script type="module" src="./auth.js"></script>
+  <script type="module" src="./map-scene.js?v=999"></script>
 </body>
 </html>
