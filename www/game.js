@@ -1,16 +1,19 @@
 const btnCreate = document.getElementById("btnCreate");
-const btnJoin = document.getElementById("btnJoin");
-const btnHome = document.getElementById("btnHome");
+const btnJoin   = document.getElementById("btnJoin");
+const btnHome   = document.getElementById("btnHome");
 
 btnCreate.onclick = () => {
-  window.location.href = "./lobby.html?mode=create";
+  sessionStorage.setItem("lobbyMode", "create");
+  sessionStorage.removeItem("lobbyCode");
+  window.location.href = "./lobby.html";
 };
 
 btnJoin.onclick = () => {
   const code = prompt("Entre le code de la partie :");
-  if (code) {
-    window.location.href = "./lobby.html?mode=join&code=" + encodeURIComponent(code.trim().toUpperCase());
-  }
+  if (!code) return;
+  sessionStorage.setItem("lobbyMode", "join");
+  sessionStorage.setItem("lobbyCode", code.trim().toUpperCase());
+  window.location.href = "./lobby.html";
 };
 
 btnHome.onclick = () => {
