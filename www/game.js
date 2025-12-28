@@ -14,6 +14,8 @@ if (mode === "join" && code) {
   joinRoom(code); // ta fonction existante
 }
 
+sessionStorage.removeItem("gameMode");
+sessionStorage.removeItem("gameCode");
 
 btnCreate.onclick = () => {
   sessionStorage.setItem("gameMode", "create");
