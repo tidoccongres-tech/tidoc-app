@@ -4,19 +4,47 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width,initial-scale=1.0">
   <title>Ti'Doc — Ti'Truant</title>
+
+  <link rel="stylesheet" href="./style.css">
   <link rel="stylesheet" href="./game.css">
 </head>
 <body>
 
-  <div class="menu-container">
-    <img src="./assets/menu-portrait.png" class="menu-bg" id="menuBg"/>
+  <main class="page blog-page">
 
-    <!-- Zones cliquables -->
-    <button class="zone zone-create" id="btnCreate"></button>
-    <button class="zone zone-join" id="btnJoin"></button>
-    <button class="zone zone-home" id="btnHome"></button>
-  </div>
+    <!-- ÉCRAN 1 : MENU -->
+    <section id="screenMenu" class="card game-menu-card">
+      <div class="menu-stage" id="menuStage">
+        <img src="./assets/menu-portrait.png" alt="Menu Ti'Truant" class="menu-img" />
 
-  <script src="./game.js"></script>
+        <!-- zones cliquables -->
+        <button id="btnCreate" class="menu-hotspot hs-create" aria-label="Créer une partie"></button>
+        <button id="btnJoin"   class="menu-hotspot hs-join"   aria-label="Rejoindre une partie"></button>
+        <button id="btnHome"   class="menu-hotspot hs-home"   aria-label="Retour accueil"></button>
+      </div>
+    </section>
+
+    <!-- ÉCRAN 2 : LOBBY -->
+    <section id="screenLobby" class="card lobby-card-premium" style="display:none;">
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap">
+        <div style="display:flex;flex-direction:column;gap:6px">
+          <div class="pill">👥 Lobby</div>
+          <div>Code : <span class="code" id="roomCodeText">—</span></div>
+          <div class="hint" id="roomStatusText">Statut : —</div>
+        </div>
+
+        <div style="display:flex;gap:10px;flex-wrap:wrap">
+          <button class="btn-outline" id="btnCopyCode" type="button">Copier le code</button>
+          <button class="btn-outline" id="btnLeaveRoom" type="button">Quitter</button>
+        </div>
+      </div>
+
+      <div class="hint" style="margin-top:10px">Astuce : partage le code aux autres participants.</div>
+      <div class="lobby-list" id="playersList" style="margin-top:10px"></div>
+    </section>
+
+  </main>
+
+  <script type="module" src="./game.js"></script>
 </body>
 </html>
