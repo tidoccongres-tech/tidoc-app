@@ -1,49 +1,28 @@
-html, body {
-  margin: 0;
-  padding: 0;
-  background: #000;
-  height: 100%;
+.game-menu-card{ padding:12px; }
+
+.menu-stage{
+  position:relative;
+  border-radius:22px;
+  overflow:hidden;
+  border:1px solid rgba(23,140,168,.16);
+  box-shadow:0 22px 46px rgba(0,0,0,.10);
 }
 
-.menu-container {
-  position: relative;
-  width: 100vw;
-  height: 100vh;
-  overflow: hidden;
+.menu-img{
+  display:block;
+  width:100%;
+  height:auto;
 }
 
-.menu-bg {
-  width: 100%;
-  height: 100%;
-  object-fit: contain;
+.menu-hotspot{
+  position:absolute;
+  border:none;
+  background:transparent;
+  cursor:pointer;
+  -webkit-tap-highlight-color: transparent;
 }
 
-/* Zones invisibles cliquables */
-.zone {
-  position: absolute;
-  background: transparent;
-  border: none;
-  cursor: pointer;
-}
-
-/* À ajuster selon le rendu réel */
-.zone-create {
-  left: 15%;
-  right: 15%;
-  top: 55%;
-  height: 12%;
-}
-
-.zone-join {
-  left: 15%;
-  right: 15%;
-  top: 70%;
-  height: 12%;
-}
-
-.zone-home {
-  left: 15%;
-  right: 15%;
-  top: 85%;
-  height: 12%;
-}
+/* ✅ Ajuste ces rectangles une fois sur ton tel */
+.hs-create{ left:12%; right:12%; top:52%; height:10%; }
+.hs-join  { left:12%; right:12%; top:64%; height:10%; }
+.hs-home  { left:12%; right:12%; top:76%; height:10%; }
