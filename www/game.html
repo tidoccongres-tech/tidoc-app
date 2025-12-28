@@ -1,106 +1,22 @@
 <!DOCTYPE html>
 <html lang="fr">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Ti’Doc — Ti’Truant</title>
-
-  <link rel="stylesheet" href="./style.css?v=999" />
-  <meta name="theme-color" content="#178CA8">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1.0">
+  <title>Ti'Doc — Ti'Truant</title>
+  <link rel="stylesheet" href="./game.css">
 </head>
-
 <body>
 
-  <script type="module" src="./header-user-menu.js?v=999"></script>
+  <div class="menu-container">
+    <img src="./assets/menu-portrait.png" class="menu-bg" id="menuBg"/>
 
-  <main class="page blog-page">
-
-    <!-- CARD: Lobby actions -->
-    <section class="card" id="mapCard" style="display:none;margin-top:12px;">
-
-  <div class="map-top">
-    <div>
-      <div class="pill">🗺️ Hôpital</div>
-      <div class="hint" style="margin-top:6px">
-        📍 Salle : <span id="myRoomText">—</span>
-      </div>
-    </div>
-
-    <button class="btn-outline" id="btnLeaveRoom" type="button">Quitter</button>
+    <!-- Zones cliquables -->
+    <button class="zone zone-create" id="btnCreate"></button>
+    <button class="zone zone-join" id="btnJoin"></button>
+    <button class="zone zone-home" id="btnHome"></button>
   </div>
 
-  <div class="map-stage">
-    <canvas id="gameCanvas" width="900" height="520"></canvas>
-
-    <!-- Joystick -->
-    <div id="joy" class="joy">
-      <div class="joy-base"></div>
-      <div class="joy-stick"></div>
-    </div>
-
-    <!-- HUD petite info -->
-    <div id="hud" class="hud"></div>
-  </div>
-
-</section>
-
-    <!-- CARD: Lobby -->
-    <section class="card lobby-card-premium" id="lobbyCard"> 
-      <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap">
-        <div style="display:flex;flex-direction:column;gap:6px">
-          <div class="pill">👥 Lobby</div>
-          <div>Code : <span class="code" id="roomCodeText">—</span></div>
-          <div class="hint" id="roomStatusText">Statut : —</div>
-        </div>
-
-        <div class="game-actions" style="display:flex;gap:10px;flex-wrap:wrap">
-          <button class="btn-outline" id="btnCopyCode" type="button">Copier le code</button>
-          <button class="btn-primary game-btn-premium" id="btnCreateRoom" type="button">Créer une partie</button>
-          <button class="btn-outline game-btn-outline-premium" id="btnJoinRoom" type="button">Rejoindre</button>
-        </div>
-      </div>
-
-      <div class="hint" style="margin-top:10px">Astuce : partage le code aux autres participants.</div>
-
-      <div class="lobby-list" id="playersList" style="margin-top:10px"></div>
-    </section>
-
-    <!-- CARD: Map / déplacement -->
-    <section class="card" id="miniMapCard">
-  <canvas id="gameCanvas" width="900" height="520"></canvas>
-
-  <div id="joystick" class="joy">
-    <div class="joy-base"></div>
-    <div class="joy-stick"></div>
-  </div>
-
-  <div class="hud">
-    <div>Salle : <span id="myRoomText">—</span></div>
-  </div>
-</section>
-        
-
-      <!-- mini carte cliquable -->
-      <div id="mapGrid" style="
-        margin-top:12px;
-        display:grid;
-        grid-template-columns:repeat(3, 1fr);
-        gap:10px;
-      "></div>
-
-      <div class="hint" style="margin-top:10px">
-        Clique une salle adjacente pour t’y déplacer. (Cooldown anti-spam inclus)
-      </div>
-
-      <div style="margin-top:12px;font-weight:950;color:#0e5f71">👀 Présents dans ta salle :</div>
-      <div id="roomPlayersHere" class="hint" style="margin-top:6px">—</div>
-    </section>
-
-  </main>
-
-  <script type="module" src="./auth.js"></script>
-  <script type="module" src="./game.js?v=999"></script>
-  <script src="./pwa.js"></script>
-
+  <script src="./game.js"></script>
 </body>
 </html>
