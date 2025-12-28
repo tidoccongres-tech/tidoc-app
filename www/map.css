@@ -1,0 +1,51 @@
+html, body {
+  margin: 0;
+  height: 100%;
+  overflow: hidden;
+  background: #06222a;
+  touch-action: none; /* important mobile */
+}
+
+#game {
+  width: 100vw;
+  height: 100vh;
+  display: block;
+}
+
+/* Joystick */
+#joy {
+  position: fixed;
+  left: 18px;
+  bottom: 18px;
+  width: 140px;
+  height: 140px;
+  z-index: 10;
+  opacity: 0.92;
+  user-select: none;
+  -webkit-user-select: none;
+  touch-action: none;
+}
+
+#joy .base {
+  position: absolute;
+  inset: 0;
+  border-radius: 999px;
+  background: rgba(255,255,255,0.10);
+  border: 2px solid rgba(255,255,255,0.14);
+  backdrop-filter: blur(6px);
+}
+
+#joy .stick {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 64px;
+  height: 64px;
+  margin-left: -32px;
+  margin-top: -32px;
+  border-radius: 999px;
+  background: rgba(255,255,255,0.20);
+  border: 2px solid rgba(255,255,255,0.22);
+  box-shadow: 0 16px 30px rgba(0,0,0,0.25);
+  transform: translate(0,0);
+}
