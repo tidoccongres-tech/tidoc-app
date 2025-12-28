@@ -1,51 +1,34 @@
-html, body {
-  margin: 0;
-  height: 100%;
-  overflow: hidden;
-  background: #06222a;
-  touch-action: none; /* important mobile */
+.map-body{ margin:0; background:#0b3440; overflow:hidden; }
+.map-root{ position:relative; width:100vw; height:100vh; }
+
+#gameCanvas{
+  width:100vw; height:100vh;
+  display:block;
+  background:#0b3440;
 }
 
-#game {
-  width: 100vw;
-  height: 100vh;
-  display: block;
+.hud{
+  position:absolute; left:12px; top:12px;
+  display:flex; gap:10px; align-items:center;
+  z-index:10;
 }
 
-/* Joystick */
-#joy {
-  position: fixed;
-  left: 18px;
-  bottom: 18px;
-  width: 140px;
-  height: 140px;
-  z-index: 10;
-  opacity: 0.92;
-  user-select: none;
-  -webkit-user-select: none;
-  touch-action: none;
+.hud-pill{
+  padding:10px 12px;
+  border-radius:999px;
+  background:rgba(255,255,255,.85);
+  border:1px solid rgba(0,0,0,.06);
+  font-weight:950;
+  color:#0e5f71;
+  backdrop-filter: blur(10px);
 }
 
-#joy .base {
-  position: absolute;
-  inset: 0;
-  border-radius: 999px;
-  background: rgba(255,255,255,0.10);
-  border: 2px solid rgba(255,255,255,0.14);
-  backdrop-filter: blur(6px);
-}
-
-#joy .stick {
-  position: absolute;
-  left: 50%;
-  top: 50%;
-  width: 64px;
-  height: 64px;
-  margin-left: -32px;
-  margin-top: -32px;
-  border-radius: 999px;
-  background: rgba(255,255,255,0.20);
-  border: 2px solid rgba(255,255,255,0.22);
-  box-shadow: 0 16px 30px rgba(0,0,0,0.25);
-  transform: translate(0,0);
+.hud-btn{
+  padding:10px 12px;
+  border-radius:999px;
+  border:1px solid rgba(255,255,255,.35);
+  background:rgba(23,140,168,.95);
+  color:white;
+  font-weight:950;
+  cursor:pointer;
 }
