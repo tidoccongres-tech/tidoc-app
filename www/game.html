@@ -5,29 +5,27 @@
   <meta name="viewport" content="width=device-width,initial-scale=1.0">
   <title>Ti'Doc — Ti'Truant</title>
 
-  <!-- tu peux garder style.css si tu veux la topbar etc -->
-  <link rel="stylesheet" href="./style.css?v=999">
-  <link rel="stylesheet" href="./game.css?v=999">
+  <link rel="stylesheet" href="./style.css?v=1000">
+  <link rel="stylesheet" href="./game.css?v=1000">
 </head>
 
 <body>
-  <script type="module" src="./header-user-menu.js?v=999"></script>
+  <script type="module" src="./header-user-menu.js?v=1000"></script>
 
   <main class="page blog-page">
 
-    <!-- ÉCRAN 1 : MENU (ton PNG dessiné) -->
+    <!-- ÉCRAN 1 : MENU (PNG) -->
     <section id="screenMenu" class="card game-menu-card">
       <div class="menu-stage">
-        <img src="www/assets/menu-portrait.png" alt="Menu Ti'Truant" class="menu-img">
+        <img src="./assets/menu-portrait.png?v=1000" alt="Menu Ti'Truant" class="menu-img">
 
-        <!-- zones cliquables -->
         <button id="btnCreate" class="menu-hotspot hs-create" aria-label="Créer une partie"></button>
         <button id="btnJoin"   class="menu-hotspot hs-join"   aria-label="Rejoindre une partie"></button>
         <button id="btnHome"   class="menu-hotspot hs-home"   aria-label="Retour accueil"></button>
       </div>
     </section>
 
-    <!-- ÉCRAN 2 : LOBBY Firebase -->
+    <!-- ÉCRAN 2 : LOBBY -->
     <section id="screenLobby" class="card lobby-card-premium" style="display:none;">
       <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap">
         <div style="display:flex;flex-direction:column;gap:6px">
@@ -49,7 +47,7 @@
 
   </main>
 
-  <script type="module" src="./auth.js"></script>
-  <script type="module" src="./game.js?v=999"></script>
+  <script type="module" src="./auth.js?v=1000"></script>
+  <script type="module" src="./game.js?v=1000"></script>
 </body>
 </html>
