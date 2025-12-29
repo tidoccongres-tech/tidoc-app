@@ -1,86 +1,98 @@
-/* plein écran, pas de card */
+/* FULLSCREEN */
 .game-body{
   margin:0;
-  height:100vh;
-  overflow:hidden;
   background:#000;
+  overflow:hidden;
 }
 
-/* sections plein écran */
-.screen{
-  position:fixed;
-  inset:0;
-}
-
-/* image plein écran */
-.menu-stage{
-  position:absolute;
-  inset:0;
-}
-
-.menu-img{
+.menu-root{
+  position:relative;
   width:100vw;
   height:100vh;
-  object-fit:cover;      /* ✅ plein écran */
+}
+
+/* Fond */
+.menu-bg{
+  position:absolute;
+  inset:0;
+  width:100%;
+  height:100%;
+}
+
+.menu-bg img{
+  width:100%;
+  height:100%;
+  object-fit:cover;          /* ✅ plein écran */
+  object-position:center;
   display:block;
 }
 
-/* boutons transparents */
-.menu-hotspot{
+/* Zone boutons overlay */
+.menu-buttons{
   position:absolute;
+  inset:0;
+  display:flex;
+  flex-direction:column;
+  justify-content:flex-end;
+  align-items:center;
+  gap:14px;
+  padding: 0 6vw 10vh;
+  pointer-events:none; /* on réactive sur boutons */
+}
+
+/* Boutons image */
+.menu-btn{
+  pointer-events:auto;
   border:none;
   background:transparent;
+  padding:0;
+  margin:0;
   cursor:pointer;
   -webkit-tap-highlight-color: transparent;
+
+  /* animation entrée */
+  opacity:0;
+  transform: translateY(16px) scale(.98);
+  animation: btnIn .55s ease forwards;
 }
 
-/* ✅ Ajuste ces rectangles (pour TON image portrait) */
-.hs-create{ left:12%; right:12%; top:52%; height:10%; }
-.hs-join  { left:12%; right:12%; top:64%; height:10%; }
-.hs-home  { left:12%; right:12%; top:76%; height:10%; }
-
-/* lobby overlay */
-.screen-lobby{
-  background: rgba(0,0,0,.45);
-  backdrop-filter: blur(8px);
+.menu-btn img{
+  width:min(84vw, 520px);
+  height:auto;
+  display:block;
+  filter: drop-shadow(0 10px 18px rgba(0,0,0,.35));
 }
 
-.lobby-wrap{
-  max-width: 520px;
-  margin: 16px auto;
-  background: #fff;
-  border-radius: 18px;
-  padding: 16px;
+/* Stagger entrée */
+.btn-create{ animation-delay: .05s; }
+.btn-join  { animation-delay: .16s; }
+.btn-home  { animation-delay: .27s; }
+
+@keyframes btnIn{
+  to{ opacity:1; transform: translateY(0) scale(1); }
 }
 
-.lobby-head{
-  display:flex;
-  align-items:flex-start;
-  justify-content:space-between;
-  gap:10px;
-  flex-wrap:wrap;
+/* Feedback tap */
+.menu-btn:active{
+  transform: scale(.97);
 }
 
-.lobby-actions{ display:flex; gap:10px; flex-wrap:wrap; }
-
-.pill{
-  display:inline-flex;
-  padding:8px 12px;
-  border-radius:999px;
-  background: rgba(23,140,168,.12);
-  color:#178CA8;
-  font-weight:900;
+/* Petit "pulse" discret (après l’entrée) */
+.menu-btn.pulse{
+  animation: pulse 1.6s ease-in-out infinite;
+}
+@keyframes pulse{
+  0%,100% { transform: scale(1); }
+  50%     { transform: scale(1.015); }
 }
 
-.code{ font-weight:900; color:#178CA8; }
-.hint{ font-weight:700; opacity:.7; }
-
-.btn-outline{
-  background:#fff;
-  color:#178CA8;
-  border:2px solid #178CA8;
-  border-radius:12px;
-  height:44px;
-  padding:0 16px;
-  font-weight:800;
+/* Ajustements landscape : boutons plus petits + plus bas */
+@media (orientation: landscape){
+  .menu-buttons{
+    padding: 0 4vw 6vh;
+    gap:12px;
+  }
+  .menu-btn img{
+    width:min(58vw, 560px);
+  }
 }
