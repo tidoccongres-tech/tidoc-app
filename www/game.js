@@ -1,4 +1,4 @@
-import * as AuthMod from "../auth.js";
+import * as AuthMod from "./auth.js";
 import {
   doc, setDoc, getDoc, updateDoc, deleteDoc,
   collection, onSnapshot, serverTimestamp
