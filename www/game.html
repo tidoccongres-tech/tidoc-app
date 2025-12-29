@@ -1,55 +1,43 @@
 <!DOCTYPE html>
 <html lang="fr">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width,initial-scale=1.0">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1.0" />
   <title>Ti'Doc — Ti'Truant</title>
 
-  <!-- IMPORTANT : on garde uniquement game.css -->
+  <link rel="stylesheet" href="./style.css?v=999">
   <link rel="stylesheet" href="./game.css?v=999">
 </head>
 
 <body class="game-body">
 
-  <!-- MENU plein écran -->
-  <section id="screenMenu" class="screen screen-menu">
-    <div class="menu-stage">
-      <picture>
-        <!-- tablette / landscape -->
-        <source media="(min-width: 768px)" srcset="./assets/menu-landscape.png">
-        <!-- iphone / portrait (fallback) -->
-        <img src="./assets/menu-portrait.png" alt="Menu Ti'Truant" class="menu-img">
-      </picture>
+  <!-- ✅ MENU FULLSCREEN -->
+  <main class="menu-root" id="menuRoot">
 
-      <!-- zones cliquables -->
-      <button id="btnCreate" class="menu-hotspot hs-create" aria-label="Créer une partie"></button>
-      <button id="btnJoin"   class="menu-hotspot hs-join"   aria-label="Rejoindre une partie"></button>
-      <button id="btnHome"   class="menu-hotspot hs-home"   aria-label="Retour accueil"></button>
+    <!-- Fond responsive -->
+    <picture class="menu-bg">
+      <source media="(orientation: landscape)" srcset="assets/menu-landscape.png">
+      <img src="assets/menu-portrait.png" alt="Menu Ti'Truant" />
+    </picture>
+
+    <!-- Boutons posés par-dessus -->
+    <div class="menu-buttons">
+      <button id="btnCreate" class="menu-btn btn-create" type="button" aria-label="Créer une partie">
+        <img src="assets/bouton-creer.png" alt="" />
+      </button>
+
+      <button id="btnJoin" class="menu-btn btn-join" type="button" aria-label="Rejoindre une partie">
+        <img src="assets/bouton-rejoindre.png" alt="" />
+      </button>
+
+      <button id="btnHome" class="menu-btn btn-home" type="button" aria-label="Menu home">
+        <img src="assets/bouton-home.png" alt="" />
+      </button>
     </div>
-  </section>
 
-  <!-- LOBBY (overlay / plein écran aussi) -->
-  <section id="screenLobby" class="screen screen-lobby" style="display:none;">
-    <div class="lobby-wrap">
-      <div class="lobby-head">
-        <div>
-          <div class="pill">👥 Lobby</div>
-          <div>Code : <span class="code" id="roomCodeText">—</span></div>
-          <div class="hint" id="roomStatusText">Statut : —</div>
-          <div class="hint" id="gameMsg" style="margin-top:6px"></div>
-        </div>
+  </main>
 
-        <div class="lobby-actions">
-          <button class="btn-outline" id="btnCopyCode" type="button">Copier le code</button>
-          <button class="btn-outline" id="btnLeaveRoom" type="button">Quitter</button>
-        </div>
-      </div>
-
-      <div class="hint" style="margin-top:10px">Astuce : partage le code aux autres participants.</div>
-      <div class="lobby-list" id="playersList" style="margin-top:10px"></div>
-    </div>
-  </section>
-
+  <!-- garde auth + game.js pour la logique -->
   <script type="module" src="./auth.js"></script>
   <script type="module" src="./game.js?v=999"></script>
 </body>
