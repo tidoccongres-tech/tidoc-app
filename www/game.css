@@ -1,19 +1,31 @@
-.game-menu-card{ padding:12px; }
-
-.menu-stage{
-  position:relative;
-  border-radius:22px;
+/* plein écran, pas de card */
+.game-body{
+  margin:0;
+  height:100vh;
   overflow:hidden;
-  border:1px solid rgba(23,140,168,.16);
-  box-shadow:0 22px 46px rgba(0,0,0,.10);
+  background:#000;
+}
+
+/* sections plein écran */
+.screen{
+  position:fixed;
+  inset:0;
+}
+
+/* image plein écran */
+.menu-stage{
+  position:absolute;
+  inset:0;
 }
 
 .menu-img{
+  width:100vw;
+  height:100vh;
+  object-fit:cover;      /* ✅ plein écran */
   display:block;
-  width:100%;
-  height:auto;
 }
 
+/* boutons transparents */
 .menu-hotspot{
   position:absolute;
   border:none;
@@ -22,7 +34,53 @@
   -webkit-tap-highlight-color: transparent;
 }
 
-/* ✅ Ajuste ces rectangles une fois sur ton tel */
+/* ✅ Ajuste ces rectangles (pour TON image portrait) */
 .hs-create{ left:12%; right:12%; top:52%; height:10%; }
 .hs-join  { left:12%; right:12%; top:64%; height:10%; }
 .hs-home  { left:12%; right:12%; top:76%; height:10%; }
+
+/* lobby overlay */
+.screen-lobby{
+  background: rgba(0,0,0,.45);
+  backdrop-filter: blur(8px);
+}
+
+.lobby-wrap{
+  max-width: 520px;
+  margin: 16px auto;
+  background: #fff;
+  border-radius: 18px;
+  padding: 16px;
+}
+
+.lobby-head{
+  display:flex;
+  align-items:flex-start;
+  justify-content:space-between;
+  gap:10px;
+  flex-wrap:wrap;
+}
+
+.lobby-actions{ display:flex; gap:10px; flex-wrap:wrap; }
+
+.pill{
+  display:inline-flex;
+  padding:8px 12px;
+  border-radius:999px;
+  background: rgba(23,140,168,.12);
+  color:#178CA8;
+  font-weight:900;
+}
+
+.code{ font-weight:900; color:#178CA8; }
+.hint{ font-weight:700; opacity:.7; }
+
+.btn-outline{
+  background:#fff;
+  color:#178CA8;
+  border:2px solid #178CA8;
+  border-radius:12px;
+  height:44px;
+  padding:0 16px;
+  font-weight:800;
+}
