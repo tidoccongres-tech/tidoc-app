@@ -77,9 +77,11 @@
   transform: scale(.97);
 }
 
-/* Petit "pulse" discret (après l’entrée) */
+/* ✅ Pulse SANS casser l’animation d’entrée */
 .menu-btn.pulse{
-  animation: pulse 1.6s ease-in-out infinite;
+  animation:
+    btnIn .55s ease forwards,
+    pulse 1.6s ease-in-out infinite;
 }
 @keyframes pulse{
   0%,100% { transform: scale(1); }
