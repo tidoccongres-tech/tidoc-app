@@ -20,7 +20,7 @@ const mapImg = new Image();
 mapImg.src = "./assets/map.png";
 
 const maskImg = new Image();
-maskImg.src = "./assets/collision.png";
+maskImg.src = "./assets/collisions.png";
 
 // mask data
 const maskCanvas = document.createElement("canvas");
