@@ -18,6 +18,16 @@ const btnCreate   = document.getElementById("btnCreate");
 const btnJoin     = document.getElementById("btnJoin");
 const btnHome     = document.getElementById("btnHome");
 
+// ✅ après l'animation d'entrée, on met un pulse léger sur le bouton principal
+setTimeout(() => {
+  btnCreate?.classList.add("pulse");
+}, 1200);
+
+// ✅ au clic sur un bouton, on enlève pulse (ça fait plus propre)
+[btnCreate, btnJoin, btnHome].forEach(b=>{
+  b?.addEventListener("pointerdown", ()=> btnCreate?.classList.remove("pulse"), { passive:true });
+});
+
 const btnCopyCode = document.getElementById("btnCopyCode");
 const btnLeaveRoom= document.getElementById("btnLeaveRoom");
 
