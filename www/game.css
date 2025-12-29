@@ -77,12 +77,6 @@
   transform: scale(.97);
 }
 
-/* ✅ Pulse SANS casser l’animation d’entrée */
-.menu-btn.pulse{
-  animation:
-    btnIn .55s ease forwards,
-    pulse 1.6s ease-in-out infinite;
-}
 @keyframes pulse{
   0%,100% { transform: scale(1); }
   50%     { transform: scale(1.015); }
