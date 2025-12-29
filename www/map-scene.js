@@ -1,7 +1,7 @@
 // map-scene.js
 // Si tu veux le brancher à Firebase après, on le fait juste après. Là c’est le core.
 
-const canvas = document.getElementById("game");
+const canvas = document.getElementById("gameCanvas");
 const ctx = canvas.getContext("2d", { alpha: false });
 
 function resize() {
