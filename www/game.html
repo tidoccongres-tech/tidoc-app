@@ -5,37 +5,41 @@
   <meta name="viewport" content="width=device-width,initial-scale=1.0">
   <title>Ti'Doc — Ti'Truant</title>
 
-  <link rel="stylesheet" href="./style.css?v=1000">
-  <link rel="stylesheet" href="./game.css?v=1000">
+  <!-- IMPORTANT : on garde uniquement game.css -->
+  <link rel="stylesheet" href="./game.css?v=999">
 </head>
 
-<body>
-  <script type="module" src="./header-user-menu.js?v=1000"></script>
+<body class="game-body">
 
-  <main class="page blog-page">
+  <!-- MENU plein écran -->
+  <section id="screenMenu" class="screen screen-menu">
+    <div class="menu-stage">
+      <picture>
+        <!-- tablette / landscape -->
+        <source media="(min-width: 768px)" srcset="./assets/menu-landscape.png">
+        <!-- iphone / portrait (fallback) -->
+        <img src="./assets/menu-portrait.png" alt="Menu Ti'Truant" class="menu-img">
+      </picture>
 
-    <!-- ÉCRAN 1 : MENU (PNG) -->
-    <section id="screenMenu" class="card game-menu-card">
-      <div class="menu-stage">
-        <img src="./assets/Untitled design.png" alt="Menu Ti'Truant" class="menu-img">
+      <!-- zones cliquables -->
+      <button id="btnCreate" class="menu-hotspot hs-create" aria-label="Créer une partie"></button>
+      <button id="btnJoin"   class="menu-hotspot hs-join"   aria-label="Rejoindre une partie"></button>
+      <button id="btnHome"   class="menu-hotspot hs-home"   aria-label="Retour accueil"></button>
+    </div>
+  </section>
 
-        <button id="btnCreate" class="menu-hotspot hs-create" aria-label="Créer une partie"></button>
-        <button id="btnJoin"   class="menu-hotspot hs-join"   aria-label="Rejoindre une partie"></button>
-        <button id="btnHome"   class="menu-hotspot hs-home"   aria-label="Retour accueil"></button>
-      </div>
-    </section>
-
-    <!-- ÉCRAN 2 : LOBBY -->
-    <section id="screenLobby" class="card lobby-card-premium" style="display:none;">
-      <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap">
-        <div style="display:flex;flex-direction:column;gap:6px">
+  <!-- LOBBY (overlay / plein écran aussi) -->
+  <section id="screenLobby" class="screen screen-lobby" style="display:none;">
+    <div class="lobby-wrap">
+      <div class="lobby-head">
+        <div>
           <div class="pill">👥 Lobby</div>
           <div>Code : <span class="code" id="roomCodeText">—</span></div>
           <div class="hint" id="roomStatusText">Statut : —</div>
           <div class="hint" id="gameMsg" style="margin-top:6px"></div>
         </div>
 
-        <div style="display:flex;gap:10px;flex-wrap:wrap">
+        <div class="lobby-actions">
           <button class="btn-outline" id="btnCopyCode" type="button">Copier le code</button>
           <button class="btn-outline" id="btnLeaveRoom" type="button">Quitter</button>
         </div>
@@ -43,11 +47,10 @@
 
       <div class="hint" style="margin-top:10px">Astuce : partage le code aux autres participants.</div>
       <div class="lobby-list" id="playersList" style="margin-top:10px"></div>
-    </section>
+    </div>
+  </section>
 
-  </main>
-
-  <script type="module" src="./auth.js?v=1000"></script>
-  <script type="module" src="./game.js?v=1000"></script>
+  <script type="module" src="./auth.js"></script>
+  <script type="module" src="./game.js?v=999"></script>
 </body>
 </html>
