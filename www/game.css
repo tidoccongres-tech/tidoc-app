@@ -68,20 +68,6 @@
 .btn-join  { animation-delay: .16s; }
 .btn-home  { animation-delay: .27s; }
 
-@keyframes btnIn{
-  to{ opacity:1; transform: translateY(0) scale(1); }
-}
-
-/* Feedback tap */
-.menu-btn:active{
-  transform: scale(.97);
-}
-
-@keyframes pulse{
-  0%,100% { transform: scale(1); }
-  50%     { transform: scale(1.015); }
-}
-
 /* Ajustements landscape : boutons plus petits + plus bas */
 @media (orientation: landscape){
   .menu-buttons{
