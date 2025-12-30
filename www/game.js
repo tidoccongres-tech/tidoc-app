@@ -266,6 +266,16 @@ btnCopyCode?.addEventListener("click", async ()=>{
 
 btnLeaveRoom?.addEventListener("click", ()=> leaveRoom());
 
+document.querySelectorAll(".menu-btn").forEach(btn => {
+  const play = (e) => {
+    btn.classList.remove("tap");     // reset si spam tap
+    void btn.offsetWidth;            // force reflow
+    btn.classList.add("tap");
+  };
+
+  btn.addEventListener("pointerdown", play, { passive: true });
+});
+
 // =======================
 // AUTH BOOT
 // =======================
