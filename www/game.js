@@ -23,7 +23,6 @@ function showScreen(which){
     if (screenLobby) screenLobby.style.display = "";
   }
 }
-
 const btnCreate   = document.getElementById("btnCreate");
 const btnJoin     = document.getElementById("btnJoin");
 const btnHome     = document.getElementById("btnHome");
