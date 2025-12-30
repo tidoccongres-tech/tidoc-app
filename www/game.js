@@ -47,15 +47,6 @@ let unsubRoom = null;
 // =======================
 // HELPERS
 // =======================
-function showScreen(which){
-  if (which === "menu"){
-    screenMenu.style.display = "";
-    screenLobby.style.display = "none";
-  } else {
-    screenMenu.style.display = "none";
-    screenLobby.style.display = "";
-  }
-}
 
 function escapeHTML(s=""){
   return String(s)
