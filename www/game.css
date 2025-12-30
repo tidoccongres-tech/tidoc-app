@@ -78,3 +78,29 @@
     width:min(58vw, 560px);
   }
 }
+
+/* ===== TAP ANIMATION (simple, propre) ===== */
+
+/* transition de base */
+.menu-btn{
+  transition: transform .12s ease, filter .12s ease;
+  transform-origin: center;
+}
+
+/* quand tu appuies (mobile + desktop) */
+.menu-btn:active{
+  transform: scale(.94);
+  filter: drop-shadow(0 6px 12px rgba(0,0,0,.28));
+}
+
+/* iOS parfois garde le :active trop peu → on ajoute un vrai feedback tactile */
+@keyframes tapPop{
+  0%   { transform: scale(1); }
+  40%  { transform: scale(.94); }
+  100% { transform: scale(1); }
+}
+
+/* classe que le JS met juste au touch/click */
+.menu-btn.tap{
+  animation: tapPop 180ms ease-out;
+}
