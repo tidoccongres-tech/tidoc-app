@@ -114,15 +114,6 @@ const player = { x: 200, y: 200, speed: 2 };
 
 let move = { x:0, y:0 };
 
-function canMove(nx, ny) {
-  if (!collisionData) return true;
-  const cx = Math.floor(nx / canvas.width * collisionImg.width);
-  const cy = Math.floor(ny / canvas.height * collisionImg.height);
-  const i = (cy * collisionImg.width + cx) * 4;
-  const val = collisionData.data[i]; 
-  return val > 200; // blanc = sol
-}
-
 function update() {
   const nx = player.x + move.x * player.speed;
   const ny = player.y + move.y * player.speed;
