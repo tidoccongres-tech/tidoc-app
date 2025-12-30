@@ -6,6 +6,65 @@ import {
 const auth = AuthMod.auth;
 const db = AuthMod.db;
 
+import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.4/firebase-auth.js";
+import { deleteDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.4/firebase-firestore.js";
+
+const params = new URLSearchParams(location.search);
+const roomId = (params.get("room") || "").trim().toUpperCase();
+
+const roomCodeEl = document.getElementById("roomCode");
+const playersEl  = document.getElementById("playersList");
+const btnStart   = document.getElementById("btnStart");
+
+if (roomCodeEl) roomCodeEl.textContent = roomId || "----";
+
+function renderPlayers(players){
+  if (!playersEl) return;
+  playersEl.innerHTML = players.map(p => {
+    const crown = p.isHost ? " 👑" : "";
+    return `<div class="player">${p.name || "Joueur"}${crown}</div>`;
+  }).join("");
+}
+
+onAuthStateChanged(auth, async (u)=>{
+  if (!u) { location.href="./login.html"; return; }
+  if (!roomId) { location.href="./game.html"; return; }
+
+  // room + players live
+  onSnapshot(doc(db,"rooms",roomId), (snap)=>{
+    if (!snap.exists()){
+      alert("Partie supprimée");
+      location.href="./game.html";
+      return;
+    }
+    const room = snap.data() || {};
+    const isHost = room.hostUid === u.uid;
+
+    // bouton démarrer seulement pour l’hôte
+    if (btnStart){
+      btnStart.style.display = isHost ? "" : "none";
+    }
+  });
+
+  onSnapshot(collection(db,"rooms",roomId,"players"), (snap)=>{
+    const players = snap.docs.map(d=>d.data());
+    renderPlayers(players);
+  });
+
+  // Start game (hôte)
+  btnStart?.addEventListener("click", async ()=>{
+    const roomRef = doc(db,"rooms",roomId);
+    await updateDoc(roomRef, { status:"started", startedAt: serverTimestamp() });
+    // plus tard: rediriger vers la vraie map / partie
+    alert("Partie lancée (status=started)");
+  });
+
+  // Quitter (simple: touche back iOS ou ajoute un bouton)
+  window.addEventListener("beforeunload", async ()=>{
+    try{ await deleteDoc(doc(db,"rooms",roomId,"players",u.uid)); } catch {}
+  });
+});
+
 const canvas = document.getElementById("gameCanvas");
 const ctx = canvas.getContext("2d");
 
