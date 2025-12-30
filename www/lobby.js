@@ -69,3 +69,42 @@ function loop() {
 }
 
 loop();
+
+const joy = document.getElementById("joystick");
+const stick = joy.querySelector(".stick");
+
+let active = false;
+let center = {x:0,y:0};
+
+joy.addEventListener("pointerdown", e => {
+  active = true;
+  const r = joy.getBoundingClientRect();
+  center.x = r.left + r.width/2;
+  center.y = r.top + r.height/2;
+});
+
+window.addEventListener("pointerup", () => {
+  active = false;
+  move.x = 0;
+  move.y = 0;
+  stick.style.transform = "translate(0,0)";
+});
+
+window.addEventListener("pointermove", e => {
+  if (!active) return;
+
+  let dx = e.clientX - center.x;
+  let dy = e.clientY - center.y;
+
+  const dist = Math.hypot(dx,dy);
+  const max = 40;
+  if (dist > max) {
+    dx *= max/dist;
+    dy *= max/dist;
+  }
+
+  stick.style.transform = `translate(${dx}px, ${dy}px)`;
+
+  move.x = dx / max;
+  move.y = dy / max;
+});
