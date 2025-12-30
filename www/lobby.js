@@ -26,6 +26,28 @@ function renderPlayers(players){
   }).join("");
 }
 
+const R = 12; // rayon perso
+
+function isWalkable(px, py){
+  if (!collisionData) return true;
+  const cx = Math.floor(px / canvas.width  * collisionImg.width);
+  const cy = Math.floor(py / canvas.height * collisionImg.height);
+  if (cx < 0 || cy < 0 || cx >= collisionImg.width || cy >= collisionImg.height) return false;
+  const i = (cy * collisionImg.width + cx) * 4;
+  const val = collisionData.data[i]; // rouge
+  return val > 200; // blanc = sol
+}
+
+function canMove(nx, ny){
+  return (
+    isWalkable(nx, ny) &&
+    isWalkable(nx - R, ny) &&
+    isWalkable(nx + R, ny) &&
+    isWalkable(nx, ny - R) &&
+    isWalkable(nx, ny + R)
+  );
+}
+
 onAuthStateChanged(auth, async (u)=>{
   if (!u) { location.href="./login.html"; return; }
   if (!roomId) { location.href="./game.html"; return; }
