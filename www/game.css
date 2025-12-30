@@ -84,7 +84,7 @@
 /* entrée sur le bouton (comme tu as) */
 .menu-btn{ /* ton code actuel */ }
 
-/* tap SUR L’IMAGE (pas sur le bouton) */
+/* TAP SIMPLE */
 .menu-btn img{
   transition: transform .12s ease, filter .12s ease;
   transform-origin:center;
