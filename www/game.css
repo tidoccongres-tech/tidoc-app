@@ -119,3 +119,13 @@
 .menu-buttons{
   z-index:10;            /* ✅ les boutons passent au-dessus */
 }
+
+.menu-bg img{
+  pointer-events:none;
+}
+
+.menu-btn{
+  position:relative;
+  z-index:20;
+  touch-action: manipulation;
+}
