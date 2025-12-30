@@ -136,7 +136,8 @@ async function createRoom(){
     joinedAt: serverTimestamp(),
   });
 
-  await enterRoom(roomId);
+  // ✅ on va au lobby
+  window.location.href = `./lobby.html?room=${encodeURIComponent(roomId)}`;
 }
 
 async function joinRoom(roomIdRaw){
@@ -167,6 +168,10 @@ async function joinRoom(roomIdRaw){
     status: "prêt",
     joinedAt: serverTimestamp(),
   }, { merge:true });
+
+  // ✅ on va au lobby
+  window.location.href = `./lobby.html?room=${encodeURIComponent(roomId)}`;
+}
 
   await enterRoom(roomId);
 }
