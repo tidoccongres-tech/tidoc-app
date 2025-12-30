@@ -11,8 +11,18 @@ const db   = AuthMod.db;
 // =======================
 // UI
 // =======================
-const screenMenu  = document.getElementById("screenMenu");
-const screenLobby = document.getElementById("screenLobby");
+const screenMenu  = document.getElementById("screenMenu") || document.getElementById("menuRoot");
+const screenLobby = document.getElementById("screenLobby"); // peut être null
+
+function showScreen(which){
+  if (which === "menu"){
+    if (screenMenu)  screenMenu.style.display = "";
+    if (screenLobby) screenLobby.style.display = "none";
+  } else {
+    if (screenMenu)  screenMenu.style.display = "none";
+    if (screenLobby) screenLobby.style.display = "";
+  }
+}
 
 const btnCreate   = document.getElementById("btnCreate");
 const btnJoin     = document.getElementById("btnJoin");
