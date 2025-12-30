@@ -150,3 +150,49 @@ html, body{
   inset:0;
   overflow:hidden;
 }
+
+.lobby-wire{
+  position:fixed;
+  inset:0;
+  display:flex;
+  flex-direction:column;
+  background:#111;
+  color:white;
+  font-family: system-ui, sans-serif;
+}
+
+.lobby-bar{
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  padding:12px;
+  background:#000;
+  border-bottom:2px solid #333;
+}
+
+.lobby-bar button{
+  background:white;
+  color:black;
+  border:none;
+  padding:8px 12px;
+  border-radius:6px;
+  font-weight:bold;
+}
+
+.lobby-room-wire{
+  flex:1;
+  border:2px dashed #444;
+  margin:10px;
+  border-radius:10px;
+  position:relative;
+}
+
+.lobby-players-wire{
+  border-top:2px solid #333;
+  padding:10px;
+}
+
+#playersList .player{
+  padding:6px 0;
+  border-bottom:1px solid #333;
+}
