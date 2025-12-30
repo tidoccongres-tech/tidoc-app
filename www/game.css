@@ -110,3 +110,12 @@
     transform: translateY(0) scale(1);
   }
 }
+
+.menu-bg{
+  pointer-events:none;   /* ✅ le fond ne capte plus rien */
+  z-index:0;
+}
+
+.menu-buttons{
+  z-index:10;            /* ✅ les boutons passent au-dessus */
+}
