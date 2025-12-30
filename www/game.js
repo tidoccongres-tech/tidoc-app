@@ -173,9 +173,6 @@ async function joinRoom(roomIdRaw){
   window.location.href = `./lobby.html?room=${encodeURIComponent(roomId)}`;
 }
 
-  await enterRoom(roomId);
-}
-
 async function enterRoom(roomId){
   cleanupSubs();
   currentRoomId = roomId;
