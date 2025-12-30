@@ -39,7 +39,7 @@ canvas {
 
 .joystick {
   position:absolute;
-  bottom:30px;
+  bottom:calc(18px + env(safe-area-inset-bottom));
   left:30px;
   width:120px;
   height:120px;
