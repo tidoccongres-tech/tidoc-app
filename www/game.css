@@ -37,7 +37,6 @@
   align-items:center;
   gap:14px;
   padding: 0 6vw 10vh;
-  pointer-events:none; /* on réactive sur boutons */
 }
 
 /* Boutons image */
