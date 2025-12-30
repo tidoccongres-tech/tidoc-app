@@ -35,8 +35,8 @@
   flex-direction:column;
   justify-content:flex-end;
   align-items:center;
-  gap:14px;
-  padding: 0 6vw 10vh;
+  gap:10px;
+  padding: 0 6vw calc(6vh + env(safe-area-inset-bottom));
 }
 
 /* Boutons image */
