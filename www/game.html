@@ -16,9 +16,12 @@
 
     <!-- Fond responsive -->
     <picture class="menu-bg">
-      <source media="(orientation: landscape)" srcset="assets/menu-landscape.png">
-      <img src="assets/menu-portrait.png" alt="Menu Ti'Truant" />
-    </picture>
+  <!-- Landscape si écran "large" -->
+  <source media="(min-aspect-ratio: 4/3)" srcset="assets/menu-landscape.png">
+  <!-- Portrait sinon -->
+  <source media="(max-aspect-ratio: 4/3)" srcset="assets/menu-portrait.png">
+  <img src="assets/menu-portrait.png" alt="Menu Ti'Truant" />
+</picture>
 
     <!-- Boutons posés par-dessus -->
     <div class="menu-buttons">
