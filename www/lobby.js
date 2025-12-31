@@ -26,7 +26,7 @@ function renderPlayers(players){
   }).join("");
 }
 
-const R = 12; // rayon perso
+const PLAYER_RADIUS = 16;
 
 function isWalkable(px, py){
   if (!collisionData) return true;
