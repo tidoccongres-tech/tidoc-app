@@ -98,3 +98,8 @@ canvas {
     0 8px 14px rgba(0,0,0,.26),
     inset 0 2px 0 rgba(255,255,255,.25);
 }
+
+
+canvas { z-index: 1; }
+.ui { z-index: 20; }
+.joystick { z-index: 30; }
