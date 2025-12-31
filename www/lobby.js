@@ -128,10 +128,69 @@ function draw() {
   ctx.clearRect(0,0,canvas.width,canvas.height);
   ctx.drawImage(bg,0,0,canvas.width,canvas.height);
 
-  ctx.fillStyle = "red";
+  // ❌ old:
+  // ctx.fillStyle = "red";
+  // ctx.beginPath();
+  // ctx.arc(player.x, player.y, 10, 0, Math.PI*2);
+  // ctx.fill();
+
+  // ✅ new:
+  drawPlayer(player.x, player.y);
+}
+
+function drawPlayer(px, py){
+  // petit perso type "avatar boule" + jambes
+  // (tout en shapes, facile à remplacer par sprite plus tard)
+
+  const bodyR = 16;
+  const legW = 7;
+  const legH = 10;
+
+  // ombre au sol
+  ctx.globalAlpha = 0.25;
+  ctx.fillStyle = "#000";
   ctx.beginPath();
-  ctx.arc(player.x, player.y, 10, 0, Math.PI*2);
+  ctx.ellipse(px, py + 18, 18, 7, 0, 0, Math.PI*2);
   ctx.fill();
+  ctx.globalAlpha = 1;
+
+  // jambes
+  ctx.fillStyle = "#1b2a3a";
+  ctx.fillRect(px - 10, py + 12, legW, legH);
+  ctx.fillRect(px + 3,  py + 12, legW, legH);
+
+  // chaussures
+  ctx.fillStyle = "#0c1520";
+  ctx.fillRect(px - 11, py + 20, 10, 5);
+  ctx.fillRect(px + 2,  py + 20, 10, 5);
+
+  // corps (bleu)
+  const grad = ctx.createRadialGradient(px-6, py-8, 6, px, py, bodyR+6);
+  grad.addColorStop(0, "#3fb6ff");
+  grad.addColorStop(1, "#0e5ea8");
+  ctx.fillStyle = grad;
+  ctx.beginPath();
+  ctx.arc(px, py, bodyR, 0, Math.PI*2);
+  ctx.fill();
+
+  // masque (simple)
+  ctx.fillStyle = "#cfefff";
+  ctx.beginPath();
+  ctx.roundRect(px - 14, py - 2, 28, 12, 6);
+  ctx.fill();
+
+  // liseré masque
+  ctx.strokeStyle = "rgba(20,80,140,.35)";
+  ctx.lineWidth = 2;
+  ctx.stroke();
+
+  // highlight
+  ctx.globalAlpha = 0.25;
+  ctx.fillStyle = "#fff";
+  ctx.beginPath();
+  ctx.arc(px-6, py-10, 10, 0, Math.PI*2);
+  ctx.fill();
+  ctx.globalAlpha = 1;
 }
 
 function loop() {
