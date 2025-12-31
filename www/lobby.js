@@ -128,7 +128,7 @@ function draw(){
 }
 
 // ✅ taille du perso (mets 64 / 72 / 80 selon ton goût)
-const SPRITE_SIZE = 80;
+const SPRITE_SIZE = 150;
 
 // petit offset pour que les pieds touchent le sol
 const FOOT_OFFSET_Y = 4;
