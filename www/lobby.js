@@ -1,7 +1,7 @@
 import * as AuthMod from "./auth.js";
 import { doc, updateDoc, onSnapshot, collection } from "https://www.gstatic.com/firebasejs/10.12.4/firebase-firestore.js";
 import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.4/firebase-auth.js";
-import { deleteDoc, serverTimestamp, getDoc } from "https://www.gstatic.com/firebasejs/10.12.4/firebase-firestore.js";
+import { deleteDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.4/firebase-firestore.js";
 
 const auth = AuthMod.auth;
 const db = AuthMod.db;
@@ -62,7 +62,7 @@ collisionImg.onload = () => {
 
 // ✅ sprite au spawn
 const spritePose1 = new Image();
-spritePose1.src = "./assets/pose-1.png"; // <- tu veux celui-là par défaut
+spritePose1.src = "./assets/pose-1.png";
 
 // ===================
 // COLLISIONS
@@ -100,6 +100,10 @@ function canMove(nx, ny){
 const player = { x: 200, y: 260, speed: 2 };
 let move = { x: 0, y: 0 };
 
+// ✅ pseudo local (et host)
+let myName = "";
+let myIsHost = false;
+
 function update(){
   const nx = player.x + move.x * player.speed;
   const ny = player.y + move.y * player.speed;
@@ -113,32 +117,75 @@ function update(){
 function draw(){
   ctx.clearRect(0, 0, window.innerWidth, window.innerHeight);
 
-  // ✅ fond (se dessine dès que chargé)
+  // fond
   if (bg.complete) ctx.drawImage(bg, 0, 0, window.innerWidth, window.innerHeight);
 
-  // ✅ perso (pose-1.png par défaut)
+  // perso
   drawPlayerSprite(player.x, player.y);
+
+  // pseudo au-dessus
+  drawNameTag(player.x, player.y, myName, myIsHost);
 }
 
+// ✅ taille du perso (mets 64 / 72 / 80 selon ton goût)
+const SPRITE_SIZE = 64;
+
+// petit offset pour que les pieds touchent le sol
+const FOOT_OFFSET_Y = 4;
+
 function drawPlayerSprite(px, py){
-  // sprite 256x256, on ancre aux pieds (bas-centre)
-  const W = 256, H = 256;
+  const W = SPRITE_SIZE;
+  const H = SPRITE_SIZE;
 
-  // ajuste si tu veux que les pieds soient un peu "au-dessus" du bord bas
-  const FOOT_OFFSET_Y = 8;
-
+  // ancre bas-centre
   const dx = Math.round(px - W / 2);
   const dy = Math.round(py - H + FOOT_OFFSET_Y);
 
-  if (spritePose1.complete){
+  if (spritePose1.complete && spritePose1.naturalWidth > 0){
     ctx.drawImage(spritePose1, dx, dy, W, H);
   } else {
-    // fallback si l’image n’est pas encore chargée
+    // fallback si l’image n’est pas chargée
     ctx.fillStyle = "red";
     ctx.beginPath();
     ctx.arc(px, py, 10, 0, Math.PI*2);
     ctx.fill();
   }
+}
+
+function drawNameTag(px, py, name, isHost){
+  if (!name) return;
+
+  const text = isHost ? `${name} 👑` : name;
+
+  // position au-dessus de la tête
+  const y = Math.round(py - SPRITE_SIZE - 14);
+
+  ctx.save();
+  ctx.font = "800 14px system-ui, -apple-system, Segoe UI, Roboto, sans-serif";
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+
+  const metrics = ctx.measureText(text);
+  const padX = 10;
+  const w = Math.ceil(metrics.width + padX * 2);
+  const h = 22;
+
+  // fond arrondi
+  ctx.fillStyle = "rgba(0,0,0,0.45)";
+  ctx.beginPath();
+  ctx.roundRect(px - w/2, y - h/2, w, h, 999);
+  ctx.fill();
+
+  // liseré léger
+  ctx.strokeStyle = "rgba(255,255,255,0.15)";
+  ctx.lineWidth = 1;
+  ctx.stroke();
+
+  // texte
+  ctx.fillStyle = "#fff";
+  ctx.fillText(text, px, y);
+
+  ctx.restore();
 }
 
 function loop(){
@@ -171,7 +218,6 @@ joy?.addEventListener("pointerdown", (e) => {
   center.x = r.left + r.width / 2;
   center.y = r.top + r.height / 2;
 
-  // important iOS
   e.preventDefault?.();
 }, { passive: false });
 
@@ -208,12 +254,13 @@ window.addEventListener("pointermove", (e) => {
 }, { passive: true });
 
 // ===================
-// FIREBASE (inchangé)
+// FIREBASE
 // ===================
 onAuthStateChanged(auth, async (u) => {
   if (!u) { location.href = "./login.html"; return; }
   if (!roomId) { location.href = "./game.html"; return; }
 
+  // room live (host)
   onSnapshot(doc(db,"rooms",roomId), (snap)=>{
     if (!snap.exists()){
       alert("Partie supprimée");
@@ -221,13 +268,19 @@ onAuthStateChanged(auth, async (u) => {
       return;
     }
     const room = snap.data() || {};
-    const isHost = room.hostUid === u.uid;
-    if (btnStart) btnStart.style.display = isHost ? "" : "none";
+    myIsHost = (room.hostUid === u.uid);
+
+    if (btnStart) btnStart.style.display = myIsHost ? "" : "none";
   });
 
+  // players list live (UI html)
   onSnapshot(collection(db,"rooms",roomId,"players"), (snap)=>{
     const players = snap.docs.map(d=>d.data());
     renderPlayers(players);
+
+    // récupère mon pseudo depuis la liste (simple)
+    const me = players.find(p => p.uid === u.uid);
+    if (me?.name) myName = me.name;
   });
 
   btnStart?.addEventListener("click", async ()=>{
