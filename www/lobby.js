@@ -1,7 +1,8 @@
 import * as AuthMod from "./auth.js";
 import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.4/firebase-auth.js";
 import {
-  doc, getDoc, updateDoc, onSnapshot, collection, deleteDoc, serverTimestamp
+  doc, getDoc, updateDoc, onSnapshot, collection, deleteDoc, serverTimestamp,
+  addDoc, query, orderBy, limit
 } from "https://www.gstatic.com/firebasejs/10.12.4/firebase-firestore.js";
 
 const auth = AuthMod.auth;
@@ -438,6 +439,53 @@ window.addEventListener("pointermove", (e) => {
   move.x = dx / max;
   move.y = dy / max;
 }, { passive: true });
+
+// ===================
+// CHAT (rooms/{roomId}/messages)
+// ===================
+const chatMessagesEl = document.getElementById("chatMessages");
+const chatForm = document.getElementById("chatForm");
+const chatInput = document.getElementById("chatInput");
+
+function escapeHTML(s=""){
+  return String(s)
+    .replaceAll("&","&amp;")
+    .replaceAll("<","&lt;")
+    .replaceAll(">","&gt;")
+    .replaceAll('"',"&quot;")
+    .replaceAll("'","&#039;");
+}
+
+function renderChat(messages){
+  if (!chatMessagesEl) return;
+  chatMessagesEl.innerHTML = "";
+
+  for (const m of messages){
+    const div = document.createElement("div");
+    div.className = "chat-msg" + (m.uid === myUid ? " me" : "");
+    div.innerHTML = `
+      <div class="chat-meta">${escapeHTML(m.name || "Joueur")}</div>
+      <div class="chat-text">${escapeHTML(m.text || "")}</div>
+    `;
+    chatMessagesEl.appendChild(div);
+  }
+
+  // auto-scroll en bas
+  chatMessagesEl.scrollTop = chatMessagesEl.scrollHeight;
+}
+
+async function sendChat(text){
+  const t = (text || "").trim();
+  if (!t || !roomId || !myUid) return;
+
+  // IMPORTANT: myName doit être ton vrai pseudo (voir fix game.js)
+  await addDoc(collection(db, "rooms", roomId, "messages"), {
+    uid: myUid,
+    name: myName || "Joueur",
+    text: t,
+    createdAt: serverTimestamp()
+  });
+}
 
 // ===================
 // FIREBASE
