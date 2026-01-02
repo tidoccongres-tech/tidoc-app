@@ -260,7 +260,7 @@ if (walking){
   }
 } else {
   walkTimer = 0;
-  walkIndex = 1; // 1 = pose-1 dans ta séquence (walk1, pose, walk2, pose)
+  walkIndex = 1; // pose-1 dans ta séquence
 }
 
   if (canMove(nx, ny)){
