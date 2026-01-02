@@ -240,9 +240,10 @@ async function sendMyPosition(){
 // UPDATE / DRAW
 // ===================
 function update(dt){
-  // local movement + collisions
-  const nx = player.x + move.x * player.speed;
-  const ny = player.y + move.y * player.speed;
+  const dtNorm = Math.min(2, dt / 16.6667); // clamp pour éviter les gros sauts
+
+  const nx = player.x + move.x * player.speed * dtNorm;
+  const ny = player.y + move.y * player.speed * dtNorm;
 
   const wasWalking = walking;
   walking = (Math.abs(move.x) + Math.abs(move.y)) > 0.15;
