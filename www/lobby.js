@@ -290,13 +290,13 @@ function drawPlayerSprite(px, py, img){
   const W = SPRITE_SIZE;
   const H = SPRITE_SIZE;
 
-  // ancre aux pieds : chaque frame peut avoir un foot différent
-  const foot = FOOT_ADJUST.get(img) ?? FOOT_OFFSET_Y;
+  const toDraw = (img && img.complete && img.naturalWidth > 0) ? img : spritePose1;
+
+  // ✅ point d’ancrage aux pieds (important)
+  const foot = FOOT_ADJUST.get(toDraw) ?? FOOT_OFFSET_Y;
 
   const dx = Math.round(px - W / 2);
   const dy = Math.round(py - H + foot);
-
-  const toDraw = (img && img.complete && img.naturalWidth > 0) ? img : spritePose1;
 
   if (toDraw.complete && toDraw.naturalWidth > 0){
     ctx.drawImage(toDraw, dx, dy, W, H);
