@@ -81,6 +81,7 @@ const PLAYER_RADIUS = 22;          // collisions
 const SEND_EVERY_MS = 120;         // sync position
 const WALK_SWAP_MS = 150;          // alternance marche
 
+const WALK_SEQUENCE = [ spriteWalk1, spritePose1, spriteWalk2, spritePose1 ];
 // ===================
 // COLLISIONS
 // ===================
@@ -184,11 +185,11 @@ function settleRemoteIdle(){
 // ===================
 let walking = false;
 let walkTimer = 0;
-let walkFrame = 0;
+let walkIndex = 0;
 
 function getLocalSprite(){
   if (!walking) return spritePose1;
-  return walkFrame === 0 ? spriteWalk1 : spriteWalk2;
+  return WALK_SEQUENCE[walkIndex];
 }
 
 function getRemoteSprite(p){
@@ -231,15 +232,15 @@ function update(dt){
   walking = (Math.abs(move.x) + Math.abs(move.y)) > 0.05;
 
   if (walking){
-    walkTimer += dt;
-    if (walkTimer > WALK_SWAP_MS){
-      walkTimer = 0;
-      walkFrame = (walkFrame + 1) % 2;
-    }
-  } else {
+  walkTimer += dt;
+  if (walkTimer > WALK_SWAP_MS){
     walkTimer = 0;
-    walkFrame = 0;
+    walkIndex = (walkIndex + 1) % WALK_SEQUENCE.length;
   }
+} else {
+  walkTimer = 0;
+  walkIndex = 0; // revient sur spriteWalk1 → mais getLocalSprite retourne pose-1
+}
 
   if (canMove(nx, ny)){
     player.x = nx;
