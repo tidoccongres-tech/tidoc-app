@@ -122,7 +122,7 @@ let myIsHost = false;
 // ===================
 // AUTRES JOUEURS + ANIM
 // ===================
-// uid -> { uid,name,isHost,x,y,lastX,lastY,moving,walkFrame,walkTimer,lastMoveAt }
+// uid -> { uid,name,isHost,x,y,lastX,lastY,moving,walkIndex,walkTimer,lastMoveAt }
 const playersMap = new Map();
 
 function ensurePlayerState(p){
@@ -139,7 +139,7 @@ function ensurePlayerState(p){
       x, y,
       lastX: x, lastY: y,
       moving: false,
-      walkFrame: 0,
+      walkIndex: 0,
       walkTimer: 0,
       lastMoveAt: performance.now()
     });
