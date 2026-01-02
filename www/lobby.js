@@ -43,9 +43,12 @@ resize();
 window.addEventListener("resize", resize);
 
 function getSpawnPosition(){
+  const offsetX = Math.floor(Math.random() * 40) - 20; // -20 .. +19
+  const offsetY = Math.floor(Math.random() * 40) - 20; // -20 .. +19
+
   return {
-    x: window.innerWidth / 2,
-    y: window.innerHeight / 2 + 60 // petit offset vers le bas pour pas être sous l’UI
+    x: window.innerWidth / 2 + offsetX,
+    y: window.innerHeight / 2 + 60 + offsetY // +60 pour éviter l’UI
   };
 }
 
