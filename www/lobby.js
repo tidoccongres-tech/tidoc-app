@@ -71,6 +71,12 @@ spriteWalk1.src = "./assets/marche1.png";
 const spriteWalk2 = new Image();
 spriteWalk2.src = "./assets/marche2.png";
 
+const FOOT_ADJUST = new Map([
+  [spritePose1, 4],
+  [spriteWalk1, 6],
+  [spriteWalk2, 6],
+]);
+
 // ===================
 // TUNING
 // ===================
@@ -270,6 +276,9 @@ function drawPlayerSprite(px, py, img){
   const W = SPRITE_SIZE;
   const H = SPRITE_SIZE;
 
+  const foot = FOOT_ADJUST.get(img) ?? FOOT_OFFSET_Y;
+  const dy = Math.round(py - H + foot);
+  
   const dx = Math.round(px - W / 2);
   const dy = Math.round(py - H + FOOT_OFFSET_Y);
 
