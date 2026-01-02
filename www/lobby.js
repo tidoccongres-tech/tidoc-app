@@ -158,12 +158,12 @@ function ensurePlayerState(p){
     const dy = (prev.lastY ?? y) - y;
     const dist = Math.hypot(dx, dy);
 
-    if (dist > 0.6){ // seuil anti-jitter
-      prev.moving = true;
-      prev.lastMoveAt = performance.now();
-      prev.lastX = x;
-      prev.lastY = y;
-    }
+    if (dist > 0.6){
+  prev.moving = true;
+  prev.lastMoveAt = performance.now();
+ }
+  prev.lastX = x;
+  prev.lastY = y;
   }
 }
 
@@ -172,9 +172,9 @@ function settleRemoteIdle(){
   const now = performance.now();
   for (const [uid, p] of playersMap){
     if (uid === myUid) continue;
-    if (p.moving && now - p.lastMoveAt > 220){
+    if (p.moving && now - p.lastMoveAt > 350){
       p.moving = false;
-      p.walkFrame = 0;
+      p.walkIndex = 0;
       p.walkTimer = 0;
     }
   }
@@ -194,7 +194,7 @@ function getLocalSprite(){
 
 function getRemoteSprite(p){
   if (!p.moving) return spritePose1;
-  return p.walkFrame === 0 ? spriteWalk1 : spriteWalk2;
+  return WALK_SEQUENCE[p.walkIndex % WALK_SEQUENCE.length];
 }
 
 // ===================
@@ -233,9 +233,11 @@ function update(dt){
 
   if (walking){
   walkTimer += dt;
-  if (walkTimer > WALK_SWAP_MS){
-    walkTimer = 0;
-    walkIndex = (walkIndex + 1) % WALK_SEQUENCE.length;
+  p.walkTimer += dt;
+if (p.walkTimer > WALK_SWAP_MS){
+  p.walkTimer = 0;
+  p.walkIndex = (p.walkIndex + 1) % WALK_SEQUENCE.length;
+}
   }
 } else {
   walkTimer = 0;
