@@ -37,7 +37,7 @@ function resize(){
   canvas.height = Math.floor(window.innerHeight * dpr);
   canvas.style.width = window.innerWidth + "px";
   canvas.style.height = window.innerHeight + "px";
-  ctx.setTransform(dpr, 0, 0, dpr, 0, 0); // dessin en coords CSS pixels
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 }
 resize();
 window.addEventListener("resize", resize);
@@ -72,10 +72,18 @@ const spriteWalk2 = new Image();
 spriteWalk2.src = "./assets/marche2.png";
 
 // ===================
+// TUNING
+// ===================
+const SPRITE_SIZE = 90;
+const FOOT_OFFSET_Y = 4;
+
+const PLAYER_RADIUS = 22;          // collisions
+const SEND_EVERY_MS = 120;         // sync position
+const WALK_SWAP_MS = 150;          // alternance marche
+
+// ===================
 // COLLISIONS
 // ===================
-const PLAYER_RADIUS = 22; // ✅ augmente ici si tu veux moins coller aux murs
-
 function isWalkable(px, py){
   if (!collisionData) return true;
 
@@ -85,7 +93,7 @@ function isWalkable(px, py){
   if (cx < 0 || cy < 0 || cx >= collisionImg.width || cy >= collisionImg.height) return false;
 
   const i = (cy * collisionImg.width + cx) * 4;
-  const val = collisionData.data[i]; // canal rouge
+  const val = collisionData.data[i];
   return val > 200; // blanc = sol
 }
 
@@ -103,39 +111,95 @@ function canMove(nx, ny){
 // ===================
 // PLAYER LOCAL
 // ===================
-const player = { x: 220, y: 320, speed: 2.2 }; // x,y = position "pieds"
+const player = { x: 220, y: 320, speed: 2.2 };
 let move = { x: 0, y: 0 };
 
-// infos locales
+let myUid = null;
 let myName = "";
 let myIsHost = false;
-let myUid = null;
 
 // ===================
-// AUTRES JOUEURS
+// AUTRES JOUEURS + ANIM
 // ===================
-const playersMap = new Map(); // uid -> {uid,name,isHost,x,y}
+// uid -> { uid,name,isHost,x,y,lastX,lastY,moving,walkFrame,walkTimer,lastMoveAt }
+const playersMap = new Map();
+
+function ensurePlayerState(p){
+  const prev = playersMap.get(p.uid);
+
+  const x = (typeof p.x === "number") ? p.x : undefined;
+  const y = (typeof p.y === "number") ? p.y : undefined;
+
+  if (!prev){
+    playersMap.set(p.uid, {
+      uid: p.uid,
+      name: p.name || "Joueur",
+      isHost: !!p.isHost,
+      x, y,
+      lastX: x, lastY: y,
+      moving: false,
+      walkFrame: 0,
+      walkTimer: 0,
+      lastMoveAt: performance.now()
+    });
+    return;
+  }
+
+  // update infos
+  prev.name = p.name || prev.name;
+  prev.isHost = !!p.isHost;
+
+  // detect mouvement
+  if (typeof x === "number" && typeof y === "number"){
+    prev.x = x; prev.y = y;
+
+    const dx = (prev.lastX ?? x) - x;
+    const dy = (prev.lastY ?? y) - y;
+    const dist = Math.hypot(dx, dy);
+
+    if (dist > 0.6){ // seuil anti-jitter
+      prev.moving = true;
+      prev.lastMoveAt = performance.now();
+      prev.lastX = x;
+      prev.lastY = y;
+    }
+  }
+}
+
+// si le joueur n’a pas bougé depuis X ms → idle
+function settleRemoteIdle(){
+  const now = performance.now();
+  for (const [uid, p] of playersMap){
+    if (uid === myUid) continue;
+    if (p.moving && now - p.lastMoveAt > 220){
+      p.moving = false;
+      p.walkFrame = 0;
+      p.walkTimer = 0;
+    }
+  }
+}
 
 // ===================
-// SPRITE / ANIM
+// LOCAL WALK ANIM
 // ===================
-const SPRITE_SIZE = 90;     // ✅ taille visible
-const FOOT_OFFSET_Y = 4;    // pour coller les pieds au sol
-
 let walking = false;
 let walkTimer = 0;
-let walkFrame = 0;          // 0 => marche1, 1 => marche2
+let walkFrame = 0;
 
-function getMySprite(){
+function getLocalSprite(){
   if (!walking) return spritePose1;
   return walkFrame === 0 ? spriteWalk1 : spriteWalk2;
 }
 
+function getRemoteSprite(p){
+  if (!p.moving) return spritePose1;
+  return p.walkFrame === 0 ? spriteWalk1 : spriteWalk2;
+}
+
 // ===================
-// FIRESTORE POS SYNC (throttle)
+// FIRESTORE POS SYNC
 // ===================
 let lastSend = 0;
-const SEND_EVERY_MS = 120; // ~8 fois/sec (nickel mobile)
 
 async function sendMyPosition(){
   if (!myUid || !roomId) return;
@@ -159,16 +223,16 @@ async function sendMyPosition(){
 // UPDATE / DRAW
 // ===================
 function update(dt){
+  // local movement + collisions
   const nx = player.x + move.x * player.speed;
   const ny = player.y + move.y * player.speed;
 
   const wasWalking = walking;
   walking = (Math.abs(move.x) + Math.abs(move.y)) > 0.05;
 
-  // anim marche : switch toutes les 150ms
   if (walking){
     walkTimer += dt;
-    if (walkTimer > 150){
+    if (walkTimer > WALK_SWAP_MS){
       walkTimer = 0;
       walkFrame = (walkFrame + 1) % 2;
     }
@@ -181,9 +245,23 @@ function update(dt){
     player.x = nx;
     player.y = ny;
 
-    // ✅ push position quand on bouge (ou fin de mouvement)
+    // update Firestore quand on bouge ou qu’on vient de s’arrêter
     if (walking || wasWalking) sendMyPosition();
   }
+
+  // remote anim timers
+  for (const [uid, p] of playersMap){
+    if (uid === myUid) continue;
+    if (!p.moving) continue;
+
+    p.walkTimer += dt;
+    if (p.walkTimer > WALK_SWAP_MS){
+      p.walkTimer = 0;
+      p.walkFrame = (p.walkFrame + 1) % 2;
+    }
+  }
+
+  settleRemoteIdle();
 }
 
 function drawPlayerSprite(px, py, img){
@@ -207,7 +285,6 @@ function drawPlayerSprite(px, py, img){
 
 function drawNameTag(px, py, name, isHost){
   if (!name) return;
-
   const text = isHost ? `${name} 👑` : name;
   const y = Math.round(py - SPRITE_SIZE - 14);
 
@@ -237,19 +314,21 @@ function drawNameTag(px, py, name, isHost){
 
 function draw(){
   ctx.clearRect(0, 0, window.innerWidth, window.innerHeight);
-
-  // fond
   if (bg.complete) ctx.drawImage(bg, 0, 0, window.innerWidth, window.innerHeight);
 
-  // dessine tous les joueurs (toi inclus)
-  for (const [uid, p] of playersMap.entries()){
-    const px = (uid === myUid) ? player.x : (p.x ?? 220);
-    const py = (uid === myUid) ? player.y : (p.y ?? 320);
+  // draw players triés par y (depth)
+  const arr = Array.from(playersMap.values())
+    .map(p => ({
+      ...p,
+      drawX: (p.uid === myUid) ? player.x : (typeof p.x === "number" ? p.x : 220),
+      drawY: (p.uid === myUid) ? player.y : (typeof p.y === "number" ? p.y : 320),
+    }))
+    .sort((a,b) => a.drawY - b.drawY);
 
-    const sprite = (uid === myUid) ? getMySprite() : spritePose1;
-
-    drawPlayerSprite(px, py, sprite);
-    drawNameTag(px, py, p.name || "Joueur", !!p.isHost);
+  for (const p of arr){
+    const sprite = (p.uid === myUid) ? getLocalSprite() : getRemoteSprite(p);
+    drawPlayerSprite(p.drawX, p.drawY, sprite);
+    drawNameTag(p.drawX, p.drawY, p.name, !!p.isHost);
   }
 }
 
@@ -318,7 +397,6 @@ window.addEventListener("pointermove", (e) => {
   }
 
   setStick(dx, dy);
-
   move.x = dx / max;
   move.y = dy / max;
 }, { passive: true });
@@ -332,7 +410,6 @@ onAuthStateChanged(auth, async (u) => {
 
   myUid = u.uid;
 
-  // room live (host)
   onSnapshot(doc(db,"rooms",roomId), (snap)=>{
     if (!snap.exists()){
       alert("Partie supprimée");
@@ -344,41 +421,41 @@ onAuthStateChanged(auth, async (u) => {
     if (btnStart) btnStart.style.display = myIsHost ? "" : "none";
   });
 
-  // players live
   onSnapshot(collection(db,"rooms",roomId,"players"), async (snap)=>{
     const players = snap.docs.map(d=>d.data());
     renderPlayers(players);
 
-    playersMap.clear();
-    for (const p of players){
-      playersMap.set(p.uid, {
-        uid: p.uid,
-        name: p.name || "Joueur",
-        isHost: !!p.isHost,
-        x: p.x,
-        y: p.y,
-      });
+    // build map + movement detection
+    for (const p of players) ensurePlayerState(p);
+
+    // remove players not in snapshot anymore
+    const live = new Set(players.map(p => p.uid));
+    for (const uid of Array.from(playersMap.keys())){
+      if (!live.has(uid)) playersMap.delete(uid);
     }
 
-    // récupère mon pseudo
+    // get my name
     const me = players.find(p => p.uid === u.uid);
     if (me?.name) myName = me.name;
 
-    // ✅ si j'ai pas de position => spawn + write
-    if (me && (typeof me.x !== "number" || typeof me.y !== "number")){
-      try{
-        await updateDoc(doc(db,"rooms",roomId,"players",u.uid), {
-          x: player.x, y: player.y
-        });
-      } catch(e){
-        console.log("spawn write error:", e);
-      }
-    }
+    // ensure me exists in map
+    if (me){
+      ensurePlayerState(me);
 
-    // ✅ si j'ai une position => je la prends (utile au join)
-    if (me && typeof me.x === "number" && typeof me.y === "number"){
-      player.x = me.x;
-      player.y = me.y;
+      // spawn init if missing
+      if (typeof me.x !== "number" || typeof me.y !== "number"){
+        try{
+          await updateDoc(doc(db,"rooms",roomId,"players",u.uid), {
+            x: player.x, y: player.y
+          });
+        } catch(e){
+          console.log("spawn write error:", e);
+        }
+      } else {
+        // take server pos at join
+        player.x = me.x;
+        player.y = me.y;
+      }
     }
   });
 
