@@ -42,6 +42,13 @@ function resize(){
 resize();
 window.addEventListener("resize", resize);
 
+function getSpawnPosition(){
+  return {
+    x: window.innerWidth / 2,
+    y: window.innerHeight / 2 + 60 // petit offset vers le bas pour pas être sous l’UI
+  };
+}
+
 // ===================
 // IMAGES
 // ===================
