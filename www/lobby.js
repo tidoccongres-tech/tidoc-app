@@ -496,6 +496,27 @@ onAuthStateChanged(auth, async (u) => {
 
   myUid = u.uid;
 
+  // ---- CHAT LIVE
+if (chatForm && chatInput){
+  const q = query(
+    collection(db, "rooms", roomId, "messages"),
+    orderBy("createdAt", "asc"),
+    limit(80)
+  );
+
+  onSnapshot(q, (snap) => {
+    const msgs = snap.docs.map(d => d.data());
+    renderChat(msgs);
+  });
+
+  chatForm.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const val = chatInput.value;
+    chatInput.value = "";
+    try { await sendChat(val); } catch (err) { console.log("chat send error:", err); }
+  });
+}
+  
   onSnapshot(doc(db,"rooms",roomId), (snap)=>{
     if (!snap.exists()){
       alert("Partie supprimée");
