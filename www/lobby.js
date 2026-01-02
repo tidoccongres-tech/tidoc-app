@@ -79,7 +79,7 @@ const FOOT_OFFSET_Y = 4;
 
 const PLAYER_RADIUS = 22;          // collisions
 const SEND_EVERY_MS = 120;         // sync position
-const WALK_SWAP_MS = 150;          // alternance marche
+const WALK_SWAP_MS = 70;          // alternance marche
 
 const WALK_SEQUENCE = [ spriteWalk1, spritePose1, spriteWalk2, spritePose1 ];
 // ===================
@@ -229,7 +229,7 @@ function update(dt){
   const ny = player.y + move.y * player.speed;
 
   const wasWalking = walking;
-  walking = (Math.abs(move.x) + Math.abs(move.y)) > 0.05;
+  walking = (Math.abs(move.x) + Math.abs(move.y)) > 0.15;
 
   // ✅ anim locale
   if (walking){
@@ -239,9 +239,9 @@ function update(dt){
       walkIndex = (walkIndex + 1) % WALK_SEQUENCE.length;
     }
   } else {
-    walkTimer = 0;
-    walkIndex = 0; // getLocalSprite() renvoie pose-1 si !walking
-  }
+  walkTimer = 0;
+  if (walkIndex !== 1) walkIndex = 1; // 1 = pose-1 dans ta séquence
+}
 
   if (canMove(nx, ny)){
     player.x = nx;
