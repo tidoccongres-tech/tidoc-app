@@ -16,6 +16,10 @@ const playersEl  = document.getElementById("playersList");
 const btnStart   = document.getElementById("btnStart");
 const btnLeave   = document.getElementById("btnLeave");
 
+const btnChatToggle = document.getElementById("btnChatToggle");
+const chatOverlay   = document.getElementById("chatOverlay");
+const btnChatClose  = document.getElementById("btnChatClose");
+
 if (roomCodeEl) roomCodeEl.textContent = roomId || "----";
 
 function renderPlayers(players){
@@ -25,6 +29,44 @@ function renderPlayers(players){
     return `<div class="player">${p.name || "Joueur"}${crown}</div>`;
   }).join("");
 }
+
+function openChat(){
+  if (!chatOverlay) return;
+  chatOverlay.classList.add("open");
+  chatOverlay.setAttribute("aria-hidden", "false");
+  document.body.classList.add("chat-open");
+
+  // focus input (mobile friendly)
+  setTimeout(() => {
+    const input = document.getElementById("chatInput");
+    input?.focus?.();
+  }, 80);
+}
+
+function closeChat(){
+  if (!chatOverlay) return;
+  chatOverlay.classList.remove("open");
+  chatOverlay.setAttribute("aria-hidden", "true");
+  document.body.classList.remove("chat-open");
+}
+
+btnChatToggle?.addEventListener("click", () => {
+  if (!chatOverlay) return;
+  if (chatOverlay.classList.contains("open")) closeChat();
+  else openChat();
+});
+
+btnChatClose?.addEventListener("click", closeChat);
+
+// clic sur le fond sombre = close
+chatOverlay?.addEventListener("click", (e) => {
+  if (e.target === chatOverlay) closeChat();
+});
+
+// ESC = close (desktop)
+window.addEventListener("keydown", (e) => {
+  if (e.key === "Escape") closeChat();
+});
 
 // ===================
 // CANVAS SETUP
