@@ -474,23 +474,27 @@ onAuthStateChanged(auth, async (u) => {
 
     // ensure me exists in map
     if (me){
-      ensurePlayerState(me);
+  ensurePlayerState(me);
 
-      // spawn init if missing
-      if (typeof me.x !== "number" || typeof me.y !== "number"){
-        try{
-          await updateDoc(doc(db,"rooms",roomId,"players",u.uid), {
-            x: player.x, y: player.y
-          });
-        } catch(e){
-          console.log("spawn write error:", e);
-        }
-      } else {
-        // take server pos at join
-        player.x = me.x;
-        player.y = me.y;
-      }
+  if (typeof me.x !== "number" || typeof me.y !== "number"){
+    const spawn = getSpawnPosition();
+
+    player.x = spawn.x;
+    player.y = spawn.y;
+
+    try{
+      await updateDoc(doc(db,"rooms",roomId,"players",u.uid), {
+        x: spawn.x,
+        y: spawn.y
+      });
+    } catch(e){
+      console.log("spawn write error:", e);
     }
+  } else {
+    player.x = me.x;
+    player.y = me.y;
+  }
+}
   });
 
   btnStart?.addEventListener("click", async ()=>{
