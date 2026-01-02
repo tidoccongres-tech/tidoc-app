@@ -276,16 +276,16 @@ function drawPlayerSprite(px, py, img){
   const W = SPRITE_SIZE;
   const H = SPRITE_SIZE;
 
+  // ancre aux pieds : chaque frame peut avoir un foot différent
   const foot = FOOT_ADJUST.get(img) ?? FOOT_OFFSET_Y;
-  const dy = Math.round(py - H + foot);
-  
-  const dx = Math.round(px - W / 2);
-  const dy = Math.round(py - H + FOOT_OFFSET_Y);
 
-  if (img && img.complete && img.naturalWidth > 0){
-    ctx.drawImage(img, dx, dy, W, H);
-  } else if (spritePose1.complete) {
-    ctx.drawImage(spritePose1, dx, dy, W, H);
+  const dx = Math.round(px - W / 2);
+  const dy = Math.round(py - H + foot);
+
+  const toDraw = (img && img.complete && img.naturalWidth > 0) ? img : spritePose1;
+
+  if (toDraw.complete && toDraw.naturalWidth > 0){
+    ctx.drawImage(toDraw, dx, dy, W, H);
   } else {
     ctx.fillStyle = "red";
     ctx.beginPath();
