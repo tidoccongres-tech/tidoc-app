@@ -1,3 +1,5 @@
+// game.js (MODULE) — Create/Join room -> redirect lobby + vrai pseudo
+
 import * as AuthMod from "./auth.js";
 import {
   doc, setDoc, getDoc, updateDoc, deleteDoc,
@@ -47,6 +49,7 @@ let unsubRoom = null;
 // =======================
 // HELPERS
 // =======================
+const LS_NAME = "tidoc_name";
 
 function escapeHTML(s=""){
   return String(s)
@@ -57,11 +60,17 @@ function escapeHTML(s=""){
     .replaceAll("'","&#039;");
 }
 
-function safeName(u){
-  const n = (u?.displayName || "").trim();
-  if (n) return n;
+// ✅ VRAI PSEUDO : localStorage -> displayName -> fallback email
+function getPseudo(u){
+  const ls = (localStorage.getItem(LS_NAME) || "").trim();
+  if (ls) return ls;
+
+  const dn = (u?.displayName || "").trim();
+  if (dn) return dn;
+
   const email = (u?.email || "").trim();
   if (email) return email.split("@")[0];
+
   return "Joueur";
 }
 
@@ -130,13 +139,12 @@ async function createRoom(){
 
   await setDoc(doc(db, "rooms", roomId, "players", u.uid), {
     uid: u.uid,
-    name: safeName(u),
+    name: getPseudo(u), // ✅ vrai pseudo
     isHost: true,
     status: "prêt",
     joinedAt: serverTimestamp(),
   });
 
-  // ✅ on va au lobby
   window.location.href = `./lobby.html?room=${encodeURIComponent(roomId)}`;
 }
 
@@ -155,6 +163,7 @@ async function joinRoom(roomIdRaw){
     msg("❌ Partie introuvable.");
     return;
   }
+
   const room = snap.data() || {};
   if (room.status !== "lobby"){
     msg("❌ Partie déjà commencée.");
@@ -163,16 +172,17 @@ async function joinRoom(roomIdRaw){
 
   await setDoc(doc(db, "rooms", roomId, "players", u.uid), {
     uid: u.uid,
-    name: safeName(u),
+    name: getPseudo(u), // ✅ vrai pseudo
     isHost: false,
     status: "prêt",
     joinedAt: serverTimestamp(),
   }, { merge:true });
 
-  // ✅ on va au lobby
   window.location.href = `./lobby.html?room=${encodeURIComponent(roomId)}`;
 }
 
+// (tu ne l’utilises plus trop car tu rediriges direct lobby.html,
+// mais je te laisse ton code intact au cas où)
 async function enterRoom(roomId){
   cleanupSubs();
   currentRoomId = roomId;
@@ -259,12 +269,11 @@ btnCopyCode?.addEventListener("click", async ()=>{
 btnLeaveRoom?.addEventListener("click", ()=> leaveRoom());
 
 document.querySelectorAll(".menu-btn").forEach(btn => {
-  const play = (e) => {
-    btn.classList.remove("tap");     // reset si spam tap
-    void btn.offsetWidth;            // force reflow
+  const play = () => {
+    btn.classList.remove("tap");
+    void btn.offsetWidth;
     btn.classList.add("tap");
   };
-
   btn.addEventListener("pointerdown", play, { passive: true });
 });
 
@@ -281,5 +290,4 @@ onAuthStateChanged(auth, (u)=>{
   }
 });
 
-// IMPORTANT : on démarre toujours sur le menu
 showScreen("menu");
