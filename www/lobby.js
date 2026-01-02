@@ -12,6 +12,7 @@ const roomId = (params.get("room") || "").trim().toUpperCase();
 const roomCodeEl = document.getElementById("roomCode");
 const playersEl  = document.getElementById("playersList");
 const btnStart   = document.getElementById("btnStart");
+const btnLeave   = document.getElementById("btnLeave");
 
 if (roomCodeEl) roomCodeEl.textContent = roomId || "----";
 
@@ -283,10 +284,22 @@ onAuthStateChanged(auth, async (u) => {
     if (me?.name) myName = me.name;
   });
 
-  btnStart?.addEventListener("click", async ()=>{
-    await updateDoc(doc(db,"rooms",roomId), { status:"started", startedAt: serverTimestamp() });
-    alert("Partie lancée (status=started)");
-  });
+  btnLeave?.addEventListener("click", async ()=>{
+  try{
+    // retire le joueur
+    await deleteDoc(doc(db,"rooms",roomId,"players",u.uid));
+
+    // si hôte => supprime la room (et donc kick tout le monde)
+    const roomSnap = await getDoc(doc(db,"rooms",roomId));
+    const room = roomSnap.data();
+    if (room?.hostUid === u.uid){
+      await deleteDoc(doc(db,"rooms",roomId));
+    }
+  } catch(e){
+    console.log("leave error:", e);
+  }
+  window.location.href = "./game.html";
+});
 
   window.addEventListener("beforeunload", async ()=>{
     try{ await deleteDoc(doc(db,"rooms",roomId,"players",u.uid)); } catch {}
