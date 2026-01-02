@@ -1,7 +1,8 @@
 import * as AuthMod from "./auth.js";
-import { doc, updateDoc, onSnapshot, collection } from "https://www.gstatic.com/firebasejs/10.12.4/firebase-firestore.js";
 import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.4/firebase-auth.js";
-import { deleteDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.4/firebase-firestore.js";
+import {
+  doc, getDoc, updateDoc, onSnapshot, collection, deleteDoc, serverTimestamp
+} from "https://www.gstatic.com/firebasejs/10.12.4/firebase-firestore.js";
 
 const auth = AuthMod.auth;
 const db = AuthMod.db;
@@ -51,7 +52,6 @@ const collisionImg = new Image();
 collisionImg.src = "./assets/lobby-NB.png";
 
 let collisionData = null;
-
 collisionImg.onload = () => {
   const tmp = document.createElement("canvas");
   tmp.width = collisionImg.width;
@@ -61,14 +61,20 @@ collisionImg.onload = () => {
   collisionData = tctx.getImageData(0, 0, tmp.width, tmp.height);
 };
 
-// ✅ sprite au spawn
+// sprites
 const spritePose1 = new Image();
 spritePose1.src = "./assets/pose-1.png";
+
+const spriteWalk1 = new Image();
+spriteWalk1.src = "./assets/marche1.png";
+
+const spriteWalk2 = new Image();
+spriteWalk2.src = "./assets/marche2.png";
 
 // ===================
 // COLLISIONS
 // ===================
-const PLAYER_RADIUS = 16;
+const PLAYER_RADIUS = 22; // ✅ augmente ici si tu veux moins coller aux murs
 
 function isWalkable(px, py){
   if (!collisionData) return true;
@@ -95,57 +101,103 @@ function canMove(nx, ny){
 }
 
 // ===================
-// PLAYER
+// PLAYER LOCAL
 // ===================
-// x,y = position "au sol" (pieds)
-const player = { x: 200, y: 260, speed: 2 };
+const player = { x: 220, y: 320, speed: 2.2 }; // x,y = position "pieds"
 let move = { x: 0, y: 0 };
 
-// ✅ pseudo local (et host)
+// infos locales
 let myName = "";
 let myIsHost = false;
+let myUid = null;
 
-function update(){
+// ===================
+// AUTRES JOUEURS
+// ===================
+const playersMap = new Map(); // uid -> {uid,name,isHost,x,y}
+
+// ===================
+// SPRITE / ANIM
+// ===================
+const SPRITE_SIZE = 90;     // ✅ taille visible
+const FOOT_OFFSET_Y = 4;    // pour coller les pieds au sol
+
+let walking = false;
+let walkTimer = 0;
+let walkFrame = 0;          // 0 => marche1, 1 => marche2
+
+function getMySprite(){
+  if (!walking) return spritePose1;
+  return walkFrame === 0 ? spriteWalk1 : spriteWalk2;
+}
+
+// ===================
+// FIRESTORE POS SYNC (throttle)
+// ===================
+let lastSend = 0;
+const SEND_EVERY_MS = 120; // ~8 fois/sec (nickel mobile)
+
+async function sendMyPosition(){
+  if (!myUid || !roomId) return;
+
+  const now = performance.now();
+  if (now - lastSend < SEND_EVERY_MS) return;
+  lastSend = now;
+
+  try{
+    await updateDoc(doc(db,"rooms",roomId,"players",myUid), {
+      x: player.x,
+      y: player.y,
+      updatedAt: serverTimestamp()
+    });
+  } catch(e){
+    console.log("pos update error:", e);
+  }
+}
+
+// ===================
+// UPDATE / DRAW
+// ===================
+function update(dt){
   const nx = player.x + move.x * player.speed;
   const ny = player.y + move.y * player.speed;
+
+  const wasWalking = walking;
+  walking = (Math.abs(move.x) + Math.abs(move.y)) > 0.05;
+
+  // anim marche : switch toutes les 150ms
+  if (walking){
+    walkTimer += dt;
+    if (walkTimer > 150){
+      walkTimer = 0;
+      walkFrame = (walkFrame + 1) % 2;
+    }
+  } else {
+    walkTimer = 0;
+    walkFrame = 0;
+  }
 
   if (canMove(nx, ny)){
     player.x = nx;
     player.y = ny;
+
+    // ✅ push position quand on bouge (ou fin de mouvement)
+    if (walking || wasWalking) sendMyPosition();
   }
 }
 
-function draw(){
-  ctx.clearRect(0, 0, window.innerWidth, window.innerHeight);
-
-  // fond
-  if (bg.complete) ctx.drawImage(bg, 0, 0, window.innerWidth, window.innerHeight);
-
-  // perso
-  drawPlayerSprite(player.x, player.y);
-
-  // pseudo au-dessus
-  drawNameTag(player.x, player.y, myName, myIsHost);
-}
-
-// ✅ taille du perso (mets 64 / 72 / 80 selon ton goût)
-const SPRITE_SIZE = 150;
-
-// petit offset pour que les pieds touchent le sol
-const FOOT_OFFSET_Y = 4;
-
-function drawPlayerSprite(px, py){
+function drawPlayerSprite(px, py, img){
   const W = SPRITE_SIZE;
   const H = SPRITE_SIZE;
 
-  // ancre bas-centre
   const dx = Math.round(px - W / 2);
   const dy = Math.round(py - H + FOOT_OFFSET_Y);
 
-  if (spritePose1.complete && spritePose1.naturalWidth > 0){
+  if (img && img.complete && img.naturalWidth > 0){
+    ctx.drawImage(img, dx, dy, W, H);
+  } else if (spritePose1.complete) {
     ctx.drawImage(spritePose1, dx, dy, W, H);
   } else {
-    // fallback si l’image n’est pas chargée
     ctx.fillStyle = "red";
     ctx.beginPath();
     ctx.arc(px, py, 10, 0, Math.PI*2);
@@ -157,8 +209,6 @@ function drawNameTag(px, py, name, isHost){
   if (!name) return;
 
   const text = isHost ? `${name} 👑` : name;
-
-  // position au-dessus de la tête
   const y = Math.round(py - SPRITE_SIZE - 14);
 
   ctx.save();
@@ -171,33 +221,52 @@ function drawNameTag(px, py, name, isHost){
   const w = Math.ceil(metrics.width + padX * 2);
   const h = 22;
 
-  // fond arrondi
   ctx.fillStyle = "rgba(0,0,0,0.45)";
   ctx.beginPath();
   ctx.roundRect(px - w/2, y - h/2, w, h, 999);
   ctx.fill();
 
-  // liseré léger
   ctx.strokeStyle = "rgba(255,255,255,0.15)";
   ctx.lineWidth = 1;
   ctx.stroke();
 
-  // texte
   ctx.fillStyle = "#fff";
   ctx.fillText(text, px, y);
-
   ctx.restore();
 }
 
-function loop(){
-  update();
+function draw(){
+  ctx.clearRect(0, 0, window.innerWidth, window.innerHeight);
+
+  // fond
+  if (bg.complete) ctx.drawImage(bg, 0, 0, window.innerWidth, window.innerHeight);
+
+  // dessine tous les joueurs (toi inclus)
+  for (const [uid, p] of playersMap.entries()){
+    const px = (uid === myUid) ? player.x : (p.x ?? 220);
+    const py = (uid === myUid) ? player.y : (p.y ?? 320);
+
+    const sprite = (uid === myUid) ? getMySprite() : spritePose1;
+
+    drawPlayerSprite(px, py, sprite);
+    drawNameTag(px, py, p.name || "Joueur", !!p.isHost);
+  }
+}
+
+// loop
+let lastT = performance.now();
+function loop(t){
+  const dt = t - lastT;
+  lastT = t;
+
+  update(dt);
   draw();
   requestAnimationFrame(loop);
 }
-loop();
+requestAnimationFrame(loop);
 
 // ===================
-// JOYSTICK (iOS safe)
+// JOYSTICK
 // ===================
 const joy = document.getElementById("joystick");
 const stick = joy?.querySelector(".stick");
@@ -261,6 +330,8 @@ onAuthStateChanged(auth, async (u) => {
   if (!u) { location.href = "./login.html"; return; }
   if (!roomId) { location.href = "./game.html"; return; }
 
+  myUid = u.uid;
+
   // room live (host)
   onSnapshot(doc(db,"rooms",roomId), (snap)=>{
     if (!snap.exists()){
@@ -270,36 +341,66 @@ onAuthStateChanged(auth, async (u) => {
     }
     const room = snap.data() || {};
     myIsHost = (room.hostUid === u.uid);
-
     if (btnStart) btnStart.style.display = myIsHost ? "" : "none";
   });
 
-  // players list live (UI html)
-  onSnapshot(collection(db,"rooms",roomId,"players"), (snap)=>{
+  // players live
+  onSnapshot(collection(db,"rooms",roomId,"players"), async (snap)=>{
     const players = snap.docs.map(d=>d.data());
     renderPlayers(players);
 
-    // récupère mon pseudo depuis la liste (simple)
+    playersMap.clear();
+    for (const p of players){
+      playersMap.set(p.uid, {
+        uid: p.uid,
+        name: p.name || "Joueur",
+        isHost: !!p.isHost,
+        x: p.x,
+        y: p.y,
+      });
+    }
+
+    // récupère mon pseudo
     const me = players.find(p => p.uid === u.uid);
     if (me?.name) myName = me.name;
+
+    // ✅ si j'ai pas de position => spawn + write
+    if (me && (typeof me.x !== "number" || typeof me.y !== "number")){
+      try{
+        await updateDoc(doc(db,"rooms",roomId,"players",u.uid), {
+          x: player.x, y: player.y
+        });
+      } catch(e){
+        console.log("spawn write error:", e);
+      }
+    }
+
+    // ✅ si j'ai une position => je la prends (utile au join)
+    if (me && typeof me.x === "number" && typeof me.y === "number"){
+      player.x = me.x;
+      player.y = me.y;
+    }
+  });
+
+  btnStart?.addEventListener("click", async ()=>{
+    await updateDoc(doc(db,"rooms",roomId), { status:"started", startedAt: serverTimestamp() });
+    alert("Partie lancée (status=started)");
   });
 
   btnLeave?.addEventListener("click", async ()=>{
-  try{
-    // retire le joueur
-    await deleteDoc(doc(db,"rooms",roomId,"players",u.uid));
+    try{
+      await deleteDoc(doc(db,"rooms",roomId,"players",u.uid));
 
-    // si hôte => supprime la room (et donc kick tout le monde)
-    const roomSnap = await getDoc(doc(db,"rooms",roomId));
-    const room = roomSnap.data();
-    if (room?.hostUid === u.uid){
-      await deleteDoc(doc(db,"rooms",roomId));
+      const roomSnap = await getDoc(doc(db,"rooms",roomId));
+      const room = roomSnap.data();
+      if (room?.hostUid === u.uid){
+        await deleteDoc(doc(db,"rooms",roomId));
+      }
+    } catch(e){
+      console.log("leave error:", e);
     }
-  } catch(e){
-    console.log("leave error:", e);
-  }
-  window.location.href = "./game.html";
-});
+    window.location.href = "./game.html";
+  });
 
   window.addEventListener("beforeunload", async ()=>{
     try{ await deleteDoc(doc(db,"rooms",roomId,"players",u.uid)); } catch {}
