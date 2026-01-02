@@ -294,6 +294,19 @@ function drawPlayerSprite(px, py, img){
   }
 }
 
+function roundRectPath(ctx, x, y, w, h, r){
+  r = Math.min(r, w/2, h/2);
+  ctx.moveTo(x+r, y);
+  ctx.lineTo(x+w-r, y);
+  ctx.quadraticCurveTo(x+w, y, x+w, y+r);
+  ctx.lineTo(x+w, y+h-r);
+  ctx.quadraticCurveTo(x+w, y+h, x+w-r, y+h);
+  ctx.lineTo(x+r, y+h);
+  ctx.quadraticCurveTo(x, y+h, x, y+h-r);
+  ctx.lineTo(x, y+r);
+  ctx.quadraticCurveTo(x, y, x+r, y);
+}
+
 function drawNameTag(px, py, name, isHost){
   if (!name) return;
   const text = isHost ? `${name} 👑` : name;
@@ -311,7 +324,7 @@ function drawNameTag(px, py, name, isHost){
 
   ctx.fillStyle = "rgba(0,0,0,0.45)";
   ctx.beginPath();
-  ctx.roundRect(px - w/2, y - h/2, w, h, 999);
+  roundRectPath(ctx, px - w/2, y - h/2, w, h, 12);
   ctx.fill();
 
   ctx.strokeStyle = "rgba(255,255,255,0.15)";
