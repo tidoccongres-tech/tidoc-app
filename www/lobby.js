@@ -231,18 +231,17 @@ function update(dt){
   const wasWalking = walking;
   walking = (Math.abs(move.x) + Math.abs(move.y)) > 0.05;
 
+  // ✅ anim locale
   if (walking){
-  walkTimer += dt;
-  p.walkTimer += dt;
-if (p.walkTimer > WALK_SWAP_MS){
-  p.walkTimer = 0;
-  p.walkIndex = (p.walkIndex + 1) % WALK_SEQUENCE.length;
-}
+    walkTimer += dt;
+    if (walkTimer > WALK_SWAP_MS){
+      walkTimer = 0;
+      walkIndex = (walkIndex + 1) % WALK_SEQUENCE.length;
+    }
+  } else {
+    walkTimer = 0;
+    walkIndex = 0; // getLocalSprite() renvoie pose-1 si !walking
   }
-} else {
-  walkTimer = 0;
-  walkIndex = 0; // revient sur spriteWalk1 → mais getLocalSprite retourne pose-1
-}
 
   if (canMove(nx, ny)){
     player.x = nx;
@@ -252,7 +251,7 @@ if (p.walkTimer > WALK_SWAP_MS){
     if (walking || wasWalking) sendMyPosition();
   }
 
-  // remote anim timers
+  // ✅ anim remote
   for (const [uid, p] of playersMap){
     if (uid === myUid) continue;
     if (!p.moving) continue;
@@ -260,7 +259,7 @@ if (p.walkTimer > WALK_SWAP_MS){
     p.walkTimer += dt;
     if (p.walkTimer > WALK_SWAP_MS){
       p.walkTimer = 0;
-      p.walkFrame = (p.walkFrame + 1) % 2;
+      p.walkIndex = (p.walkIndex + 1) % WALK_SEQUENCE.length;
     }
   }
 
