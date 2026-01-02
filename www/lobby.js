@@ -238,15 +238,18 @@ function update(dt){
   walking = (Math.abs(move.x) + Math.abs(move.y)) > 0.15;
 
   // ✅ anim locale
-  if (walking){
-    walkTimer += dt;
-    if (walkTimer > WALK_SWAP_MS){
-      walkTimer = 0;
-      walkIndex = (walkIndex + 1) % WALK_SEQUENCE.length;
-    }
-  } else {
+const speed01 = Math.min(1, (Math.abs(move.x) + Math.abs(move.y)) / 1.4);
+const swapMs  = 140 - speed01 * 70; // 140ms lent -> 70ms rapide
+
+if (walking){
+  walkTimer += dt;
+  if (walkTimer > swapMs){
+    walkTimer = 0;
+    walkIndex = (walkIndex + 1) % WALK_SEQUENCE.length;
+  }
+} else {
   walkTimer = 0;
-  if (walkIndex !== 1) walkIndex = 1; // 1 = pose-1 dans ta séquence
+  walkIndex = 1; // 1 = pose-1 dans ta séquence (walk1, pose, walk2, pose)
 }
 
   if (canMove(nx, ny)){
