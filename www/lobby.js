@@ -114,69 +114,295 @@ function getSpawnPosition(){
 }
 
 // ===================
-// IMAGES / COLLISIONS
+// MAP + CAMERA + COLLISIONS (NEW)
 // ===================
-const bg = new Image();
-bg.src = "./assets/lobby.png";
 
+// ✅ ta vraie map
+const mapImg = new Image();
+mapImg.src = "./assets/map.png";
+
+// ✅ ta collision colorée (noir/blanc + zones couleur)
 const collisionImg = new Image();
-collisionImg.src = "./assets/lobby-NB.png";
+collisionImg.src = "./assets/collisions.png";
 
 let collisionData = null;
+
+// monde = taille image (pixels)
+let MAP_W = 1536;
+let MAP_H = 1024;
+
+// zoom caméra
+const ZOOM = 1.7;           // ajuste (1.4 / 1.7 / 2.0)
+const CAM_LERP = 0.12;      // fluidité caméra (0.1–0.2)
+
+// caméra (centre dans les coords monde)
+let camX = 0;
+let camY = 0;
+
+function clamp(v, a, b){ return Math.max(a, Math.min(b, v)); }
+
 collisionImg.onload = () => {
+  MAP_W = collisionImg.width;
+  MAP_H = collisionImg.height;
+
   const tmp = document.createElement("canvas");
-  tmp.width = collisionImg.width;
-  tmp.height = collisionImg.height;
+  tmp.width = MAP_W;
+  tmp.height = MAP_H;
   const tctx = tmp.getContext("2d");
   tctx.drawImage(collisionImg, 0, 0);
-  collisionData = tctx.getImageData(0, 0, tmp.width, tmp.height);
+  collisionData = tctx.getImageData(0, 0, MAP_W, MAP_H);
+
+  // ✅ calcule les zones couleur (centres)
+  buildZonesFromCollision();
 };
 
-// sprites
-const spritePose1 = new Image();
-spritePose1.src = "./assets/pose-1.png";
+mapImg.onload = () => {
+  // si map size connue ici
+  MAP_W = mapImg.width || MAP_W;
+  MAP_H = mapImg.height || MAP_H;
+};
 
-const spriteWalk1 = new Image();
-spriteWalk1.src = "./assets/marche1.png";
-
-const spriteWalk2 = new Image();
-spriteWalk2.src = "./assets/marche2.png";
-
-const FOOT_ADJUST = new Map([
-  [spritePose1, 4],
-  [spriteWalk1, 6],
-  [spriteWalk2, 6],
-]);
-
-const SPRITE_SIZE = 90;
-const FOOT_OFFSET_Y = 4;
-const PLAYER_RADIUS = 22;
-const SEND_EVERY_MS = 120;
-const WALK_SWAP_MS = 70;
-const WALK_SEQUENCE = [ spriteWalk1, spritePose1, spriteWalk2, spritePose1 ];
-
-function isWalkable(px, py){
+// ---- collisions: blanc = sol, tout le reste = obstacle (noir + couleurs)
+function isWalkableWorld(wx, wy){
   if (!collisionData) return true;
 
-  const cx = Math.floor(px / window.innerWidth  * collisionImg.width);
-  const cy = Math.floor(py / window.innerHeight * collisionImg.height);
+  const x = Math.floor(wx);
+  const y = Math.floor(wy);
 
-  if (cx < 0 || cy < 0 || cx >= collisionImg.width || cy >= collisionImg.height) return false;
+  if (x < 0 || y < 0 || x >= MAP_W || y >= MAP_H) return false;
 
-  const i = (cy * collisionImg.width + cx) * 4;
-  const val = collisionData.data[i];
-  return val > 200;
+  const i = (y * MAP_W + x) * 4;
+  const r = collisionData.data[i];
+  const g = collisionData.data[i+1];
+  const b = collisionData.data[i+2];
+
+  // "blanc" tolérant (JPEG/PNG)
+  const isWhite = (r > 220 && g > 220 && b > 220);
+  return isWhite;
 }
 
-function canMove(nx, ny){
+function canMoveWorld(nx, ny){
   const R = PLAYER_RADIUS;
   return (
-    isWalkable(nx, ny) &&
-    isWalkable(nx - R, ny) &&
-    isWalkable(nx + R, ny) &&
-    isWalkable(nx, ny - R) &&
-    isWalkable(nx, ny + R)
+    isWalkableWorld(nx, ny) &&
+    isWalkableWorld(nx - R, ny) &&
+    isWalkableWorld(nx + R, ny) &&
+    isWalkableWorld(nx, ny - R) &&
+    isWalkableWorld(nx, ny + R)
   );
+}
+
+// ===================
+// SPAWN sur la map (coords monde)
+// ===================
+
+// ✅ option 1: spawn centre map
+function getSpawnPosition(){
+  const baseX = MAP_W * 0.50;
+  const baseY = MAP_H * 0.45;
+
+  const offsetX = Math.floor(Math.random() * 60) - 30;
+  const offsetY = Math.floor(Math.random() * 60) - 30;
+
+  return { x: baseX + offsetX, y: baseY + offsetY };
+}
+
+// ===================
+// ZONES COULEUR = INTERACTIONS (obstacles + actions)
+// ===================
+
+// couleurs cibles (tolérance)
+const ZONE_COLORS = {
+  red:     { rgb:[255,0,0],    id:"meeting",   label:"DÉNONCER" },
+  blue:    { rgb:[0,0,255],    id:"labo",      label:"MISSION LABO" },
+  green:   { rgb:[0,128,0],    id:"imagerie",  label:"IMAGERIE" },
+  yellow:  { rgb:[255,255,0],  id:"pharma",    label:"PHARMA" },
+  orange:  { rgb:[255,128,0],  id:"exam",      label:"ANAMNÈSE" },
+  magenta: { rgb:[255,0,255],  id:"soins",     label:"SOINS" },
+  purple:  { rgb:[128,0,128],  id:"admin",     label:"DOSSIERS" },
+  cyan:    { rgb:[0,255,200],  id:"rcp",       label:"RCP" },
+};
+
+const COLOR_TOL = 85;
+
+// zones = {id, name, cx, cy}
+let zones = [];
+
+function colorDist(r,g,b, tr,tg,tb){
+  const dr = r-tr, dg=g-tg, db=b-tb;
+  return Math.sqrt(dr*dr + dg*dg + db*db);
+}
+
+function buildZonesFromCollision(){
+  if (!collisionData) return;
+
+  const sums = {};
+  const counts = {};
+
+  for (const k of Object.keys(ZONE_COLORS)){
+    sums[k] = { x:0, y:0 };
+    counts[k] = 0;
+  }
+
+  const d = collisionData.data;
+
+  for (let y=0; y<MAP_H; y+=2){           // step 2 = plus rapide
+    for (let x=0; x<MAP_W; x+=2){
+      const i = (y*MAP_W + x)*4;
+      const r = d[i], g = d[i+1], b = d[i+2];
+
+      // ignore blancs
+      if (r > 220 && g > 220 && b > 220) continue;
+
+      for (const k of Object.keys(ZONE_COLORS)){
+        const [tr,tg,tb] = ZONE_COLORS[k].rgb;
+        if (colorDist(r,g,b,tr,tg,tb) < COLOR_TOL){
+          sums[k].x += x;
+          sums[k].y += y;
+          counts[k] += 1;
+          break;
+        }
+      }
+    }
+  }
+
+  zones = [];
+  for (const k of Object.keys(ZONE_COLORS)){
+    if (counts[k] < 200) continue; // ignore bruit
+    zones.push({
+      color: k,
+      id: ZONE_COLORS[k].id,
+      label: ZONE_COLORS[k].label,
+      cx: sums[k].x / counts[k],
+      cy: sums[k].y / counts[k],
+    });
+  }
+
+  console.log("zones:", zones);
+}
+
+// proche d’une zone → action possible
+const ZONE_RADIUS = 85; // rayon interaction (pixels monde)
+
+function getNearbyZone(){
+  for (const z of zones){
+    const dx = player.x - z.cx;
+    const dy = player.y - z.cy;
+    if (Math.hypot(dx,dy) <= ZONE_RADIUS) return z;
+  }
+  return null;
+}
+
+// ===================
+// DRAW avec caméra
+// ===================
+function draw(){
+  ctx.clearRect(0,0,window.innerWidth, window.innerHeight);
+
+  // camera suit le joueur (lerp)
+  camX += (player.x - camX) * CAM_LERP;
+  camY += (player.y - camY) * CAM_LERP;
+
+  // clamp camera pour ne pas voir hors map
+  const halfW = (window.innerWidth  / ZOOM) / 2;
+  const halfH = (window.innerHeight / ZOOM) / 2;
+  camX = clamp(camX, halfW, MAP_W - halfW);
+  camY = clamp(camY, halfH, MAP_H - halfH);
+
+  // apply transform
+  ctx.save();
+  ctx.translate(window.innerWidth/2, window.innerHeight/2);
+  ctx.scale(ZOOM, ZOOM);
+  ctx.translate(-camX, -camY);
+
+  // draw map
+  if (mapImg.complete && mapImg.naturalWidth > 0){
+    ctx.drawImage(mapImg, 0, 0, MAP_W, MAP_H);
+  }
+
+  // draw players triés par y (depth)
+  const arr = Array.from(playersMap.values())
+    .map(p => ({
+      ...p,
+      drawX: (p.uid === myUid) ? player.x : (typeof p.x === "number" ? p.x : player.x),
+      drawY: (p.uid === myUid) ? player.y : (typeof p.y === "number" ? p.y : player.y),
+    }))
+    .sort((a,b) => a.drawY - b.drawY);
+
+  for (const p of arr){
+    const sprite = (p.uid === myUid) ? getLocalSprite() : getRemoteSprite(p);
+    drawPlayerSprite(p.drawX, p.drawY, sprite);
+    drawNameTag(p.drawX, p.drawY, p.name, !!p.isHost);
+  }
+
+  // debug : montre zone proche
+  const z = getNearbyZone();
+  if (z){
+    ctx.beginPath();
+    ctx.arc(z.cx, z.cy, ZONE_RADIUS, 0, Math.PI*2);
+    ctx.strokeStyle = "rgba(255,255,255,0.25)";
+    ctx.lineWidth = 2;
+    ctx.stroke();
+  }
+
+  ctx.restore();
+
+  // UI overlay (hors transform): afficher un bouton action si proche
+  drawActionUI();
+}
+
+// ===================
+// UI ACTION (simple)
+// ===================
+let actionBtn = null;
+
+function ensureActionBtn(){
+  if (actionBtn) return actionBtn;
+
+  actionBtn = document.createElement("button");
+  actionBtn.id = "btnAction";
+  actionBtn.textContent = "ACTION";
+  actionBtn.style.position = "fixed";
+  actionBtn.style.left = "50%";
+  actionBtn.style.bottom = "110px";
+  actionBtn.style.transform = "translateX(-50%)";
+  actionBtn.style.zIndex = "200";
+  actionBtn.style.padding = "14px 18px";
+  actionBtn.style.borderRadius = "999px";
+  actionBtn.style.border = "0";
+  actionBtn.style.fontWeight = "900";
+  actionBtn.style.display = "none";
+  document.body.appendChild(actionBtn);
+
+  actionBtn.addEventListener("click", () => {
+    const z = getNearbyZone();
+    if (!z) return;
+
+    console.log("ACTION on zone:", z.id);
+
+    // TODO: ici tu branches :
+    // - meeting (dénoncer)
+    // - ouvrir mini-jeu
+    // - etc
+    alert(`Zone: ${z.label}`);
+  });
+
+  return actionBtn;
+}
+
+function drawActionUI(){
+  const btn = ensureActionBtn();
+  const z = getNearbyZone();
+
+  if (!z){
+    btn.style.display = "none";
+    return;
+  }
+
+  btn.style.display = "";
+  btn.textContent = z.label;
+  btn.style.background = "linear-gradient(180deg, #48c6ff 0%, #1479ff 100%)";
+  btn.style.color = "#fff";
 }
 
 // ===================
