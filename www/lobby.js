@@ -16,6 +16,16 @@ const playersEl  = document.getElementById("playersList");
 const btnStart   = document.getElementById("btnStart");
 const btnLeave   = document.getElementById("btnLeave");
 
+// ✅ ROLE OVERLAY
+const roleOverlay = document.getElementById("roleOverlay");
+const roleImg     = document.getElementById("roleImg");
+const roleTitle   = document.getElementById("roleTitle");
+const roleSub     = document.getElementById("roleSub");
+const btnRoleOk   = document.getElementById("btnRoleOk");
+
+// ✅ badge chat
+const chatFab = document.getElementById("btnChatToggle");
+
 const btnChatToggle = document.getElementById("btnChatToggle");
 const chatOverlay   = document.getElementById("chatOverlay");
 const btnChatClose  = document.getElementById("btnChatClose");
