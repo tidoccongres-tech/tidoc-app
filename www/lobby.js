@@ -111,31 +111,26 @@ function resize(){
   canvas.height = Math.floor(window.innerHeight * dpr);
   canvas.style.width = window.innerWidth + "px";
   canvas.style.height = window.innerHeight + "px";
-  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0); // coords en px CSS
 }
 resize();
 window.addEventListener("resize", resize);
 
 // ===================
-// GAME STATE (Lobby vs Started)
+// GAME STATE
 // ===================
 let gameStarted = false;
 let loopRunning = false;
 
 function setLobbyMode(){
   gameStarted = false;
-
-  // ✅ joystick DOIT RESTER VISIBLE ET ACTIF en lobby
-  joy?.classList.remove("is-hidden");
-
-  // reset action button (optionnel)
+  joy?.classList.remove("is-hidden");      // ✅ joystick visible en lobby
+  // pas de bouton action en lobby
   if (actionBtn) actionBtn.style.display = "none";
 }
 
 function setGameMode(){
   gameStarted = true;
-
-  // joystick visible
   joy?.classList.remove("is-hidden");
 }
 
@@ -147,7 +142,7 @@ function startLoopOnce(){
 }
 
 // ===================
-// IMAGES: lobby.png vs map.png
+// IMAGES
 // ===================
 const lobbyBgImg = new Image();
 lobbyBgImg.src = "./assets/lobby.png";
@@ -167,6 +162,7 @@ mapImg.onload = () => {
   MAP_H = mapImg.height || MAP_H;
 };
 
+// si collisions donne la vraie taille monde, c’est la meilleure source
 collisionImg.onload = () => {
   MAP_W = collisionImg.width || MAP_W;
   MAP_H = collisionImg.height || MAP_H;
@@ -182,12 +178,10 @@ collisionImg.onload = () => {
 };
 
 // ===================
-// CAMERA + ZOOM (pas de zoom lobby)
+// CAMERA + ZOOM (game seulement)
 // ===================
-const ZOOM_LOBBY = 1.0;
 const ZOOM_GAME  = 1.7;
 const CAM_LERP   = 0.12;
-
 let camX = 0, camY = 0;
 
 // ===================
@@ -204,7 +198,6 @@ const ZONE_COLORS = {
   cyan:    { rgb:[0,255,200],  id:"rcp",       label:"RCP" },
 };
 const COLOR_TOL = 85;
-const ZONE_RADIUS = 85;
 let zones = [];
 
 function colorDist(r,g,b, tr,tg,tb){
@@ -482,7 +475,7 @@ function drawNameTag(px, py, name, isHost){
 // UPDATE / DRAW / LOOP
 // ===================
 function update(dt){
-  // ✅ IMPORTANT: on autorise le mouvement AUSSI en lobby
+  // ✅ mouvement autorisé lobby + game
   const dtNorm = Math.min(2, dt / 16.6667);
 
   const nx = player.x + move.x * player.speed * dtNorm;
@@ -528,36 +521,78 @@ function update(dt){
 function draw(){
   ctx.clearRect(0,0,window.innerWidth, window.innerHeight);
 
-  const zoomNow = gameStarted ? ZOOM_GAME : ZOOM_LOBBY;
+  // =========================
+  // LOBBY: image fixe plein écran (aucune cam, aucun zoom)
+  // =========================
+  if (!gameStarted){
+    const bg = (lobbyBgImg.complete && lobbyBgImg.naturalWidth > 0) ? lobbyBgImg : mapImg;
 
-  if (gameStarted){
-    camX += (player.x - camX) * CAM_LERP;
-    camY += (player.y - camY) * CAM_LERP;
-  } else {
-    camX = player.x;
-    camY = player.y;
+    const bw = MAP_W;
+    const bh = MAP_H;
+
+    // cover (remplit l'écran)
+    const sx = window.innerWidth / bw;
+    const sy = window.innerHeight / bh;
+    const s  = Math.max(sx, sy);
+
+    const drawW = bw * s;
+    const drawH = bh * s;
+    const ox = (window.innerWidth  - drawW) / 2;
+    const oy = (window.innerHeight - drawH) / 2;
+
+    if (bg.complete && bg.naturalWidth > 0){
+      ctx.drawImage(bg, ox, oy, drawW, drawH);
+    }
+
+    // joueurs projetés en screen-space
+    const arr = Array.from(playersMap.values())
+      .map(p => ({
+        ...p,
+        worldX: (p.uid === myUid) ? player.x : (typeof p.x === "number" ? p.x : player.x),
+        worldY: (p.uid === myUid) ? player.y : (typeof p.y === "number" ? p.y : player.y),
+      }))
+      .sort((a,b) => a.worldY - b.worldY);
+
+    for (const p of arr){
+      const px = ox + p.worldX * s;
+      const py = oy + p.worldY * s;
+
+      // sprite + nametag "suivent" le scale du lobby
+      ctx.save();
+      ctx.translate(px, py);
+      ctx.scale(s, s);
+      ctx.translate(-px, -py);
+
+      const sprite = (p.uid === myUid) ? getLocalSprite() : getRemoteSprite(p);
+      drawPlayerSprite(px, py, sprite);
+      drawNameTag(px, py, p.name, !!p.isHost);
+
+      ctx.restore();
+    }
+
+    // pas de bouton action en lobby
+    if (actionBtn) actionBtn.style.display = "none";
+    return;
   }
 
-  const halfW = (window.innerWidth  / zoomNow) / 2;
-  const halfH = (window.innerHeight / zoomNow) / 2;
+  // =========================
+  // GAME: caméra + zoom
+  // =========================
+  camX += (player.x - camX) * CAM_LERP;
+  camY += (player.y - camY) * CAM_LERP;
+
+  const halfW = (window.innerWidth  / ZOOM_GAME) / 2;
+  const halfH = (window.innerHeight / ZOOM_GAME) / 2;
   camX = clamp(camX, halfW, MAP_W - halfW);
   camY = clamp(camY, halfH, MAP_H - halfH);
 
   ctx.save();
   ctx.translate(window.innerWidth/2, window.innerHeight/2);
-  ctx.scale(zoomNow, zoomNow);
+  ctx.scale(ZOOM_GAME, ZOOM_GAME);
   ctx.translate(-camX, -camY);
 
-  if (!gameStarted){
-    if (lobbyBgImg.complete && lobbyBgImg.naturalWidth > 0){
-      ctx.drawImage(lobbyBgImg, 0, 0, MAP_W, MAP_H);
-    } else if (mapImg.complete && mapImg.naturalWidth > 0){
-      ctx.drawImage(mapImg, 0, 0, MAP_W, MAP_H);
-    }
-  } else {
-    if (mapImg.complete && mapImg.naturalWidth > 0){
-      ctx.drawImage(mapImg, 0, 0, MAP_W, MAP_H);
-    }
+  if (mapImg.complete && mapImg.naturalWidth > 0){
+    ctx.drawImage(mapImg, 0, 0, MAP_W, MAP_H);
   }
 
   const arr = Array.from(playersMap.values())
@@ -575,6 +610,8 @@ function draw(){
   }
 
   ctx.restore();
+
+  // si tu veux remettre action UI en game plus tard, appelle drawActionUI() ici
 }
 
 let lastT = performance.now();
@@ -611,7 +648,6 @@ function endJoystick(){
 }
 
 joy?.addEventListener("pointerdown", (e) => {
-  // ✅ plus de "if (!gameStarted) return;"
   if (!joy) return;
 
   active = true;
@@ -658,7 +694,7 @@ joy?.addEventListener("pointercancel", (e) => {
 window.addEventListener("blur", endJoystick);
 
 // ===================
-// FIREBASE (inchangé, colle ton bloc existant ici)
+// FIREBASE
 // ===================
 onAuthStateChanged(auth, async (u) => {
   if (!u) { location.href = "./login.html"; return; }
@@ -672,6 +708,7 @@ onAuthStateChanged(auth, async (u) => {
       location.href="./game.html";
       return;
     }
+
     const room = snap.data() || {};
     const status = room.status;
 
