@@ -111,7 +111,7 @@ function resize(){
   canvas.height = Math.floor(window.innerHeight * dpr);
   canvas.style.width = window.innerWidth + "px";
   canvas.style.height = window.innerHeight + "px";
-  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0); // coords en "px CSS"
 }
 resize();
 window.addEventListener("resize", resize);
@@ -119,16 +119,25 @@ window.addEventListener("resize", resize);
 // ===================
 // GAME STATE (Lobby vs Started)
 // ===================
-let gameStarted = false;     // status === "started"
-let loopRunning = false;     // évite double RAF
+let gameStarted = false;  // status === "started"
+let loopRunning = false;
 
 function setLobbyMode(){
   gameStarted = false;
-  document.getElementById("joystick")?.classList.add("is-hidden");
+
+  // joystick off + reset mouvement
+  active = false;
+  move.x = 0; move.y = 0;
+  setStick(0,0);
+  joy?.classList.add("is-hidden");
+
+  // bouton action invisible
+  if (actionBtn) actionBtn.style.display = "none";
 }
+
 function setGameMode(){
   gameStarted = true;
-  document.getElementById("joystick")?.classList.remove("is-hidden");
+  joy?.classList.remove("is-hidden");
 }
 
 function startLoopOnce(){
@@ -139,13 +148,13 @@ function startLoopOnce(){
 }
 
 // ===================
-// IMAGES: lobby.png vs map.png ✅
+// IMAGES: lobby.png vs map.png
 // ===================
 const lobbyBgImg = new Image();
-lobbyBgImg.src = "./assets/lobby.png";      // ✅ ton écran lobby
+lobbyBgImg.src = "./assets/lobby.png";
 
 const mapImg = new Image();
-mapImg.src = "./assets/map.png";            // ✅ ta map in-game
+mapImg.src = "./assets/map.png";
 
 const collisionImg = new Image();
 collisionImg.src = "./assets/collisions.png";
@@ -157,11 +166,6 @@ let MAP_H = 1024;
 mapImg.onload = () => {
   MAP_W = mapImg.width || MAP_W;
   MAP_H = mapImg.height || MAP_H;
-};
-lobbyBgImg.onload = () => {
-  // si lobby.png a une taille différente, on s'aligne dessus
-  MAP_W = lobbyBgImg.width || MAP_W;
-  MAP_H = lobbyBgImg.height || MAP_H;
 };
 
 collisionImg.onload = () => {
@@ -179,10 +183,12 @@ collisionImg.onload = () => {
 };
 
 // ===================
-// CAMERA
+// CAMERA + ZOOM (✅ pas de zoom en lobby)
 // ===================
-const ZOOM = 1.7;
-const CAM_LERP = 0.12;
+const ZOOM_LOBBY = 1.0; // ✅
+const ZOOM_GAME  = 1.7; // ✅
+const CAM_LERP   = 0.12;
+
 let camX = 0, camY = 0;
 
 // ===================
@@ -206,7 +212,6 @@ function colorDist(r,g,b, tr,tg,tb){
   const dr = r-tr, dg=g-tg, db=b-tb;
   return Math.sqrt(dr*dr + dg*dg + db*db);
 }
-
 function isZoneColor(r,g,b){
   for (const k of Object.keys(ZONE_COLORS)){
     const [tr,tg,tb] = ZONE_COLORS[k].rgb;
@@ -231,6 +236,7 @@ function buildZonesFromCollision(){
       const i = (y*MAP_W + x)*4;
       const r = d[i], g = d[i+1], b = d[i+2];
 
+      // ignore blancs
       if (r > 220 && g > 220 && b > 220) continue;
 
       for (const k of Object.keys(ZONE_COLORS)){
@@ -280,7 +286,6 @@ function isWalkableWorld(wx, wy){
 
   const x = Math.floor(wx);
   const y = Math.floor(wy);
-
   if (x < 0 || y < 0 || x >= MAP_W || y >= MAP_H) return false;
 
   const i = (y * MAP_W + x) * 4;
@@ -290,7 +295,6 @@ function isWalkableWorld(wx, wy){
 
   const isWhite = (r > 220 && g > 220 && b > 220);
   if (isWhite) return true;
-
   if (isZoneColor(r,g,b)) return true;
 
   return false;
@@ -309,7 +313,7 @@ function canMoveWorld(nx, ny){
 }
 
 // ===================
-// SPRITES ✅ (TES BONS NOMS)
+// SPRITES (✅ tes noms)
 // ===================
 const SPRITE_SIZE = 96;
 const FOOT_OFFSET_Y = 16;
@@ -585,25 +589,33 @@ function update(dt){
 function draw(){
   ctx.clearRect(0,0,window.innerWidth, window.innerHeight);
 
-  camX += (player.x - camX) * CAM_LERP;
-  camY += (player.y - camY) * CAM_LERP;
+  // ✅ zoom uniquement en game
+  const zoomNow = gameStarted ? ZOOM_GAME : ZOOM_LOBBY;
 
-  const halfW = (window.innerWidth  / ZOOM) / 2;
-  const halfH = (window.innerHeight / ZOOM) / 2;
+  // camera suit le joueur uniquement en game (en lobby, pas besoin de lerp)
+  if (gameStarted){
+    camX += (player.x - camX) * CAM_LERP;
+    camY += (player.y - camY) * CAM_LERP;
+  } else {
+    camX = player.x;
+    camY = player.y;
+  }
+
+  const halfW = (window.innerWidth  / zoomNow) / 2;
+  const halfH = (window.innerHeight / zoomNow) / 2;
   camX = clamp(camX, halfW, MAP_W - halfW);
   camY = clamp(camY, halfH, MAP_H - halfH);
 
   ctx.save();
   ctx.translate(window.innerWidth/2, window.innerHeight/2);
-  ctx.scale(ZOOM, ZOOM);
+  ctx.scale(zoomNow, zoomNow);
   ctx.translate(-camX, -camY);
 
-  // ✅ BACKGROUND SELON ÉTAT : lobby.png vs map.png
+  // background selon état
   if (!gameStarted){
     if (lobbyBgImg.complete && lobbyBgImg.naturalWidth > 0){
       ctx.drawImage(lobbyBgImg, 0, 0, MAP_W, MAP_H);
     } else if (mapImg.complete && mapImg.naturalWidth > 0){
-      // fallback si lobby.png pas encore chargée
       ctx.drawImage(mapImg, 0, 0, MAP_W, MAP_H);
     }
   } else {
@@ -612,7 +624,7 @@ function draw(){
     }
   }
 
-  // players depth by y
+  // players
   const arr = Array.from(playersMap.values())
     .map(p => ({
       ...p,
@@ -636,15 +648,13 @@ let lastT = performance.now();
 function loop(t){
   const dt = t - lastT;
   lastT = t;
-
   update(dt);
   draw();
-
   requestAnimationFrame(loop);
 }
 
 // ===================
-// JOYSTICK
+// JOYSTICK (✅ corrigé mobile)
 // ===================
 const joy = document.getElementById("joystick");
 const stick = joy?.querySelector(".stick");
@@ -667,7 +677,7 @@ joy?.addEventListener("pointerdown", (e) => {
   center.x = r.left + r.width / 2;
   center.y = r.top + r.height / 2;
 
-  e.preventDefault?.();
+  e.preventDefault();
 }, { passive: false });
 
 window.addEventListener("pointerup", () => {
@@ -699,7 +709,10 @@ window.addEventListener("pointermove", (e) => {
   setStick(dx, dy);
   move.x = dx / max;
   move.y = dy / max;
-}, { passive: true });
+
+  // ✅ super important sur mobile
+  e.preventDefault();
+}, { passive: false });
 
 // ===================
 // CHAT
@@ -929,7 +942,6 @@ onAuthStateChanged(auth, async (u) => {
       ensurePlayerState({ ...me, x: player.x, y: player.y });
     }
 
-    // ✅ on dessine toujours (lobby inclus)
     startLoopOnce();
   });
 
