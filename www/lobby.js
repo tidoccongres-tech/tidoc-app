@@ -792,6 +792,7 @@ btnStart?.addEventListener("click", async ()=>{
 });
 
   btnLeave?.addEventListener("click", async ()=>{
+    overlayShown = false;
     try{
       await deleteDoc(doc(db,"rooms",roomId,"players",u.uid));
 
