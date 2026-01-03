@@ -515,7 +515,6 @@ function renderChat(messages){
     chatMessagesEl.appendChild(div);
   }
 
-  // auto-scroll en bas
   chatMessagesEl.scrollTop = chatMessagesEl.scrollHeight;
 }
 
@@ -523,12 +522,12 @@ async function sendChat(text){
   const t = (text || "").trim();
   if (!t || !roomId || !myUid) return;
 
-  // IMPORTANT: myName doit être ton vrai pseudo (voir fix game.js)
   await addDoc(collection(db, "rooms", roomId, "messages"), {
     uid: myUid,
     name: myName || "Joueur",
     text: t,
-    createdAt: serverTimestamp()
+    createdAt: serverTimestamp(),   // timestamp serveur (pour plus tard)
+    createdAtMs: Date.now()         // ✅ timestamp client (affichage instant)
   });
 }
 
