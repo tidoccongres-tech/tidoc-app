@@ -694,6 +694,42 @@ joy?.addEventListener("pointercancel", (e) => {
 window.addEventListener("blur", endJoystick);
 
 // ===================
+// CHAT live (à remettre)
+// ===================
+if (chatForm && chatInput){
+  const q = query(
+    collection(db, "rooms", roomId, "messages"),
+    orderBy("createdAtMs", "asc"),
+    limit(120)
+  );
+
+  onSnapshot(q, (snap) => {
+    const msgs = snap.docs.map(d => d.data());
+    renderChat(msgs);
+
+    if (msgs.length && !chatOverlay?.classList.contains("open")){
+      const last = msgs[msgs.length - 1];
+      if (last?.uid && last.uid !== myUid){
+        chatFab?.classList.add("has-unread");
+        if (chatBadge) chatBadge.hidden = false;
+      }
+    }
+  });
+
+  chatForm.addEventListener("submit", async (e) => {
+    e.preventDefault();                 // ✅ empêche le reload
+    e.stopPropagation();
+
+    const val = chatInput.value;
+    chatInput.value = "";
+
+    try { await sendChat(val); }
+    catch (err) { console.log("chat send error:", err); }
+  });
+}
+
+
+// ===================
 // FIREBASE
 // ===================
 onAuthStateChanged(auth, async (u) => {
