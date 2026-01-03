@@ -522,58 +522,48 @@ function draw(){
   ctx.clearRect(0,0,window.innerWidth, window.innerHeight);
 
   // =========================
-  // LOBBY: image fixe plein écran (aucune cam, aucun zoom)
-  // =========================
-  if (!gameStarted){
-    const bg = (lobbyBgImg.complete && lobbyBgImg.naturalWidth > 0) ? lobbyBgImg : mapImg;
+// LOBBY: image cover NON déformée + joueurs dans le même repère
+// =========================
+if (!gameStarted){
+  const bg = (lobbyBgImg.complete && lobbyBgImg.naturalWidth > 0) ? lobbyBgImg : mapImg;
+  if (!(bg.complete && bg.naturalWidth > 0)) return;
 
-    const bw = MAP_W;
-    const bh = MAP_H;
+  // ✅ IMPORTANT: on prend la taille réelle de l'image, pas MAP_W/H
+  const bw = bg.naturalWidth;
+  const bh = bg.naturalHeight;
 
-    // cover (remplit l'écran)
-    const sx = window.innerWidth / bw;
-    const sy = window.innerHeight / bh;
-    const s  = Math.max(sx, sy);
+  // cover sans déformation
+  const s = Math.max(window.innerWidth / bw, window.innerHeight / bh);
+  const ox = (window.innerWidth  - bw * s) / 2;
+  const oy = (window.innerHeight - bh * s) / 2;
 
-    const drawW = bw * s;
-    const drawH = bh * s;
-    const ox = (window.innerWidth  - drawW) / 2;
-    const oy = (window.innerHeight - drawH) / 2;
+  // Transform global (monde = pixels de l'image)
+  ctx.setTransform(s, 0, 0, s, ox, oy);
 
-    if (bg.complete && bg.naturalWidth > 0){
-      ctx.drawImage(bg, ox, oy, drawW, drawH);
-    }
+  // fond
+  ctx.drawImage(bg, 0, 0);
 
-    // joueurs projetés en screen-space
-    const arr = Array.from(playersMap.values())
-      .map(p => ({
-        ...p,
-        worldX: (p.uid === myUid) ? player.x : (typeof p.x === "number" ? p.x : player.x),
-        worldY: (p.uid === myUid) ? player.y : (typeof p.y === "number" ? p.y : player.y),
-      }))
-      .sort((a,b) => a.worldY - b.worldY);
+  // joueurs (coords "image")
+  const arr = Array.from(playersMap.values())
+    .map(p => ({
+      ...p,
+      x: (p.uid === myUid) ? player.x : (typeof p.x === "number" ? p.x : player.x),
+      y: (p.uid === myUid) ? player.y : (typeof p.y === "number" ? p.y : player.y),
+    }))
+    .sort((a,b) => a.y - b.y);
 
-    for (const p of arr){
-      const px = ox + p.worldX * s;
-      const py = oy + p.worldY * s;
-
-      // sprite + nametag "suivent" le scale du lobby
-      ctx.save();
-      ctx.translate(px, py);
-      ctx.scale(s, s);
-      ctx.translate(-px, -py);
-
-      const sprite = (p.uid === myUid) ? getLocalSprite() : getRemoteSprite(p);
-      drawPlayerSprite(px, py, sprite);
-      drawNameTag(px, py, p.name, !!p.isHost);
-
-      ctx.restore();
-    }
-
-    // pas de bouton action en lobby
-    if (actionBtn) actionBtn.style.display = "none";
-    return;
+  for (const p of arr){
+    const sprite = (p.uid === myUid) ? getLocalSprite() : getRemoteSprite(p);
+    drawPlayerSprite(p.x, p.y, sprite);
+    drawNameTag(p.x, p.y, p.name, !!p.isHost);
   }
+
+  // reset pour l'UI en coordonnées écran
+  ctx.setTransform(1,0,0,1,0,0);
+
+  if (actionBtn) actionBtn.style.display = "none";
+  return;
+}
 
   // =========================
   // GAME: caméra + zoom
