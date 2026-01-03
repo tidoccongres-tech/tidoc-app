@@ -654,12 +654,13 @@ function loop(t){
 }
 
 // ===================
-// JOYSTICK (✅ corrigé mobile)
+// JOYSTICK (✅ FIX: move sur joy + pointerId)
 // ===================
 const joy = document.getElementById("joystick");
 const stick = joy?.querySelector(".stick");
 
 let active = false;
+let pointerId = null;
 let center = { x: 0, y: 0 };
 const max = 40;
 
@@ -668,10 +669,22 @@ function setStick(dx, dy){
   stick.style.transform = `translate(${dx}px, ${dy}px)`;
 }
 
+function endJoystick(){
+  active = false;
+  pointerId = null;
+  move.x = 0;
+  move.y = 0;
+  setStick(0, 0);
+}
+
 joy?.addEventListener("pointerdown", (e) => {
   if (!gameStarted) return;
+  if (!joy) return;
+
   active = true;
-  joy.setPointerCapture?.(e.pointerId);
+  pointerId = e.pointerId;
+
+  joy.setPointerCapture(pointerId);
 
   const r = joy.getBoundingClientRect();
   center.x = r.left + r.width / 2;
@@ -680,22 +693,9 @@ joy?.addEventListener("pointerdown", (e) => {
   e.preventDefault();
 }, { passive: false });
 
-window.addEventListener("pointerup", () => {
-  active = false;
-  move.x = 0;
-  move.y = 0;
-  setStick(0, 0);
-});
-
-window.addEventListener("pointercancel", () => {
-  active = false;
-  move.x = 0;
-  move.y = 0;
-  setStick(0, 0);
-});
-
-window.addEventListener("pointermove", (e) => {
+joy?.addEventListener("pointermove", (e) => {
   if (!active || !gameStarted) return;
+  if (pointerId !== null && e.pointerId !== pointerId) return;
 
   let dx = e.clientX - center.x;
   let dy = e.clientY - center.y;
@@ -710,9 +710,21 @@ window.addEventListener("pointermove", (e) => {
   move.x = dx / max;
   move.y = dy / max;
 
-  // ✅ super important sur mobile
   e.preventDefault();
 }, { passive: false });
+
+joy?.addEventListener("pointerup", (e) => {
+  if (pointerId !== null && e.pointerId !== pointerId) return;
+  endJoystick();
+});
+
+joy?.addEventListener("pointercancel", (e) => {
+  if (pointerId !== null && e.pointerId !== pointerId) return;
+  endJoystick();
+});
+
+// sécurité: si le doigt sort / alt-tab / etc.
+window.addEventListener("blur", endJoystick);
 
 // ===================
 // CHAT
