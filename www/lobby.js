@@ -23,12 +23,16 @@ const roleTitle   = document.getElementById("roleTitle");
 const roleSub     = document.getElementById("roleSub");
 const btnRoleOk   = document.getElementById("btnRoleOk");
 
-// ✅ badge chat
-const chatFab = document.getElementById("btnChatToggle");
-
+// ✅ chat
+const chatFab       = document.getElementById("btnChatToggle");
 const btnChatToggle = document.getElementById("btnChatToggle");
 const chatOverlay   = document.getElementById("chatOverlay");
 const btnChatClose  = document.getElementById("btnChatClose");
+
+// chat DOM
+const chatMessagesEl = document.getElementById("chatMessages");
+const chatForm = document.getElementById("chatForm");
+const chatInput = document.getElementById("chatInput");
 
 if (roomCodeEl) roomCodeEl.textContent = roomId || "----";
 
@@ -40,16 +44,17 @@ function renderPlayers(players){
   }).join("");
 }
 
+// ===================
+// CHAT OPEN/CLOSE
+// ===================
 function openChat(){
   if (!chatOverlay) return;
   chatOverlay.classList.add("open");
   chatOverlay.setAttribute("aria-hidden", "false");
   document.body.classList.add("chat-open");
 
-  // focus input (mobile friendly)
   setTimeout(() => {
-    const input = document.getElementById("chatInput");
-    input?.focus?.();
+    chatInput?.focus?.();
   }, 80);
 }
 
@@ -61,21 +66,21 @@ function closeChat(){
 }
 
 btnChatToggle?.addEventListener("click", () => {
-  chatFab?.classList.remove("has-unread");
-});
   if (!chatOverlay) return;
+
+  // ✅ on retire la pastille quand on ouvre
+  chatFab?.classList.remove("has-unread");
+
   if (chatOverlay.classList.contains("open")) closeChat();
   else openChat();
 });
 
 btnChatClose?.addEventListener("click", closeChat);
 
-// clic sur le fond sombre = close
 chatOverlay?.addEventListener("click", (e) => {
   if (e.target === chatOverlay) closeChat();
 });
 
-// ESC = close (desktop)
 window.addEventListener("keydown", (e) => {
   if (e.key === "Escape") closeChat();
 });
@@ -86,7 +91,6 @@ window.addEventListener("keydown", (e) => {
 const canvas = document.getElementById("gameCanvas");
 const ctx = canvas.getContext("2d");
 
-// ✅ sécurité : si tu as laissé "is-hidden" quelque part, on le retire
 chatOverlay?.classList.remove("is-hidden");
 
 function resize(){
@@ -101,17 +105,16 @@ resize();
 window.addEventListener("resize", resize);
 
 function getSpawnPosition(){
-  const offsetX = Math.floor(Math.random() * 40) - 20; // -20 .. +19
-  const offsetY = Math.floor(Math.random() * 40) - 20; // -20 .. +19
-
+  const offsetX = Math.floor(Math.random() * 40) - 20;
+  const offsetY = Math.floor(Math.random() * 40) - 20;
   return {
     x: window.innerWidth / 2 + offsetX,
-    y: window.innerHeight / 2 + 60 + offsetY // +60 pour éviter l’UI
+    y: window.innerHeight / 2 + 60 + offsetY
   };
 }
 
 // ===================
-// IMAGES
+// IMAGES / COLLISIONS
 // ===================
 const bg = new Image();
 bg.src = "./assets/lobby.png";
@@ -145,20 +148,13 @@ const FOOT_ADJUST = new Map([
   [spriteWalk2, 6],
 ]);
 
-// ===================
-// TUNING
-// ===================
 const SPRITE_SIZE = 90;
 const FOOT_OFFSET_Y = 4;
-
-const PLAYER_RADIUS = 22;          // collisions
-const SEND_EVERY_MS = 120;         // sync position
-const WALK_SWAP_MS = 70;          // alternance marche
-
+const PLAYER_RADIUS = 22;
+const SEND_EVERY_MS = 120;
+const WALK_SWAP_MS = 70;
 const WALK_SEQUENCE = [ spriteWalk1, spritePose1, spriteWalk2, spritePose1 ];
-// ===================
-// COLLISIONS
-// ===================
+
 function isWalkable(px, py){
   if (!collisionData) return true;
 
@@ -169,7 +165,7 @@ function isWalkable(px, py){
 
   const i = (cy * collisionImg.width + cx) * 4;
   const val = collisionData.data[i];
-  return val > 200; // blanc = sol
+  return val > 200;
 }
 
 function canMove(nx, ny){
@@ -193,10 +189,7 @@ let myUid = null;
 let myName = "";
 let myIsHost = false;
 
-// ===================
-// AUTRES JOUEURS + ANIM
-// ===================
-// uid -> { uid,name,isHost,x,y,lastX,lastY,moving,walkIndex,walkTimer,lastMoveAt }
+// uid -> state remote
 const playersMap = new Map();
 
 function ensurePlayerState(p){
@@ -220,11 +213,9 @@ function ensurePlayerState(p){
     return;
   }
 
-  // update infos
   prev.name = p.name || prev.name;
   prev.isHost = !!p.isHost;
 
-  // detect mouvement
   if (typeof x === "number" && typeof y === "number"){
     prev.x = x; prev.y = y;
 
@@ -233,15 +224,14 @@ function ensurePlayerState(p){
     const dist = Math.hypot(dx, dy);
 
     if (dist > 0.6){
-  prev.moving = true;
-  prev.lastMoveAt = performance.now();
- }
-  prev.lastX = x;
-  prev.lastY = y;
+      prev.moving = true;
+      prev.lastMoveAt = performance.now();
+    }
+    prev.lastX = x;
+    prev.lastY = y;
   }
 }
 
-// si le joueur n’a pas bougé depuis X ms → idle
 function settleRemoteIdle(){
   const now = performance.now();
   for (const [uid, p] of playersMap){
@@ -254,9 +244,7 @@ function settleRemoteIdle(){
   }
 }
 
-// ===================
-// LOCAL WALK ANIM
-// ===================
+// local walk anim
 let walking = false;
 let walkTimer = 0;
 let walkIndex = 0;
@@ -271,11 +259,7 @@ function getRemoteSprite(p){
   return WALK_SEQUENCE[p.walkIndex % WALK_SEQUENCE.length];
 }
 
-// ===================
-// FIRESTORE POS SYNC
-// ===================
 let lastSend = 0;
-
 async function sendMyPosition(){
   if (!myUid || !roomId) return;
 
@@ -295,73 +279,13 @@ async function sendMyPosition(){
 }
 
 // ===================
-// UPDATE / DRAW
+// DRAW HELPERS
 // ===================
-function update(dt){
-  const dtNorm = Math.min(2, dt / 16.6667); // clamp pour éviter les gros sauts
-
-  const nx = player.x + move.x * player.speed * dtNorm;
-  const ny = player.y + move.y * player.speed * dtNorm;
-
-  const wasWalking = walking;
-  walking = (Math.abs(move.x) + Math.abs(move.y)) > 0.15;
-
-  // ✅ anim locale
-const speed01 = Math.min(1, (Math.abs(move.x) + Math.abs(move.y)) / 1.4);
-const swapMs  = 140 - speed01 * 70; // 140ms lent -> 70ms rapide
-
-if (walking){
-  walkTimer += dt;
-  if (walkTimer > swapMs){
-    walkTimer = 0;
-    walkIndex = (walkIndex + 1) % WALK_SEQUENCE.length;
-  }
-} else {
-  walkTimer = 0;
-  walkIndex = 1; // pose-1 dans ta séquence
-}
-
-  if (canMove(nx, ny)){
-    player.x = nx;
-    player.y = ny;
-
-    // update Firestore quand on bouge ou qu’on vient de s’arrêter
-    if (walking || wasWalking) sendMyPosition();
-  }
-
-  // ✅ anim remote
-  for (const [uid, p] of playersMap){
-    if (uid === myUid) continue;
-    if (!p.moving) continue;
-
-    p.walkTimer += dt;
-    if (p.walkTimer > WALK_SWAP_MS){
-      p.walkTimer = 0;
-      p.walkIndex = (p.walkIndex + 1) % WALK_SEQUENCE.length;
-    }
-  }
-
-  settleRemoteIdle();
-
-// loop
-let lastT = performance.now();
-function loop(t){
-  const dt = t - lastT;
-  lastT = t;
-
-  update(dt);
-  draw();
-  requestAnimationFrame(loop);
-}
-requestAnimationFrame(loop);
-
 function drawPlayerSprite(px, py, img){
   const W = SPRITE_SIZE;
   const H = SPRITE_SIZE;
 
   const toDraw = (img && img.complete && img.naturalWidth > 0) ? img : spritePose1;
-
-  // ✅ point d’ancrage aux pieds (important)
   const foot = FOOT_ADJUST.get(toDraw) ?? FOOT_OFFSET_Y;
 
   const dx = Math.round(px - W / 2);
@@ -419,11 +343,56 @@ function drawNameTag(px, py, name, isHost){
   ctx.restore();
 }
 
+// ===================
+// UPDATE / DRAW / LOOP
+// ===================
+function update(dt){
+  const dtNorm = Math.min(2, dt / 16.6667);
+
+  const nx = player.x + move.x * player.speed * dtNorm;
+  const ny = player.y + move.y * player.speed * dtNorm;
+
+  const wasWalking = walking;
+  walking = (Math.abs(move.x) + Math.abs(move.y)) > 0.15;
+
+  const speed01 = Math.min(1, (Math.abs(move.x) + Math.abs(move.y)) / 1.4);
+  const swapMs  = 140 - speed01 * 70;
+
+  if (walking){
+    walkTimer += dt;
+    if (walkTimer > swapMs){
+      walkTimer = 0;
+      walkIndex = (walkIndex + 1) % WALK_SEQUENCE.length;
+    }
+  } else {
+    walkTimer = 0;
+    walkIndex = 1;
+  }
+
+  if (canMove(nx, ny)){
+    player.x = nx;
+    player.y = ny;
+    if (walking || wasWalking) sendMyPosition();
+  }
+
+  for (const [uid, p] of playersMap){
+    if (uid === myUid) continue;
+    if (!p.moving) continue;
+
+    p.walkTimer += dt;
+    if (p.walkTimer > WALK_SWAP_MS){
+      p.walkTimer = 0;
+      p.walkIndex = (p.walkIndex + 1) % WALK_SEQUENCE.length;
+    }
+  }
+
+  settleRemoteIdle();
+}
+
 function draw(){
   ctx.clearRect(0, 0, window.innerWidth, window.innerHeight);
   if (bg.complete) ctx.drawImage(bg, 0, 0, window.innerWidth, window.innerHeight);
 
-  // draw players triés par y (depth)
   const arr = Array.from(playersMap.values())
     .map(p => ({
       ...p,
@@ -438,7 +407,17 @@ function draw(){
     drawNameTag(p.drawX, p.drawY, p.name, !!p.isHost);
   }
 }
-  
+
+let lastT = performance.now();
+function loop(t){
+  const dt = t - lastT;
+  lastT = t;
+  update(dt);
+  draw();
+  requestAnimationFrame(loop);
+}
+requestAnimationFrame(loop);
+
 // ===================
 // JOYSTICK
 // ===================
@@ -497,12 +476,8 @@ window.addEventListener("pointermove", (e) => {
 }, { passive: true });
 
 // ===================
-// CHAT (rooms/{roomId}/messages)
+// CHAT
 // ===================
-const chatMessagesEl = document.getElementById("chatMessages");
-const chatForm = document.getElementById("chatForm");
-const chatInput = document.getElementById("chatInput");
-
 function escapeHTML(s=""){
   return String(s)
     .replaceAll("&","&amp;")
@@ -525,15 +500,7 @@ function renderChat(messages){
     `;
     chatMessagesEl.appendChild(div);
   }
-
   chatMessagesEl.scrollTop = chatMessagesEl.scrollHeight;
-}
-
-  if (!chatOverlay.classList.contains("open") && msgs.length){
-  const last = msgs[msgs.length - 1];
-  if (last.uid !== myUid){
-    chatFab?.classList.add("has-unread");
-  }
 }
 
 async function sendChat(text){
@@ -544,134 +511,33 @@ async function sendChat(text){
     uid: myUid,
     name: myName || "Joueur",
     text: t,
-    createdAt: serverTimestamp(),   // timestamp serveur (pour plus tard)
-    createdAtMs: Date.now()         // ✅ timestamp client (affichage instant)
+    createdAt: serverTimestamp(),
+    createdAtMs: Date.now()
   });
 }
 
 // ===================
-// FIREBASE
+// ROLE SPINNER
 // ===================
-onAuthStateChanged(auth, async (u) => {
-  if (!u) { location.href = "./login.html"; return; }
-  if (!roomId) { location.href = "./game.html"; return; }
-
-  myUid = u.uid;
-
-onSnapshot(doc(db, "rooms", roomId, "privateRoles", u.uid), (snap) => {
-  if (!snap.exists()) return;
-  const data = snap.data();
-  if (!data?.role) return;
-
-  if (!overlayShown) startSpinner();
-  stopSpinner(data.role);
-});
-  
- // ---- CHAT LIVE
-if (chatForm && chatInput){
-  const q = query(
-    collection(db, "rooms", roomId, "messages"),
-    orderBy("createdAtMs", "asc"),
-    limit(120)
-  );
-
-  onSnapshot(q, (snap) => {
-    const msgs = snap.docs.map(d => d.data());
-    renderChat(msgs);
-  }, (err) => {
-    console.log("chat snapshot error:", err);
-  });
-
-  chatForm.addEventListener("submit", async (e) => {
-    e.preventDefault();
-
-    const val = chatInput.value;
-    chatInput.value = "";
-
-    try {
-      await sendChat(val);
-    } catch (err) {
-      console.log("chat send error:", err);
-      alert("Message non envoyé (permissions Firestore ?). Regarde la console.");
-    }
-  });
-}
-  
-  onSnapshot(doc(db,"rooms",roomId), (snap)=>{
-  if (!snap.exists()){ ... }
-
-  const room = snap.data() || {};
-  const status = room.status;
-
-  if ((status === "starting" || status === "started") && !overlayShown){
-    startSpinner();
-  }
-
-  myIsHost = (room.hostUid === u.uid);
-  if (btnStart) btnStart.style.display = myIsHost ? "" : "none";
-});
-  
-  onSnapshot(collection(db,"rooms",roomId,"players"), async (snap)=>{
-    const players = snap.docs.map(d=>d.data());
-    renderPlayers(players);
-
-    // build map + movement detection
-    for (const p of players) ensurePlayerState(p);
-
-    // remove players not in snapshot anymore
-    const live = new Set(players.map(p => p.uid));
-    for (const uid of Array.from(playersMap.keys())){
-      if (!live.has(uid)) playersMap.delete(uid);
-    }
-
-    // get my name
-    const me = players.find(p => p.uid === u.uid);
-    if (me?.name) myName = me.name;
-
-    // ensure me exists in map
-    if (me){
-  ensurePlayerState(me);
-
-  if (typeof me.x !== "number" || typeof me.y !== "number"){
-    const spawn = getSpawnPosition();
-
-    player.x = spawn.x;
-    player.y = spawn.y;
-
-    try{
-      await updateDoc(doc(db,"rooms",roomId,"players",u.uid), {
-        x: spawn.x,
-        y: spawn.y
-      });
-    } catch(e){
-      console.log("spawn write error:", e);
-    }
-  } else {
-    player.x = me.x;
-    player.y = me.y;
-  }
-}
-  });
-
 const ROLE_IMG = {
   innocent: "./assets/tinocent.png",
   truant:   "./assets/titruant.png",
 };
 
-let myRole = null;                 // "innocent" | "truant"
+let myRole = null;
 let spinTimer = null;
 let spinStart = 0;
 let pendingStopRole = null;
 let overlayShown = false;
 
-const SPIN_MS = 70;                // vitesse switch
-const MIN_SPIN_TOTAL = 1400;       // au moins 1.4s de roulette
+const SPIN_MS = 70;
+const MIN_SPIN_TOTAL = 1400;
 
 function openRoleOverlay(){
   if (!roleOverlay) return;
   roleOverlay.classList.add("open");
   roleOverlay.setAttribute("aria-hidden","false");
-  document.body.classList.add("chat-open"); // bloque joystick/canvas events
+  document.body.classList.add("chat-open");
 }
 
 function closeRoleOverlay(){
@@ -716,17 +582,16 @@ function stopSpinner(finalRole){
     roleImg.src = ROLE_IMG[pendingStopRole];
     roleTitle.textContent = pendingStopRole === "truant" ? "TI’TRUANT" : "TI’NOCENT";
     roleSub.textContent   = "Garde ton rôle secret 🤫";
-
     btnRoleOk.style.display = "";
   }, wait);
 }
 
-btnRoleOk?.addEventListener("click", () => {
-  closeRoleOverlay();
-});
+btnRoleOk?.addEventListener("click", closeRoleOverlay);
 
-  
-  function shuffle(arr){
+// ===================
+// START GAME (HOST)
+// ===================
+function shuffle(arr){
   for (let i = arr.length - 1; i > 0; i--){
     const j = Math.floor(Math.random() * (i + 1));
     [arr[i], arr[j]] = [arr[j], arr[i]];
@@ -735,79 +600,169 @@ btnRoleOk?.addEventListener("click", () => {
 }
 
 function computeTruants(count){
-  // ✅ règle simple
   if (count >= 8) return 2;
-  return 1; // 4..7
+  return 1;
 }
 
-btnStart?.addEventListener("click", async ()=>{
-  if (!myIsHost) return;
+// ===================
+// FIREBASE
+// ===================
+onAuthStateChanged(auth, async (u) => {
+  if (!u) { location.href = "./login.html"; return; }
+  if (!roomId) { location.href = "./game.html"; return; }
 
-  try{
-    // 1) récup joueurs
-    const snapPlayers = await getDocs(collection(db, "rooms", roomId, "players"));
-    const players = snapPlayers.docs.map(d => d.data()).filter(p => p?.uid);
+  myUid = u.uid;
 
-    const n = players.length;
+  // ✅ écoute rôle privé
+  onSnapshot(doc(db, "rooms", roomId, "privateRoles", myUid), (snap) => {
+    if (!snap.exists()) return;
+    const data = snap.data();
+    if (!data?.role) return;
 
-    if (n < 4){
-      alert("Il faut au moins 4 joueurs pour démarrer.");
-      return;
-    }
-    if (n > 12){
-      alert("Maximum 12 joueurs.");
-      return;
-    }
+    if (!overlayShown) startSpinner();
+    stopSpinner(data.role);
+  });
 
-    // 2) passage en starting (déclenche roulette chez tout le monde)
-    await updateDoc(doc(db,"rooms",roomId), {
-      status: "starting",
-      startingAt: serverTimestamp(),
+  // ✅ chat live
+  if (chatForm && chatInput){
+    const q = query(
+      collection(db, "rooms", roomId, "messages"),
+      orderBy("createdAtMs", "asc"),
+      limit(120)
+    );
+
+    onSnapshot(q, (snap) => {
+      const msgs = snap.docs.map(d => d.data());
+      renderChat(msgs);
+
+      // ✅ pastille rouge si nouveau msg d'un autre + chat fermé
+      if (msgs.length && !chatOverlay?.classList.contains("open")){
+        const last = msgs[msgs.length - 1];
+        if (last?.uid && last.uid !== myUid){
+          chatFab?.classList.add("has-unread");
+        }
+      }
+    }, (err) => {
+      console.log("chat snapshot error:", err);
     });
 
-    // 3) tirage rôles
-    const truantsCount = computeTruants(n);
-    const uids = shuffle(players.map(p => p.uid));
-
-    const truants = new Set(uids.slice(0, truantsCount));
-
-    // 4) writeBatch dans privateRoles
-    const batch = writeBatch(db);
-
-    for (const uid of uids){
-      const role = truants.has(uid) ? "truant" : "innocent";
-      const ref = doc(db, "rooms", roomId, "privateRoles", uid);
-      batch.set(ref, {
-        uid,
-        role,
-        createdAt: serverTimestamp(),
-      }, { merge: true });
-    }
-
-    await batch.commit();
-
-    // 5) start officiel
-    await updateDoc(doc(db,"rooms",roomId), {
-      status: "started",
-      startedAt: serverTimestamp(),
-      truantsCount,
-      playersCount: n,
+    chatForm.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const val = chatInput.value;
+      chatInput.value = "";
+      try { await sendChat(val); }
+      catch (err) { console.log("chat send error:", err); }
     });
-
-  } catch(e){
-    console.log("start error:", e);
-    alert("Erreur au démarrage : " + (e?.message || e));
   }
-});
 
+  // room status + host
+  onSnapshot(doc(db,"rooms",roomId), (snap)=>{
+    if (!snap.exists()){
+      alert("Partie supprimée");
+      location.href="./game.html";
+      return;
+    }
+
+    const room = snap.data() || {};
+    const status = room.status;
+
+    // optionnel: afficher roulette dès "starting"
+    if ((status === "starting" || status === "started") && !overlayShown){
+      startSpinner();
+    }
+
+    myIsHost = (room.hostUid === myUid);
+    if (btnStart) btnStart.style.display = myIsHost ? "" : "none";
+  });
+
+  // players
+  onSnapshot(collection(db,"rooms",roomId,"players"), async (snap)=>{
+    const players = snap.docs.map(d=>d.data());
+    renderPlayers(players);
+
+    for (const p of players) ensurePlayerState(p);
+
+    const live = new Set(players.map(p => p.uid));
+    for (const uid of Array.from(playersMap.keys())){
+      if (!live.has(uid)) playersMap.delete(uid);
+    }
+
+    const me = players.find(p => p.uid === myUid);
+    if (me?.name) myName = me.name;
+
+    if (me){
+      ensurePlayerState(me);
+
+      if (typeof me.x !== "number" || typeof me.y !== "number"){
+        const spawn = getSpawnPosition();
+        player.x = spawn.x;
+        player.y = spawn.y;
+        try{
+          await updateDoc(doc(db,"rooms",roomId,"players",myUid), { x: spawn.x, y: spawn.y });
+        } catch(e){
+          console.log("spawn write error:", e);
+        }
+      } else {
+        player.x = me.x;
+        player.y = me.y;
+      }
+    }
+  });
+
+  // host start
+  btnStart?.addEventListener("click", async ()=>{
+    if (!myIsHost) return;
+
+    try{
+      const snapPlayers = await getDocs(collection(db, "rooms", roomId, "players"));
+      const players = snapPlayers.docs.map(d => d.data()).filter(p => p?.uid);
+
+      const n = players.length;
+      if (n < 4){ alert("Il faut au moins 4 joueurs pour démarrer."); return; }
+      if (n > 12){ alert("Maximum 12 joueurs."); return; }
+
+      await updateDoc(doc(db,"rooms",roomId), {
+        status: "starting",
+        startingAt: serverTimestamp(),
+      });
+
+      const truantsCount = computeTruants(n);
+      const uids = shuffle(players.map(p => p.uid));
+      const truants = new Set(uids.slice(0, truantsCount));
+
+      const batch = writeBatch(db);
+      for (const uid of uids){
+        const role = truants.has(uid) ? "truant" : "innocent";
+        batch.set(doc(db, "rooms", roomId, "privateRoles", uid), {
+          uid,
+          role,
+          createdAt: serverTimestamp(),
+        }, { merge: true });
+      }
+      await batch.commit();
+
+      await updateDoc(doc(db,"rooms",roomId), {
+        status: "started",
+        startedAt: serverTimestamp(),
+        truantsCount,
+        playersCount: n,
+      });
+
+    } catch(e){
+      console.log("start error:", e);
+      alert("Erreur au démarrage : " + (e?.message || e));
+    }
+  });
+
+  // leave
   btnLeave?.addEventListener("click", async ()=>{
     overlayShown = false;
     try{
-      await deleteDoc(doc(db,"rooms",roomId,"players",u.uid));
+      await deleteDoc(doc(db,"rooms",roomId,"players",myUid));
 
       const roomSnap = await getDoc(doc(db,"rooms",roomId));
       const room = roomSnap.data();
-      if (room?.hostUid === u.uid){
+      if (room?.hostUid === myUid){
         await deleteDoc(doc(db,"rooms",roomId));
       }
     } catch(e){
@@ -817,6 +772,6 @@ btnStart?.addEventListener("click", async ()=>{
   });
 
   window.addEventListener("beforeunload", async ()=>{
-    try{ await deleteDoc(doc(db,"rooms",roomId,"players",u.uid)); } catch {}
+    try{ await deleteDoc(doc(db,"rooms",roomId,"players",myUid)); } catch {}
   });
 });
