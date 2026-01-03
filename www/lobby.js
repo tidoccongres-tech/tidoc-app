@@ -585,6 +585,10 @@ if (chatForm && chatInput){
       location.href="./game.html";
       return;
     }
+   const status = room.status;
+   if ((status === "starting" || status === "started") && !overlayShown){
+  startSpinner();
+   }
     const room = snap.data() || {};
     myIsHost = (room.hostUid === u.uid);
     if (btnStart) btnStart.style.display = myIsHost ? "" : "none";
@@ -705,10 +709,79 @@ btnRoleOk?.addEventListener("click", () => {
 });
 
   
-  btnStart?.addEventListener("click", async ()=>{
-    await updateDoc(doc(db,"rooms",roomId), { status:"started", startedAt: serverTimestamp() });
-    alert("Partie lancée (status=started)");
-  });
+  function shuffle(arr){
+  for (let i = arr.length - 1; i > 0; i--){
+    const j = Math.floor(Math.random() * (i + 1));
+    [arr[i], arr[j]] = [arr[j], arr[i]];
+  }
+  return arr;
+}
+
+function computeTruants(count){
+  // ✅ règle simple
+  if (count >= 8) return 2;
+  return 1; // 4..7
+}
+
+btnStart?.addEventListener("click", async ()=>{
+  if (!myIsHost) return;
+
+  try{
+    // 1) récup joueurs
+    const snapPlayers = await getDocs(collection(db, "rooms", roomId, "players"));
+    const players = snapPlayers.docs.map(d => d.data()).filter(p => p?.uid);
+
+    const n = players.length;
+
+    if (n < 4){
+      alert("Il faut au moins 4 joueurs pour démarrer.");
+      return;
+    }
+    if (n > 12){
+      alert("Maximum 12 joueurs.");
+      return;
+    }
+
+    // 2) passage en starting (déclenche roulette chez tout le monde)
+    await updateDoc(doc(db,"rooms",roomId), {
+      status: "starting",
+      startingAt: serverTimestamp(),
+    });
+
+    // 3) tirage rôles
+    const truantsCount = computeTruants(n);
+    const uids = shuffle(players.map(p => p.uid));
+
+    const truants = new Set(uids.slice(0, truantsCount));
+
+    // 4) writeBatch dans privateRoles
+    const batch = writeBatch(db);
+
+    for (const uid of uids){
+      const role = truants.has(uid) ? "truant" : "innocent";
+      const ref = doc(db, "rooms", roomId, "privateRoles", uid);
+      batch.set(ref, {
+        uid,
+        role,
+        createdAt: serverTimestamp(),
+      }, { merge: true });
+    }
+
+    await batch.commit();
+
+    // 5) start officiel
+    await updateDoc(doc(db,"rooms",roomId), {
+      status: "started",
+      startedAt: serverTimestamp(),
+      truantsCount,
+      playersCount: n,
+    });
+
+  } catch(e){
+    console.log("start error:", e);
+    alert("Erreur au démarrage : " + (e?.message || e));
+  }
+});
 
   btnLeave?.addEventListener("click", async ()=>{
     try{
