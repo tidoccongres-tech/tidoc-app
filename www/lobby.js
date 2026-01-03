@@ -341,6 +341,18 @@ if (walking){
 
   settleRemoteIdle();
 
+// loop
+let lastT = performance.now();
+function loop(t){
+  const dt = t - lastT;
+  lastT = t;
+
+  update(dt);
+  draw();
+  requestAnimationFrame(loop);
+}
+requestAnimationFrame(loop);
+
 function drawPlayerSprite(px, py, img){
   const W = SPRITE_SIZE;
   const H = SPRITE_SIZE;
@@ -424,19 +436,7 @@ function draw(){
     drawNameTag(p.drawX, p.drawY, p.name, !!p.isHost);
   }
 }
-
-// loop
-let lastT = performance.now();
-function loop(t){
-  const dt = t - lastT;
-  lastT = t;
-
-  update(dt);
-  draw();
-  requestAnimationFrame(loop);
-}
-requestAnimationFrame(loop);
-
+  
 // ===================
 // JOYSTICK
 // ===================
@@ -549,6 +549,15 @@ onAuthStateChanged(auth, async (u) => {
 
   myUid = u.uid;
 
+onSnapshot(doc(db, "rooms", roomId, "privateRoles", u.uid), (snap) => {
+  if (!snap.exists()) return;
+  const data = snap.data();
+  if (!data?.role) return;
+
+  if (!overlayShown) startSpinner();
+  stopSpinner(data.role);
+});
+  
  // ---- CHAT LIVE
 if (chatForm && chatInput){
   const q = query(
@@ -580,20 +589,19 @@ if (chatForm && chatInput){
 }
   
   onSnapshot(doc(db,"rooms",roomId), (snap)=>{
-    if (!snap.exists()){
-      alert("Partie supprimée");
-      location.href="./game.html";
-      return;
-    }
-   const status = room.status;
-   if ((status === "starting" || status === "started") && !overlayShown){
-  startSpinner();
-   }
-    const room = snap.data() || {};
-    myIsHost = (room.hostUid === u.uid);
-    if (btnStart) btnStart.style.display = myIsHost ? "" : "none";
-  });
+  if (!snap.exists()){ ... }
 
+  const room = snap.data() || {};
+  const status = room.status;
+
+  if ((status === "starting" || status === "started") && !overlayShown){
+    startSpinner();
+  }
+
+  myIsHost = (room.hostUid === u.uid);
+  if (btnStart) btnStart.style.display = myIsHost ? "" : "none";
+});
+  
   onSnapshot(collection(db,"rooms",roomId,"players"), async (snap)=>{
     const players = snap.docs.map(d=>d.data());
     renderPlayers(players);
