@@ -74,6 +74,9 @@ window.addEventListener("keydown", (e) => {
 const canvas = document.getElementById("gameCanvas");
 const ctx = canvas.getContext("2d");
 
+// ✅ sécurité : si tu as laissé "is-hidden" quelque part, on le retire
+chatOverlay?.classList.remove("is-hidden");
+
 function resize(){
   const dpr = window.devicePixelRatio || 1;
   canvas.width  = Math.floor(window.innerWidth * dpr);
