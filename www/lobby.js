@@ -1,8 +1,8 @@
 import * as AuthMod from "./auth.js";
 import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.4/firebase-auth.js";
 import {
-  doc, getDoc, updateDoc, onSnapshot, collection, deleteDoc, serverTimestamp,
-  addDoc, query, orderBy, limit
+  doc, getDoc, getDocs, updateDoc, onSnapshot, collection, deleteDoc, serverTimestamp,
+  addDoc, query, orderBy, limit, writeBatch
 } from "https://www.gstatic.com/firebasejs/10.12.4/firebase-firestore.js";
 
 const auth = AuthMod.auth;
