@@ -54,6 +54,15 @@ function renderPlayers(players){
   }).join("");
 }
 
+function getNearbyZone(){
+  for (const z of zones){
+    const dx = player.x - z.cx;
+    const dy = player.y - z.cy;
+    if (Math.hypot(dx,dy) <= ZONE_RADIUS) return z;
+  }
+  return null;
+}
+
 // ===================
 // CHAT OPEN/CLOSE
 // ===================
