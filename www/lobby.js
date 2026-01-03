@@ -61,6 +61,8 @@ function closeChat(){
 }
 
 btnChatToggle?.addEventListener("click", () => {
+  chatFab?.classList.remove("has-unread");
+});
   if (!chatOverlay) return;
   if (chatOverlay.classList.contains("open")) closeChat();
   else openChat();
@@ -525,6 +527,13 @@ function renderChat(messages){
   }
 
   chatMessagesEl.scrollTop = chatMessagesEl.scrollHeight;
+}
+
+  if (!chatOverlay.classList.contains("open") && msgs.length){
+  const last = msgs[msgs.length - 1];
+  if (last.uid !== myUid){
+    chatFab?.classList.add("has-unread");
+  }
 }
 
 async function sendChat(text){
