@@ -435,3 +435,6 @@ body.chat-open canvas{
 
 .chat-badge{ display:none; }
 .chat-fab.has-unread .chat-badge{ display:block; }
+
+.joystick { pointer-events: auto; }
+canvas { pointer-events: none; } /* le canvas ne capte rien, joystick OK */
