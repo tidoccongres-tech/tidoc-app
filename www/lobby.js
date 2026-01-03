@@ -52,10 +52,7 @@ function openChat(){
   chatOverlay.classList.add("open");
   chatOverlay.setAttribute("aria-hidden", "false");
   document.body.classList.add("chat-open");
-
-  setTimeout(() => {
-    chatInput?.focus?.();
-  }, 80);
+  setTimeout(() => chatInput?.focus?.(), 80);
 }
 
 function closeChat(){
@@ -67,10 +64,7 @@ function closeChat(){
 
 btnChatToggle?.addEventListener("click", () => {
   if (!chatOverlay) return;
-
-  // ✅ on retire la pastille quand on ouvre
   chatFab?.classList.remove("has-unread");
-
   if (chatOverlay.classList.contains("open")) closeChat();
   else openChat();
 });
@@ -117,8 +111,6 @@ const collisionImg = new Image();
 collisionImg.src = "./assets/collisions.png";
 
 let collisionData = null;
-
-// monde = taille image (pixels)
 let MAP_W = 1536;
 let MAP_H = 1024;
 
@@ -132,6 +124,11 @@ let camY = 0;
 
 function clamp(v, a, b){ return Math.max(a, Math.min(b, v)); }
 
+mapImg.onload = () => {
+  MAP_W = mapImg.width || MAP_W;
+  MAP_H = mapImg.height || MAP_H;
+};
+
 collisionImg.onload = () => {
   MAP_W = collisionImg.width;
   MAP_H = collisionImg.height;
@@ -143,14 +140,7 @@ collisionImg.onload = () => {
   tctx.drawImage(collisionImg, 0, 0);
   collisionData = tctx.getImageData(0, 0, MAP_W, MAP_H);
 
-  // ✅ calcule les zones couleur (centres)
   buildZonesFromCollision();
-};
-
-mapImg.onload = () => {
-  // si map size connue ici
-  MAP_W = mapImg.width || MAP_W;
-  MAP_H = mapImg.height || MAP_H;
 };
 
 // ---- collisions: blanc = sol, tout le reste = obstacle (noir + couleurs)
@@ -167,10 +157,10 @@ function isWalkableWorld(wx, wy){
   const g = collisionData.data[i+1];
   const b = collisionData.data[i+2];
 
-  // "blanc" tolérant (JPEG/PNG)
-  const isWhite = (r > 220 && g > 220 && b > 220);
-  return isWhite;
-}
+  return (r > 220 && g > 220 && b > 220);
+ }
+
+  const PLAYER_RADIUS = 22
 
 function canMoveWorld(nx, ny){
   const R = PLAYER_RADIUS;
@@ -181,21 +171,6 @@ function canMoveWorld(nx, ny){
     isWalkableWorld(nx, ny - R) &&
     isWalkableWorld(nx, ny + R)
   );
-}
-
-// ===================
-// SPAWN sur la map (coords monde)
-// ===================
-
-// ✅ option 1: spawn centre map
-function getSpawnPosition(){
-  const baseX = MAP_W * 0.50;
-  const baseY = MAP_H * 0.45;
-
-  const offsetX = Math.floor(Math.random() * 60) - 30;
-  const offsetY = Math.floor(Math.random() * 60) - 30;
-
-  return { x: baseX + offsetX, y: baseY + offsetY };
 }
 
 // ===================
@@ -215,8 +190,8 @@ const ZONE_COLORS = {
 };
 
 const COLOR_TOL = 85;
+const ZONE_RADIUS = 85;
 
-// zones = {id, name, cx, cy}
 let zones = [];
 
 function colorDist(r,g,b, tr,tg,tb){
@@ -229,7 +204,6 @@ function buildZonesFromCollision(){
 
   const sums = {};
   const counts = {};
-
   for (const k of Object.keys(ZONE_COLORS)){
     sums[k] = { x:0, y:0 };
     counts[k] = 0;
@@ -269,13 +243,10 @@ function buildZonesFromCollision(){
     });
   }
 
-  console.log("zones:", zones);
+  console.log("zones détectées:", zones);
 }
 
-// proche d’une zone → action possible
-const ZONE_RADIUS = 85; // rayon interaction (pixels monde)
-
-function getNearbyZone(){
+function getNearbyZone(worldX, worldY){
   for (const z of zones){
     const dx = player.x - z.cx;
     const dy = player.y - z.cy;
