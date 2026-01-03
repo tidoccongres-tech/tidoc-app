@@ -104,15 +104,6 @@ function resize(){
 resize();
 window.addEventListener("resize", resize);
 
-function getSpawnPosition(){
-  const offsetX = Math.floor(Math.random() * 40) - 20;
-  const offsetY = Math.floor(Math.random() * 40) - 20;
-  return {
-    x: window.innerWidth / 2 + offsetX,
-    y: window.innerHeight / 2 + 60 + offsetY
-  };
-}
-
 // ===================
 // MAP + CAMERA + COLLISIONS (NEW)
 // ===================
@@ -613,25 +604,6 @@ function update(dt){
   }
 
   settleRemoteIdle();
-}
-
-function draw(){
-  ctx.clearRect(0, 0, window.innerWidth, window.innerHeight);
-  if (bg.complete) ctx.drawImage(bg, 0, 0, window.innerWidth, window.innerHeight);
-
-  const arr = Array.from(playersMap.values())
-    .map(p => ({
-      ...p,
-      drawX: (p.uid === myUid) ? player.x : (typeof p.x === "number" ? p.x : 220),
-      drawY: (p.uid === myUid) ? player.y : (typeof p.y === "number" ? p.y : 320),
-    }))
-    .sort((a,b) => a.drawY - b.drawY);
-
-  for (const p of arr){
-    const sprite = (p.uid === myUid) ? getLocalSprite() : getRemoteSprite(p);
-    drawPlayerSprite(p.drawX, p.drawY, sprite);
-    drawNameTag(p.drawX, p.drawY, p.name, !!p.isHost);
-  }
 }
 
 let lastT = performance.now();
