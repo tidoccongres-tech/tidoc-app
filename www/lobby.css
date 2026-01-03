@@ -280,15 +280,17 @@ body.chat-open canvas{
 
 /* ✅ Bouton flottant (SVG) */
 .chat-fab{
-  position:absolute;
+  position: absolute;
   right: 14px;
-  bottom: calc(18px + env(safe-area-inset-bottom));
+  top: calc(14px + env(safe-area-inset-top));
+  bottom: auto;
+
   width: 54px;
   height: 54px;
   border: 0;
   border-radius: 999px;
   cursor: pointer;
-  z-index: 70;          /* ✅ au-dessus de tout */
+  z-index: 70;
   color: white;
 
   background: rgba(0,0,0,.35);
