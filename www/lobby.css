@@ -430,3 +430,8 @@ body.chat-open canvas{
   cursor:pointer;
   background: linear-gradient(180deg, #48c6ff 0%, #1479ff 100%);
 }
+
+.is-hidden{ display:none !important; }
+
+.chat-badge{ display:none; }
+.chat-fab.has-unread .chat-badge{ display:block; }
