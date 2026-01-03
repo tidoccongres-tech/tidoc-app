@@ -1,3 +1,5 @@
+// lobby.js (MODULE) — Lobby (lobby.png) -> Game (map.png) quand status="started"
+
 import * as AuthMod from "./auth.js";
 import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.4/firebase-auth.js";
 import {
@@ -6,26 +8,29 @@ import {
 } from "https://www.gstatic.com/firebasejs/10.12.4/firebase-firestore.js";
 
 const auth = AuthMod.auth;
-const db = AuthMod.db;
+const db   = AuthMod.db;
 
 const params = new URLSearchParams(location.search);
 const roomId = (params.get("room") || "").trim().toUpperCase();
 
+// ===================
+// DOM
+// ===================
 const roomCodeEl = document.getElementById("roomCode");
 const playersEl  = document.getElementById("playersList");
 const btnStart   = document.getElementById("btnStart");
 const btnLeave   = document.getElementById("btnLeave");
 
-// ✅ ROLE OVERLAY
+// ROLE OVERLAY
 const roleOverlay = document.getElementById("roleOverlay");
 const roleImg     = document.getElementById("roleImg");
 const roleTitle   = document.getElementById("roleTitle");
 const roleSub     = document.getElementById("roleSub");
 const btnRoleOk   = document.getElementById("btnRoleOk");
 
-// ✅ chat
+// chat
 const chatFab      = document.getElementById("btnChatToggle");
-const chatBadge    = document.getElementById("chatBadge"); // ✅ ton HTML
+const chatBadge    = document.getElementById("chatBadge");
 const chatOverlay  = document.getElementById("chatOverlay");
 const btnChatClose = document.getElementById("btnChatClose");
 
@@ -35,6 +40,64 @@ const chatForm  = document.getElementById("chatForm");
 const chatInput = document.getElementById("chatInput");
 
 if (roomCodeEl) roomCodeEl.textContent = roomId || "----";
+
+// ===================
+// HELPERS
+// ===================
+function clamp(v, a, b){ return Math.max(a, Math.min(b, v)); }
+
+function escapeHTML(s=""){
+  return String(s)
+    .replaceAll("&","&amp;")
+    .replaceAll("<","&lt;")
+    .replaceAll(">","&gt;")
+    .replaceAll('"',"&quot;")
+    .replaceAll("'","&#039;");
+}
+
+function renderPlayers(players){
+  if (!playersEl) return;
+  playersEl.innerHTML = players.map(p => {
+    const crown = p.isHost ? " 👑" : "";
+    return `<div class="player">${escapeHTML(p.name || "Joueur")}${crown}</div>`;
+  }).join("");
+}
+
+// ===================
+// CHAT OPEN/CLOSE
+// ===================
+function openChat(){
+  if (!chatOverlay) return;
+  chatOverlay.classList.add("open");
+  chatOverlay.setAttribute("aria-hidden", "false");
+  document.body.classList.add("chat-open");
+  setTimeout(() => chatInput?.focus?.(), 80);
+}
+function closeChat(){
+  if (!chatOverlay) return;
+  chatOverlay.classList.remove("open");
+  chatOverlay.setAttribute("aria-hidden", "true");
+  document.body.classList.remove("chat-open");
+}
+
+chatFab?.addEventListener("click", () => {
+  if (!chatOverlay) return;
+
+  chatFab.classList.remove("has-unread");
+  if (chatBadge) chatBadge.hidden = true;
+
+  if (chatOverlay.classList.contains("open")) closeChat();
+  else openChat();
+});
+btnChatClose?.addEventListener("click", closeChat);
+
+chatOverlay?.addEventListener("click", (e) => {
+  if (e.target === chatOverlay) closeChat();
+});
+
+window.addEventListener("keydown", (e) => {
+  if (e.key === "Escape") closeChat();
+});
 
 // ===================
 // CANVAS SETUP
@@ -56,18 +119,16 @@ window.addEventListener("resize", resize);
 // ===================
 // GAME STATE (Lobby vs Started)
 // ===================
-let gameStarted = false;     // ✅ room.status === "started"
-let loopRunning = false;     // ✅ évite double RAF
+let gameStarted = false;     // status === "started"
+let loopRunning = false;     // évite double RAF
 
 function setLobbyMode(){
   gameStarted = false;
   document.getElementById("joystick")?.classList.add("is-hidden");
 }
-
 function setGameMode(){
   gameStarted = true;
   document.getElementById("joystick")?.classList.remove("is-hidden");
-  startLoopOnce();
 }
 
 function startLoopOnce(){
@@ -78,48 +139,13 @@ function startLoopOnce(){
 }
 
 // ===================
-// CHAT OPEN/CLOSE
+// IMAGES: lobby.png vs map.png ✅
 // ===================
-function openChat(){
-  if (!chatOverlay) return;
-  chatOverlay.classList.add("open");
-  chatOverlay.setAttribute("aria-hidden", "false");
-  document.body.classList.add("chat-open");
-  setTimeout(() => chatInput?.focus?.(), 80);
-}
+const lobbyBgImg = new Image();
+lobbyBgImg.src = "./assets/lobby.png";      // ✅ ton écran lobby
 
-function closeChat(){
-  if (!chatOverlay) return;
-  chatOverlay.classList.remove("open");
-  chatOverlay.setAttribute("aria-hidden", "true");
-  document.body.classList.remove("chat-open");
-}
-
-chatFab?.addEventListener("click", () => {
-  if (!chatOverlay) return;
-
-  chatFab.classList.remove("has-unread");
-  if (chatBadge) chatBadge.hidden = true;
-
-  if (chatOverlay.classList.contains("open")) closeChat();
-  else openChat();
-});
-
-btnChatClose?.addEventListener("click", closeChat);
-
-chatOverlay?.addEventListener("click", (e) => {
-  if (e.target === chatOverlay) closeChat();
-});
-
-window.addEventListener("keydown", (e) => {
-  if (e.key === "Escape") closeChat();
-});
-
-// ===================
-// MAP + CAMERA + COLLISIONS
-// ===================
 const mapImg = new Image();
-mapImg.src = "./assets/map.png";
+mapImg.src = "./assets/map.png";            // ✅ ta map in-game
 
 const collisionImg = new Image();
 collisionImg.src = "./assets/collisions.png";
@@ -128,22 +154,19 @@ let collisionData = null;
 let MAP_W = 1536;
 let MAP_H = 1024;
 
-const ZOOM = 1.7;
-const CAM_LERP = 0.12;
-
-let camX = 0;
-let camY = 0;
-
-function clamp(v, a, b){ return Math.max(a, Math.min(b, v)); }
-
 mapImg.onload = () => {
   MAP_W = mapImg.width || MAP_W;
   MAP_H = mapImg.height || MAP_H;
 };
+lobbyBgImg.onload = () => {
+  // si lobby.png a une taille différente, on s'aligne dessus
+  MAP_W = lobbyBgImg.width || MAP_W;
+  MAP_H = lobbyBgImg.height || MAP_H;
+};
 
 collisionImg.onload = () => {
-  MAP_W = collisionImg.width;
-  MAP_H = collisionImg.height;
+  MAP_W = collisionImg.width || MAP_W;
+  MAP_H = collisionImg.height || MAP_H;
 
   const tmp = document.createElement("canvas");
   tmp.width = MAP_W;
@@ -154,6 +177,13 @@ collisionImg.onload = () => {
 
   buildZonesFromCollision();
 };
+
+// ===================
+// CAMERA
+// ===================
+const ZOOM = 1.7;
+const CAM_LERP = 0.12;
+let camX = 0, camY = 0;
 
 // ===================
 // ZONES
@@ -168,7 +198,6 @@ const ZONE_COLORS = {
   purple:  { rgb:[128,0,128],  id:"admin",     label:"DOSSIERS" },
   cyan:    { rgb:[0,255,200],  id:"rcp",       label:"RCP" },
 };
-
 const COLOR_TOL = 85;
 const ZONE_RADIUS = 85;
 let zones = [];
@@ -197,7 +226,6 @@ function buildZonesFromCollision(){
   }
 
   const d = collisionData.data;
-
   for (let y=0; y<MAP_H; y+=2){
     for (let x=0; x<MAP_W; x+=2){
       const i = (y*MAP_W + x)*4;
@@ -228,7 +256,6 @@ function buildZonesFromCollision(){
       cy: sums[k].y / counts[k],
     });
   }
-
   console.log("zones détectées:", zones);
 }
 
@@ -236,6 +263,7 @@ function buildZonesFromCollision(){
 // PLAYER + COLLISION
 // ===================
 const player = { x: 220, y: 320, speed: 2.2 };
+let move = { x: 0, y: 0 };
 
 function getNearbyZone(worldX = player.x, worldY = player.y){
   for (const z of zones){
@@ -286,8 +314,9 @@ function canMoveWorld(nx, ny){
 const SPRITE_SIZE = 96;
 const FOOT_OFFSET_Y = 16;
 const FOOT_ADJUST = new Map();
+
 const SEND_EVERY_MS = 90;
-const WALK_SWAP_MS = 120;
+const WALK_SWAP_MS  = 120;
 
 function loadImg(src){
   const im = new Image();
@@ -296,36 +325,18 @@ function loadImg(src){
 }
 
 const spritePose1 = loadImg("./assets/pose-1.png");
-const marche1 = loadImg("./assets/marche1.png");
-const marche2 = loadImg("./assets/marche2.png");
+const marche1     = loadImg("./assets/marche1.png");
+const marche2     = loadImg("./assets/marche2.png");
 const WALK_SEQUENCE = [marche1, marche2, marche1, marche2];
 
 // ===================
 // PLAYERS STATE
 // ===================
-let move = { x: 0, y: 0 };
 let myUid = null;
 let myName = "";
 let myIsHost = false;
 
 const playersMap = new Map();
-
-function escapeHTML(s=""){
-  return String(s)
-    .replaceAll("&","&amp;")
-    .replaceAll("<","&lt;")
-    .replaceAll(">","&gt;")
-    .replaceAll('"',"&quot;")
-    .replaceAll("'","&#039;");
-}
-
-function renderPlayers(players){
-  if (!playersEl) return;
-  playersEl.innerHTML = players.map(p => {
-    const crown = p.isHost ? " 👑" : "";
-    return `<div class="player">${escapeHTML(p.name || "Joueur")}${crown}</div>`;
-  }).join("");
-}
 
 function ensurePlayerState(p){
   const prev = playersMap.get(p.uid);
@@ -387,7 +398,6 @@ function getLocalSprite(){
   if (!walking) return spritePose1;
   return WALK_SEQUENCE[walkIndex];
 }
-
 function getRemoteSprite(p){
   if (!p.moving) return spritePose1;
   return WALK_SEQUENCE[p.walkIndex % WALK_SEQUENCE.length];
@@ -478,7 +488,7 @@ function drawNameTag(px, py, name, isHost){
 }
 
 // ===================
-// ACTION UI (simple)
+// ACTION UI
 // ===================
 let actionBtn = null;
 
@@ -588,10 +598,21 @@ function draw(){
   ctx.scale(ZOOM, ZOOM);
   ctx.translate(-camX, -camY);
 
-  if (mapImg.complete && mapImg.naturalWidth > 0){
-    ctx.drawImage(mapImg, 0, 0, MAP_W, MAP_H);
+  // ✅ BACKGROUND SELON ÉTAT : lobby.png vs map.png
+  if (!gameStarted){
+    if (lobbyBgImg.complete && lobbyBgImg.naturalWidth > 0){
+      ctx.drawImage(lobbyBgImg, 0, 0, MAP_W, MAP_H);
+    } else if (mapImg.complete && mapImg.naturalWidth > 0){
+      // fallback si lobby.png pas encore chargée
+      ctx.drawImage(mapImg, 0, 0, MAP_W, MAP_H);
+    }
+  } else {
+    if (mapImg.complete && mapImg.naturalWidth > 0){
+      ctx.drawImage(mapImg, 0, 0, MAP_W, MAP_H);
+    }
   }
 
+  // players depth by y
   const arr = Array.from(playersMap.values())
     .map(p => ({
       ...p,
@@ -792,12 +813,10 @@ function shuffle(arr){
   }
   return arr;
 }
-
 function computeTruants(count){
   if (count >= 8) return 2;
   return 1;
 }
-
 function getSpawnPosition(){
   const baseX = MAP_W * 0.50;
   const baseY = MAP_H * 0.45;
@@ -910,7 +929,7 @@ onAuthStateChanged(auth, async (u) => {
       ensurePlayerState({ ...me, x: player.x, y: player.y });
     }
 
-    // ✅ on dessine même en lobby (juste sans bouger)
+    // ✅ on dessine toujours (lobby inclus)
     startLoopOnce();
   });
 
