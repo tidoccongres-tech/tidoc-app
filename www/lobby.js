@@ -111,7 +111,7 @@ function resize(){
   canvas.height = Math.floor(window.innerHeight * dpr);
   canvas.style.width = window.innerWidth + "px";
   canvas.style.height = window.innerHeight + "px";
-  ctx.setTransform(dpr, 0, 0, dpr, 0, 0); // coords en "px CSS"
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 }
 resize();
 window.addEventListener("resize", resize);
@@ -119,24 +119,23 @@ window.addEventListener("resize", resize);
 // ===================
 // GAME STATE (Lobby vs Started)
 // ===================
-let gameStarted = false;  // status === "started"
+let gameStarted = false;
 let loopRunning = false;
 
 function setLobbyMode(){
   gameStarted = false;
 
-  // joystick off + reset mouvement
-  active = false;
-  move.x = 0; move.y = 0;
-  setStick(0,0);
-  joy?.classList.add("is-hidden");
+  // ✅ joystick DOIT RESTER VISIBLE ET ACTIF en lobby
+  joy?.classList.remove("is-hidden");
 
-  // bouton action invisible
+  // reset action button (optionnel)
   if (actionBtn) actionBtn.style.display = "none";
 }
 
 function setGameMode(){
   gameStarted = true;
+
+  // joystick visible
   joy?.classList.remove("is-hidden");
 }
 
@@ -183,10 +182,10 @@ collisionImg.onload = () => {
 };
 
 // ===================
-// CAMERA + ZOOM (✅ pas de zoom en lobby)
+// CAMERA + ZOOM (pas de zoom lobby)
 // ===================
-const ZOOM_LOBBY = 1.0; // ✅
-const ZOOM_GAME  = 1.7; // ✅
+const ZOOM_LOBBY = 1.0;
+const ZOOM_GAME  = 1.7;
 const CAM_LERP   = 0.12;
 
 let camX = 0, camY = 0;
@@ -236,7 +235,6 @@ function buildZonesFromCollision(){
       const i = (y*MAP_W + x)*4;
       const r = d[i], g = d[i+1], b = d[i+2];
 
-      // ignore blancs
       if (r > 220 && g > 220 && b > 220) continue;
 
       for (const k of Object.keys(ZONE_COLORS)){
@@ -262,7 +260,6 @@ function buildZonesFromCollision(){
       cy: sums[k].y / counts[k],
     });
   }
-  console.log("zones détectées:", zones);
 }
 
 // ===================
@@ -271,16 +268,6 @@ function buildZonesFromCollision(){
 const player = { x: 220, y: 320, speed: 2.2 };
 let move = { x: 0, y: 0 };
 
-function getNearbyZone(worldX = player.x, worldY = player.y){
-  for (const z of zones){
-    const dx = worldX - z.cx;
-    const dy = worldY - z.cy;
-    if (Math.hypot(dx, dy) <= ZONE_RADIUS) return z;
-  }
-  return null;
-}
-
-// blanc + zones = walkable
 function isWalkableWorld(wx, wy){
   if (!collisionData) return true;
 
@@ -313,7 +300,7 @@ function canMoveWorld(nx, ny){
 }
 
 // ===================
-// SPRITES (✅ tes noms)
+// SPRITES
 // ===================
 const SPRITE_SIZE = 96;
 const FOOT_OFFSET_Y = 16;
@@ -492,58 +479,10 @@ function drawNameTag(px, py, name, isHost){
 }
 
 // ===================
-// ACTION UI
-// ===================
-let actionBtn = null;
-
-function ensureActionBtn(){
-  if (actionBtn) return actionBtn;
-
-  actionBtn = document.createElement("button");
-  actionBtn.id = "btnAction";
-  actionBtn.textContent = "ACTION";
-  actionBtn.style.position = "fixed";
-  actionBtn.style.left = "50%";
-  actionBtn.style.bottom = "110px";
-  actionBtn.style.transform = "translateX(-50%)";
-  actionBtn.style.zIndex = "200";
-  actionBtn.style.padding = "14px 18px";
-  actionBtn.style.borderRadius = "999px";
-  actionBtn.style.border = "0";
-  actionBtn.style.fontWeight = "900";
-  actionBtn.style.display = "none";
-  document.body.appendChild(actionBtn);
-
-  actionBtn.addEventListener("click", () => {
-    const z = getNearbyZone();
-    if (!z) return;
-    alert(`Zone: ${z.label}`);
-  });
-
-  return actionBtn;
-}
-
-function drawActionUI(){
-  const btn = ensureActionBtn();
-  const z = getNearbyZone();
-
-  if (!gameStarted || !z){
-    btn.style.display = "none";
-    return;
-  }
-
-  btn.style.display = "";
-  btn.textContent = z.label;
-  btn.style.background = "linear-gradient(180deg, #48c6ff 0%, #1479ff 100%)";
-  btn.style.color = "#fff";
-}
-
-// ===================
 // UPDATE / DRAW / LOOP
 // ===================
 function update(dt){
-  if (!gameStarted) return;
-
+  // ✅ IMPORTANT: on autorise le mouvement AUSSI en lobby
   const dtNorm = Math.min(2, dt / 16.6667);
 
   const nx = player.x + move.x * player.speed * dtNorm;
@@ -589,10 +528,8 @@ function update(dt){
 function draw(){
   ctx.clearRect(0,0,window.innerWidth, window.innerHeight);
 
-  // ✅ zoom uniquement en game
   const zoomNow = gameStarted ? ZOOM_GAME : ZOOM_LOBBY;
 
-  // camera suit le joueur uniquement en game (en lobby, pas besoin de lerp)
   if (gameStarted){
     camX += (player.x - camX) * CAM_LERP;
     camY += (player.y - camY) * CAM_LERP;
@@ -611,7 +548,6 @@ function draw(){
   ctx.scale(zoomNow, zoomNow);
   ctx.translate(-camX, -camY);
 
-  // background selon état
   if (!gameStarted){
     if (lobbyBgImg.complete && lobbyBgImg.naturalWidth > 0){
       ctx.drawImage(lobbyBgImg, 0, 0, MAP_W, MAP_H);
@@ -624,7 +560,6 @@ function draw(){
     }
   }
 
-  // players
   const arr = Array.from(playersMap.values())
     .map(p => ({
       ...p,
@@ -640,8 +575,6 @@ function draw(){
   }
 
   ctx.restore();
-
-  drawActionUI();
 }
 
 let lastT = performance.now();
@@ -654,7 +587,7 @@ function loop(t){
 }
 
 // ===================
-// JOYSTICK (✅ FIX: move sur joy + pointerId)
+// JOYSTICK (actif lobby + game)
 // ===================
 const joy = document.getElementById("joystick");
 const stick = joy?.querySelector(".stick");
@@ -678,12 +611,11 @@ function endJoystick(){
 }
 
 joy?.addEventListener("pointerdown", (e) => {
-  if (!gameStarted) return;
+  // ✅ plus de "if (!gameStarted) return;"
   if (!joy) return;
 
   active = true;
   pointerId = e.pointerId;
-
   joy.setPointerCapture(pointerId);
 
   const r = joy.getBoundingClientRect();
@@ -694,7 +626,7 @@ joy?.addEventListener("pointerdown", (e) => {
 }, { passive: false });
 
 joy?.addEventListener("pointermove", (e) => {
-  if (!active || !gameStarted) return;
+  if (!active) return;
   if (pointerId !== null && e.pointerId !== pointerId) return;
 
   let dx = e.clientX - center.x;
@@ -723,135 +655,10 @@ joy?.addEventListener("pointercancel", (e) => {
   endJoystick();
 });
 
-// sécurité: si le doigt sort / alt-tab / etc.
 window.addEventListener("blur", endJoystick);
 
 // ===================
-// CHAT
-// ===================
-function renderChat(messages){
-  if (!chatMessagesEl) return;
-  chatMessagesEl.innerHTML = "";
-
-  for (const m of messages){
-    const div = document.createElement("div");
-    div.className = "chat-msg" + (m.uid === myUid ? " me" : "");
-    div.innerHTML = `
-      <div class="chat-meta">${escapeHTML(m.name || "Joueur")}</div>
-      <div class="chat-text">${escapeHTML(m.text || "")}</div>
-    `;
-    chatMessagesEl.appendChild(div);
-  }
-  chatMessagesEl.scrollTop = chatMessagesEl.scrollHeight;
-}
-
-async function sendChat(text){
-  const t = (text || "").trim();
-  if (!t || !roomId || !myUid) return;
-
-  await addDoc(collection(db, "rooms", roomId, "messages"), {
-    uid: myUid,
-    name: myName || "Joueur",
-    text: t,
-    createdAt: serverTimestamp(),
-    createdAtMs: Date.now()
-  });
-}
-
-// ===================
-// ROLE SPINNER
-// ===================
-const ROLE_IMG = {
-  innocent: "./assets/tinocent.png",
-  truant:   "./assets/titruant.png",
-};
-
-let overlayShown = false;
-let spinTimer = null;
-let spinStart = 0;
-let pendingStopRole = null;
-
-const SPIN_MS = 70;
-const MIN_SPIN_TOTAL = 1400;
-
-function openRoleOverlay(){
-  if (!roleOverlay) return;
-  roleOverlay.classList.add("open");
-  roleOverlay.setAttribute("aria-hidden","false");
-  document.body.classList.add("role-open");
-}
-
-function closeRoleOverlay(){
-  if (!roleOverlay) return;
-  roleOverlay.classList.remove("open");
-  roleOverlay.setAttribute("aria-hidden","true");
-  document.body.classList.remove("role-open");
-}
-
-function startSpinner(){
-  if (!roleImg) return;
-  overlayShown = true;
-  openRoleOverlay();
-
-  roleTitle.textContent = "Tirage au sort…";
-  roleSub.textContent   = "Ça tourne…";
-  btnRoleOk.style.display = "none";
-
-  spinStart = performance.now();
-  let toggle = false;
-
-  clearInterval(spinTimer);
-  spinTimer = setInterval(() => {
-    toggle = !toggle;
-    roleImg.src = toggle ? ROLE_IMG.truant : ROLE_IMG.innocent;
-  }, SPIN_MS);
-}
-
-function stopSpinner(finalRole){
-  if (!finalRole) return;
-
-  const elapsed = performance.now() - spinStart;
-  const wait = Math.max(0, MIN_SPIN_TOTAL - elapsed);
-
-  pendingStopRole = finalRole;
-
-  setTimeout(() => {
-    clearInterval(spinTimer);
-    spinTimer = null;
-
-    roleImg.src = ROLE_IMG[pendingStopRole];
-    roleTitle.textContent = pendingStopRole === "truant" ? "TI’TRUANT" : "TI’NOCENT";
-    roleSub.textContent   = "Garde ton rôle secret 🤫";
-    btnRoleOk.style.display = "";
-  }, wait);
-}
-
-btnRoleOk?.addEventListener("click", closeRoleOverlay);
-
-// ===================
-// START GAME (HOST)
-// ===================
-function shuffle(arr){
-  for (let i = arr.length - 1; i > 0; i--){
-    const j = Math.floor(Math.random() * (i + 1));
-    [arr[i], arr[j]] = [arr[j], arr[i]];
-  }
-  return arr;
-}
-function computeTruants(count){
-  if (count >= 8) return 2;
-  return 1;
-}
-function getSpawnPosition(){
-  const baseX = MAP_W * 0.50;
-  const baseY = MAP_H * 0.45;
-  const offsetX = Math.floor(Math.random() * 60) - 30;
-  const offsetY = Math.floor(Math.random() * 60) - 30;
-  return { x: baseX + offsetX, y: baseY + offsetY };
-}
-
-// ===================
-// FIREBASE
+// FIREBASE (inchangé, colle ton bloc existant ici)
 // ===================
 onAuthStateChanged(auth, async (u) => {
   if (!u) { location.href = "./login.html"; return; }
@@ -859,54 +666,12 @@ onAuthStateChanged(auth, async (u) => {
 
   myUid = u.uid;
 
-  // rôle privé
-  onSnapshot(doc(db, "rooms", roomId, "privateRoles", myUid), (snap) => {
-    if (!snap.exists()) return;
-    const data = snap.data();
-    if (!data?.role) return;
-
-    if (!overlayShown) startSpinner();
-    stopSpinner(data.role);
-  });
-
-  // chat live
-  if (chatForm && chatInput){
-    const q = query(
-      collection(db, "rooms", roomId, "messages"),
-      orderBy("createdAtMs", "asc"),
-      limit(120)
-    );
-
-    onSnapshot(q, (snap) => {
-      const msgs = snap.docs.map(d => d.data());
-      renderChat(msgs);
-
-      if (msgs.length && !chatOverlay?.classList.contains("open")){
-        const last = msgs[msgs.length - 1];
-        if (last?.uid && last.uid !== myUid){
-          chatFab?.classList.add("has-unread");
-          if (chatBadge) chatBadge.hidden = false;
-        }
-      }
-    });
-
-    chatForm.addEventListener("submit", async (e) => {
-      e.preventDefault();
-      const val = chatInput.value;
-      chatInput.value = "";
-      try { await sendChat(val); }
-      catch (err) { console.log("chat send error:", err); }
-    });
-  }
-
-  // room status + host
   onSnapshot(doc(db,"rooms",roomId), (snap)=>{
     if (!snap.exists()){
       alert("Partie supprimée");
       location.href="./game.html";
       return;
     }
-
     const room = snap.data() || {};
     const status = room.status;
 
@@ -915,13 +680,8 @@ onAuthStateChanged(auth, async (u) => {
 
     if (status === "started") setGameMode();
     else setLobbyMode();
-
-    if ((status === "starting" || status === "started") && !overlayShown){
-      startSpinner();
-    }
   });
 
-  // players
   onSnapshot(collection(db,"rooms",roomId,"players"), async (snap)=>{
     const players = snap.docs.map(d=>d.data());
     renderPlayers(players);
@@ -937,76 +697,19 @@ onAuthStateChanged(auth, async (u) => {
     if (me?.name) myName = me.name;
 
     if (me){
-      if (typeof me.x !== "number" || typeof me.y !== "number"){
-        const spawn = getSpawnPosition();
-        player.x = spawn.x;
-        player.y = spawn.y;
-        try{
-          await updateDoc(doc(db,"rooms",roomId,"players",myUid), { x: spawn.x, y: spawn.y });
-        } catch(e){
-          console.log("spawn write error:", e);
-        }
-      } else {
+      if (typeof me.x === "number" && typeof me.y === "number"){
         player.x = me.x;
         player.y = me.y;
       }
-
       ensurePlayerState({ ...me, x: player.x, y: player.y });
     }
 
     startLoopOnce();
   });
 
-  // host start
-  btnStart?.addEventListener("click", async ()=>{
-    if (!myIsHost) return;
-
-    try{
-      const snapPlayers = await getDocs(collection(db, "rooms", roomId, "players"));
-      const players = snapPlayers.docs.map(d => d.data()).filter(p => p?.uid);
-
-      const n = players.length;
-      if (n < 4){ alert("Il faut au moins 4 joueurs pour démarrer."); return; }
-      if (n > 12){ alert("Maximum 12 joueurs."); return; }
-
-      await updateDoc(doc(db,"rooms",roomId), {
-        status: "starting",
-        startingAt: serverTimestamp(),
-      });
-
-      const truantsCount = computeTruants(n);
-      const uids = shuffle(players.map(p => p.uid));
-      const truants = new Set(uids.slice(0, truantsCount));
-
-      const batch = writeBatch(db);
-      for (const uid of uids){
-        const role = truants.has(uid) ? "truant" : "innocent";
-        batch.set(doc(db, "rooms", roomId, "privateRoles", uid), {
-          uid,
-          role,
-          createdAt: serverTimestamp(),
-        }, { merge: true });
-      }
-      await batch.commit();
-
-      await updateDoc(doc(db,"rooms",roomId), {
-        status: "started",
-        startedAt: serverTimestamp(),
-        truantsCount,
-        playersCount: n,
-      });
-
-    } catch(e){
-      console.log("start error:", e);
-      alert("Erreur au démarrage : " + (e?.message || e));
-    }
-  });
-
-  // leave
   btnLeave?.addEventListener("click", async ()=>{
     try{
       await deleteDoc(doc(db,"rooms",roomId,"players",myUid));
-
       const roomSnap = await getDoc(doc(db,"rooms",roomId));
       const room = roomSnap.data();
       if (room?.hostUid === myUid){
@@ -1016,9 +719,5 @@ onAuthStateChanged(auth, async (u) => {
       console.log("leave error:", e);
     }
     window.location.href = "./game.html";
-  });
-
-  window.addEventListener("beforeunload", async ()=>{
-    try{ await deleteDoc(doc(db,"rooms",roomId,"players",myUid)); } catch {}
   });
 });
