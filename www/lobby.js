@@ -595,7 +595,7 @@ function update(dt){
     walkIndex = 1;
   }
 
-  if (canMove(nx, ny)){
+  if (canMoveWorld(nx, ny)){
     player.x = nx;
     player.y = ny;
     if (walking || wasWalking) sendMyPosition();
