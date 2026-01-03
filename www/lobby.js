@@ -24,17 +24,21 @@ const roleSub     = document.getElementById("roleSub");
 const btnRoleOk   = document.getElementById("btnRoleOk");
 
 // ✅ chat
-const chatFab       = document.getElementById("btnChatToggle");
-const btnChatToggle = document.getElementById("btnChatToggle");
-const chatOverlay   = document.getElementById("chatOverlay");
-const btnChatClose  = document.getElementById("btnChatClose");
+const chatFab      = document.getElementById("btnChatToggle");
+const chatOverlay  = document.getElementById("chatOverlay");
+const btnChatClose = document.getElementById("btnChatClose");
 
 // chat DOM
 const chatMessagesEl = document.getElementById("chatMessages");
-const chatForm = document.getElementById("chatForm");
+const chatForm  = document.getElementById("chatForm");
 const chatInput = document.getElementById("chatInput");
 
 if (roomCodeEl) roomCodeEl.textContent = roomId || "----";
+
+// ===================
+// HELPERS
+// ===================
+function clamp(v, a, b){ return Math.max(a, Math.min(b, v)); }
 
 function getSpawnPosition(){
   const baseX = MAP_W * 0.50;
@@ -52,15 +56,6 @@ function renderPlayers(players){
     const crown = p.isHost ? " 👑" : "";
     return `<div class="player">${p.name || "Joueur"}${crown}</div>`;
   }).join("");
-}
-
-function getNearbyZone(){
-  for (const z of zones){
-    const dx = player.x - z.cx;
-    const dy = player.y - z.cy;
-    if (Math.hypot(dx,dy) <= ZONE_RADIUS) return z;
-  }
-  return null;
 }
 
 // ===================
@@ -81,7 +76,7 @@ function closeChat(){
   document.body.classList.remove("chat-open");
 }
 
-btnChatToggle?.addEventListener("click", () => {
+chatFab?.addEventListener("click", () => {
   if (!chatOverlay) return;
   chatFab?.classList.remove("has-unread");
   if (chatOverlay.classList.contains("open")) closeChat();
@@ -118,7 +113,7 @@ resize();
 window.addEventListener("resize", resize);
 
 // ===================
-// MAP + CAMERA + COLLISIONS (NEW)
+// MAP + CAMERA + COLLISIONS
 // ===================
 
 // ✅ ta vraie map
@@ -141,8 +136,6 @@ const CAM_LERP = 0.12;      // fluidité caméra (0.1–0.2)
 let camX = 0;
 let camY = 0;
 
-function clamp(v, a, b){ return Math.max(a, Math.min(b, v)); }
-
 mapImg.onload = () => {
   MAP_W = mapImg.width || MAP_W;
   MAP_H = mapImg.height || MAP_H;
@@ -162,38 +155,8 @@ collisionImg.onload = () => {
   buildZonesFromCollision();
 };
 
-// ---- collisions: blanc = sol, tout le reste = obstacle (noir + couleurs)
-function isWalkableWorld(wx, wy){
-  if (!collisionData) return true;
-
-  const x = Math.floor(wx);
-  const y = Math.floor(wy);
-
-  if (x < 0 || y < 0 || x >= MAP_W || y >= MAP_H) return false;
-
-  const i = (y * MAP_W + x) * 4;
-  const r = collisionData.data[i];
-  const g = collisionData.data[i+1];
-  const b = collisionData.data[i+2];
-
-  return (r > 220 && g > 220 && b > 220);
- }
-
-  const PLAYER_RADIUS = 22;
-
-function canMoveWorld(nx, ny){
-  const R = PLAYER_RADIUS;
-  return (
-    isWalkableWorld(nx, ny) &&
-    isWalkableWorld(nx - R, ny) &&
-    isWalkableWorld(nx + R, ny) &&
-    isWalkableWorld(nx, ny - R) &&
-    isWalkableWorld(nx, ny + R)
-  );
-}
-
 // ===================
-// ZONES COULEUR = INTERACTIONS (obstacles + actions)
+// ZONES COULEUR = INTERACTIONS
 // ===================
 
 // couleurs cibles (tolérance)
@@ -218,6 +181,15 @@ function colorDist(r,g,b, tr,tg,tb){
   return Math.sqrt(dr*dr + dg*dg + db*db);
 }
 
+// ✅ détecte si une couleur appartient à une zone
+function isZoneColor(r,g,b){
+  for (const k of Object.keys(ZONE_COLORS)){
+    const [tr,tg,tb] = ZONE_COLORS[k].rgb;
+    if (colorDist(r,g,b,tr,tg,tb) < COLOR_TOL) return true;
+  }
+  return false;
+}
+
 function buildZonesFromCollision(){
   if (!collisionData) return;
 
@@ -230,7 +202,7 @@ function buildZonesFromCollision(){
 
   const d = collisionData.data;
 
-  for (let y=0; y<MAP_H; y+=2){           // step 2 = plus rapide
+  for (let y=0; y<MAP_H; y+=2){
     for (let x=0; x<MAP_W; x+=2){
       const i = (y*MAP_W + x)*4;
       const r = d[i], g = d[i+1], b = d[i+2];
@@ -252,7 +224,7 @@ function buildZonesFromCollision(){
 
   zones = [];
   for (const k of Object.keys(ZONE_COLORS)){
-    if (counts[k] < 200) continue; // ignore bruit
+    if (counts[k] < 200) continue;
     zones.push({
       color: k,
       id: ZONE_COLORS[k].id,
@@ -265,13 +237,53 @@ function buildZonesFromCollision(){
   console.log("zones détectées:", zones);
 }
 
-function getNearbyZone(worldX, worldY){
+// ✅ UNE SEULE fonction getNearbyZone, propre
+function getNearbyZone(worldX = player.x, worldY = player.y){
   for (const z of zones){
-    const dx = player.x - z.cx;
-    const dy = player.y - z.cy;
-    if (Math.hypot(dx,dy) <= ZONE_RADIUS) return z;
+    const dx = worldX - z.cx;
+    const dy = worldY - z.cy;
+    if (Math.hypot(dx, dy) <= ZONE_RADIUS) return z;
   }
   return null;
+}
+
+// ===================
+// COLLISIONS
+// ===================
+// blanc = sol, couleurs zones = sol, noir/autres = obstacle
+function isWalkableWorld(wx, wy){
+  if (!collisionData) return true;
+
+  const x = Math.floor(wx);
+  const y = Math.floor(wy);
+
+  if (x < 0 || y < 0 || x >= MAP_W || y >= MAP_H) return false;
+
+  const i = (y * MAP_W + x) * 4;
+  const r = collisionData.data[i];
+  const g = collisionData.data[i+1];
+  const b = collisionData.data[i+2];
+
+  const isWhite = (r > 220 && g > 220 && b > 220);
+  if (isWhite) return true;
+
+  // ✅ zones colorées = walkable (sinon tu ne peux jamais déclencher l’action)
+  if (isZoneColor(r,g,b)) return true;
+
+  return false;
+}
+
+const PLAYER_RADIUS = 22;
+
+function canMoveWorld(nx, ny){
+  const R = PLAYER_RADIUS;
+  return (
+    isWalkableWorld(nx, ny) &&
+    isWalkableWorld(nx - R, ny) &&
+    isWalkableWorld(nx + R, ny) &&
+    isWalkableWorld(nx, ny - R) &&
+    isWalkableWorld(nx, ny + R)
+  );
 }
 
 // ===================
@@ -280,28 +292,23 @@ function getNearbyZone(worldX, worldY){
 function draw(){
   ctx.clearRect(0,0,window.innerWidth, window.innerHeight);
 
-  // camera suit le joueur (lerp)
   camX += (player.x - camX) * CAM_LERP;
   camY += (player.y - camY) * CAM_LERP;
 
-  // clamp camera pour ne pas voir hors map
   const halfW = (window.innerWidth  / ZOOM) / 2;
   const halfH = (window.innerHeight / ZOOM) / 2;
   camX = clamp(camX, halfW, MAP_W - halfW);
   camY = clamp(camY, halfH, MAP_H - halfH);
 
-  // apply transform
   ctx.save();
   ctx.translate(window.innerWidth/2, window.innerHeight/2);
   ctx.scale(ZOOM, ZOOM);
   ctx.translate(-camX, -camY);
 
-  // draw map
   if (mapImg.complete && mapImg.naturalWidth > 0){
     ctx.drawImage(mapImg, 0, 0, MAP_W, MAP_H);
   }
 
-  // draw players triés par y (depth)
   const arr = Array.from(playersMap.values())
     .map(p => ({
       ...p,
@@ -316,7 +323,7 @@ function draw(){
     drawNameTag(p.drawX, p.drawY, p.name, !!p.isHost);
   }
 
-  // debug : montre zone proche
+  // debug zone proche
   const z = getNearbyZone();
   if (z){
     ctx.beginPath();
@@ -328,7 +335,6 @@ function draw(){
 
   ctx.restore();
 
-  // UI overlay (hors transform): afficher un bouton action si proche
   drawActionUI();
 }
 
@@ -360,11 +366,6 @@ function ensureActionBtn(){
     if (!z) return;
 
     console.log("ACTION on zone:", z.id);
-
-    // TODO: ici tu branches :
-    // - meeting (dénoncer)
-    // - ouvrir mini-jeu
-    // - etc
     alert(`Zone: ${z.label}`);
   });
 
@@ -455,6 +456,17 @@ function settleRemoteIdle(){
 let walking = false;
 let walkTimer = 0;
 let walkIndex = 0;
+
+// ⚠️ supposé existants ailleurs dans ton projet :
+/*
+const SPRITE_SIZE = ...
+const FOOT_OFFSET_Y = ...
+const FOOT_ADJUST = new Map()
+const spritePose1 = new Image()
+const WALK_SEQUENCE = [...]
+const WALK_SWAP_MS = ...
+const SEND_EVERY_MS = ...
+*/
 
 function getLocalSprite(){
   if (!walking) return spritePose1;
@@ -705,7 +717,7 @@ async function sendChat(text){
 }
 
 // ===================
-// ROLE SPINNER
+// ROLE SPINNER (corrigé: role-open au lieu de chat-open)
 // ===================
 const ROLE_IMG = {
   innocent: "./assets/tinocent.png",
@@ -725,14 +737,14 @@ function openRoleOverlay(){
   if (!roleOverlay) return;
   roleOverlay.classList.add("open");
   roleOverlay.setAttribute("aria-hidden","false");
-  document.body.classList.add("chat-open");
+  document.body.classList.add("role-open");
 }
 
 function closeRoleOverlay(){
   if (!roleOverlay) return;
   roleOverlay.classList.remove("open");
   roleOverlay.setAttribute("aria-hidden","true");
-  document.body.classList.remove("chat-open");
+  document.body.classList.remove("role-open");
 }
 
 function startSpinner(){
@@ -854,7 +866,6 @@ onAuthStateChanged(auth, async (u) => {
     const room = snap.data() || {};
     const status = room.status;
 
-    // optionnel: afficher roulette dès "starting"
     if ((status === "starting" || status === "started") && !overlayShown){
       startSpinner();
     }
