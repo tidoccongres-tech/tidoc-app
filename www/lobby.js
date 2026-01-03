@@ -36,6 +36,16 @@ const chatInput = document.getElementById("chatInput");
 
 if (roomCodeEl) roomCodeEl.textContent = roomId || "----";
 
+function getSpawnPosition(){
+  const baseX = MAP_W * 0.50;
+  const baseY = MAP_H * 0.45;
+
+  const offsetX = Math.floor(Math.random() * 60) - 30;
+  const offsetY = Math.floor(Math.random() * 60) - 30;
+
+  return { x: baseX + offsetX, y: baseY + offsetY };
+}
+
 function renderPlayers(players){
   if (!playersEl) return;
   playersEl.innerHTML = players.map(p => {
@@ -160,7 +170,7 @@ function isWalkableWorld(wx, wy){
   return (r > 220 && g > 220 && b > 220);
  }
 
-  const PLAYER_RADIUS = 22
+  const PLAYER_RADIUS = 22;
 
 function canMoveWorld(nx, ny){
   const R = PLAYER_RADIUS;
