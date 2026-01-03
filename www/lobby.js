@@ -25,6 +25,7 @@ const btnRoleOk   = document.getElementById("btnRoleOk");
 
 // ✅ chat
 const chatFab      = document.getElementById("btnChatToggle");
+const chatBadge    = document.getElementById("chatBadge"); // ✅ ton HTML
 const chatOverlay  = document.getElementById("chatOverlay");
 const btnChatClose = document.getElementById("btnChatClose");
 
@@ -36,26 +37,44 @@ const chatInput = document.getElementById("chatInput");
 if (roomCodeEl) roomCodeEl.textContent = roomId || "----";
 
 // ===================
-// HELPERS
+// CANVAS SETUP
 // ===================
-function clamp(v, a, b){ return Math.max(a, Math.min(b, v)); }
+const canvas = document.getElementById("gameCanvas");
+const ctx = canvas.getContext("2d");
 
-function getSpawnPosition(){
-  const baseX = MAP_W * 0.50;
-  const baseY = MAP_H * 0.45;
+function resize(){
+  const dpr = window.devicePixelRatio || 1;
+  canvas.width  = Math.floor(window.innerWidth * dpr);
+  canvas.height = Math.floor(window.innerHeight * dpr);
+  canvas.style.width = window.innerWidth + "px";
+  canvas.style.height = window.innerHeight + "px";
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+}
+resize();
+window.addEventListener("resize", resize);
 
-  const offsetX = Math.floor(Math.random() * 60) - 30;
-  const offsetY = Math.floor(Math.random() * 60) - 30;
+// ===================
+// GAME STATE (Lobby vs Started)
+// ===================
+let gameStarted = false;     // ✅ room.status === "started"
+let loopRunning = false;     // ✅ évite double RAF
 
-  return { x: baseX + offsetX, y: baseY + offsetY };
+function setLobbyMode(){
+  gameStarted = false;
+  document.getElementById("joystick")?.classList.add("is-hidden");
 }
 
-function renderPlayers(players){
-  if (!playersEl) return;
-  playersEl.innerHTML = players.map(p => {
-    const crown = p.isHost ? " 👑" : "";
-    return `<div class="player">${p.name || "Joueur"}${crown}</div>`;
-  }).join("");
+function setGameMode(){
+  gameStarted = true;
+  document.getElementById("joystick")?.classList.remove("is-hidden");
+  startLoopOnce();
+}
+
+function startLoopOnce(){
+  if (loopRunning) return;
+  loopRunning = true;
+  lastT = performance.now();
+  requestAnimationFrame(loop);
 }
 
 // ===================
@@ -78,7 +97,10 @@ function closeChat(){
 
 chatFab?.addEventListener("click", () => {
   if (!chatOverlay) return;
-  chatFab?.classList.remove("has-unread");
+
+  chatFab.classList.remove("has-unread");
+  if (chatBadge) chatBadge.hidden = true;
+
   if (chatOverlay.classList.contains("open")) closeChat();
   else openChat();
 });
@@ -94,33 +116,11 @@ window.addEventListener("keydown", (e) => {
 });
 
 // ===================
-// CANVAS SETUP
-// ===================
-const canvas = document.getElementById("gameCanvas");
-const ctx = canvas.getContext("2d");
-
-chatOverlay?.classList.remove("is-hidden");
-
-function resize(){
-  const dpr = window.devicePixelRatio || 1;
-  canvas.width  = Math.floor(window.innerWidth * dpr);
-  canvas.height = Math.floor(window.innerHeight * dpr);
-  canvas.style.width = window.innerWidth + "px";
-  canvas.style.height = window.innerHeight + "px";
-  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-}
-resize();
-window.addEventListener("resize", resize);
-
-// ===================
 // MAP + CAMERA + COLLISIONS
 // ===================
-
-// ✅ ta vraie map
 const mapImg = new Image();
 mapImg.src = "./assets/map.png";
 
-// ✅ ta collision colorée (noir/blanc + zones couleur)
 const collisionImg = new Image();
 collisionImg.src = "./assets/collisions.png";
 
@@ -128,13 +128,13 @@ let collisionData = null;
 let MAP_W = 1536;
 let MAP_H = 1024;
 
-// zoom caméra
-const ZOOM = 1.7;           // ajuste (1.4 / 1.7 / 2.0)
-const CAM_LERP = 0.12;      // fluidité caméra (0.1–0.2)
+const ZOOM = 1.7;
+const CAM_LERP = 0.12;
 
-// caméra (centre dans les coords monde)
 let camX = 0;
 let camY = 0;
+
+function clamp(v, a, b){ return Math.max(a, Math.min(b, v)); }
 
 mapImg.onload = () => {
   MAP_W = mapImg.width || MAP_W;
@@ -156,10 +156,8 @@ collisionImg.onload = () => {
 };
 
 // ===================
-// ZONES COULEUR = INTERACTIONS
+// ZONES
 // ===================
-
-// couleurs cibles (tolérance)
 const ZONE_COLORS = {
   red:     { rgb:[255,0,0],    id:"meeting",   label:"DÉNONCER" },
   blue:    { rgb:[0,0,255],    id:"labo",      label:"MISSION LABO" },
@@ -173,7 +171,6 @@ const ZONE_COLORS = {
 
 const COLOR_TOL = 85;
 const ZONE_RADIUS = 85;
-
 let zones = [];
 
 function colorDist(r,g,b, tr,tg,tb){
@@ -181,7 +178,6 @@ function colorDist(r,g,b, tr,tg,tb){
   return Math.sqrt(dr*dr + dg*dg + db*db);
 }
 
-// ✅ détecte si une couleur appartient à une zone
 function isZoneColor(r,g,b){
   for (const k of Object.keys(ZONE_COLORS)){
     const [tr,tg,tb] = ZONE_COLORS[k].rgb;
@@ -207,7 +203,6 @@ function buildZonesFromCollision(){
       const i = (y*MAP_W + x)*4;
       const r = d[i], g = d[i+1], b = d[i+2];
 
-      // ignore blancs
       if (r > 220 && g > 220 && b > 220) continue;
 
       for (const k of Object.keys(ZONE_COLORS)){
@@ -237,7 +232,11 @@ function buildZonesFromCollision(){
   console.log("zones détectées:", zones);
 }
 
-// ✅ UNE SEULE fonction getNearbyZone, propre
+// ===================
+// PLAYER + COLLISION
+// ===================
+const player = { x: 220, y: 320, speed: 2.2 };
+
 function getNearbyZone(worldX = player.x, worldY = player.y){
   for (const z of zones){
     const dx = worldX - z.cx;
@@ -247,10 +246,7 @@ function getNearbyZone(worldX = player.x, worldY = player.y){
   return null;
 }
 
-// ===================
-// COLLISIONS
-// ===================
-// blanc = sol, couleurs zones = sol, noir/autres = obstacle
+// blanc + zones = walkable
 function isWalkableWorld(wx, wy){
   if (!collisionData) return true;
 
@@ -267,14 +263,12 @@ function isWalkableWorld(wx, wy){
   const isWhite = (r > 220 && g > 220 && b > 220);
   if (isWhite) return true;
 
-  // ✅ zones colorées = walkable (sinon tu ne peux jamais déclencher l’action)
   if (isZoneColor(r,g,b)) return true;
 
   return false;
 }
 
 const PLAYER_RADIUS = 22;
-
 function canMoveWorld(nx, ny){
   const R = PLAYER_RADIUS;
   return (
@@ -287,122 +281,54 @@ function canMoveWorld(nx, ny){
 }
 
 // ===================
-// DRAW avec caméra
+// SPRITES ✅ (TES BONS NOMS)
 // ===================
-function draw(){
-  ctx.clearRect(0,0,window.innerWidth, window.innerHeight);
+const SPRITE_SIZE = 96;
+const FOOT_OFFSET_Y = 16;
+const FOOT_ADJUST = new Map();
+const SEND_EVERY_MS = 90;
+const WALK_SWAP_MS = 120;
 
-  camX += (player.x - camX) * CAM_LERP;
-  camY += (player.y - camY) * CAM_LERP;
-
-  const halfW = (window.innerWidth  / ZOOM) / 2;
-  const halfH = (window.innerHeight / ZOOM) / 2;
-  camX = clamp(camX, halfW, MAP_W - halfW);
-  camY = clamp(camY, halfH, MAP_H - halfH);
-
-  ctx.save();
-  ctx.translate(window.innerWidth/2, window.innerHeight/2);
-  ctx.scale(ZOOM, ZOOM);
-  ctx.translate(-camX, -camY);
-
-  if (mapImg.complete && mapImg.naturalWidth > 0){
-    ctx.drawImage(mapImg, 0, 0, MAP_W, MAP_H);
-  }
-
-  const arr = Array.from(playersMap.values())
-    .map(p => ({
-      ...p,
-      drawX: (p.uid === myUid) ? player.x : (typeof p.x === "number" ? p.x : player.x),
-      drawY: (p.uid === myUid) ? player.y : (typeof p.y === "number" ? p.y : player.y),
-    }))
-    .sort((a,b) => a.drawY - b.drawY);
-
-  for (const p of arr){
-    const sprite = (p.uid === myUid) ? getLocalSprite() : getRemoteSprite(p);
-    drawPlayerSprite(p.drawX, p.drawY, sprite);
-    drawNameTag(p.drawX, p.drawY, p.name, !!p.isHost);
-  }
-
-  // debug zone proche
-  const z = getNearbyZone();
-  if (z){
-    ctx.beginPath();
-    ctx.arc(z.cx, z.cy, ZONE_RADIUS, 0, Math.PI*2);
-    ctx.strokeStyle = "rgba(255,255,255,0.25)";
-    ctx.lineWidth = 2;
-    ctx.stroke();
-  }
-
-  ctx.restore();
-
-  drawActionUI();
+function loadImg(src){
+  const im = new Image();
+  im.src = src;
+  return im;
 }
 
-// ===================
-// UI ACTION (simple)
-// ===================
-let actionBtn = null;
-
-function ensureActionBtn(){
-  if (actionBtn) return actionBtn;
-
-  actionBtn = document.createElement("button");
-  actionBtn.id = "btnAction";
-  actionBtn.textContent = "ACTION";
-  actionBtn.style.position = "fixed";
-  actionBtn.style.left = "50%";
-  actionBtn.style.bottom = "110px";
-  actionBtn.style.transform = "translateX(-50%)";
-  actionBtn.style.zIndex = "200";
-  actionBtn.style.padding = "14px 18px";
-  actionBtn.style.borderRadius = "999px";
-  actionBtn.style.border = "0";
-  actionBtn.style.fontWeight = "900";
-  actionBtn.style.display = "none";
-  document.body.appendChild(actionBtn);
-
-  actionBtn.addEventListener("click", () => {
-    const z = getNearbyZone();
-    if (!z) return;
-
-    console.log("ACTION on zone:", z.id);
-    alert(`Zone: ${z.label}`);
-  });
-
-  return actionBtn;
-}
-
-function drawActionUI(){
-  const btn = ensureActionBtn();
-  const z = getNearbyZone();
-
-  if (!z){
-    btn.style.display = "none";
-    return;
-  }
-
-  btn.style.display = "";
-  btn.textContent = z.label;
-  btn.style.background = "linear-gradient(180deg, #48c6ff 0%, #1479ff 100%)";
-  btn.style.color = "#fff";
-}
+const spritePose1 = loadImg("./assets/pose-1.png");
+const marche1 = loadImg("./assets/marche1.png");
+const marche2 = loadImg("./assets/marche2.png");
+const WALK_SEQUENCE = [marche1, marche2, marche1, marche2];
 
 // ===================
-// PLAYER LOCAL
+// PLAYERS STATE
 // ===================
-const player = { x: 220, y: 320, speed: 2.2 };
 let move = { x: 0, y: 0 };
-
 let myUid = null;
 let myName = "";
 let myIsHost = false;
 
-// uid -> state remote
 const playersMap = new Map();
+
+function escapeHTML(s=""){
+  return String(s)
+    .replaceAll("&","&amp;")
+    .replaceAll("<","&lt;")
+    .replaceAll(">","&gt;")
+    .replaceAll('"',"&quot;")
+    .replaceAll("'","&#039;");
+}
+
+function renderPlayers(players){
+  if (!playersEl) return;
+  playersEl.innerHTML = players.map(p => {
+    const crown = p.isHost ? " 👑" : "";
+    return `<div class="player">${escapeHTML(p.name || "Joueur")}${crown}</div>`;
+  }).join("");
+}
 
 function ensurePlayerState(p){
   const prev = playersMap.get(p.uid);
-
   const x = (typeof p.x === "number") ? p.x : undefined;
   const y = (typeof p.y === "number") ? p.y : undefined;
 
@@ -457,17 +383,6 @@ let walking = false;
 let walkTimer = 0;
 let walkIndex = 0;
 
-// ⚠️ supposé existants ailleurs dans ton projet :
-/*
-const SPRITE_SIZE = ...
-const FOOT_OFFSET_Y = ...
-const FOOT_ADJUST = new Map()
-const spritePose1 = new Image()
-const WALK_SEQUENCE = [...]
-const WALK_SWAP_MS = ...
-const SEND_EVERY_MS = ...
-*/
-
 function getLocalSprite(){
   if (!walking) return spritePose1;
   return WALK_SEQUENCE[walkIndex];
@@ -513,9 +428,9 @@ function drawPlayerSprite(px, py, img){
   if (toDraw.complete && toDraw.naturalWidth > 0){
     ctx.drawImage(toDraw, dx, dy, W, H);
   } else {
-    ctx.fillStyle = "red";
+    ctx.fillStyle = "#ff4d4d";
     ctx.beginPath();
-    ctx.arc(px, py, 10, 0, Math.PI*2);
+    ctx.arc(px, py, 16, 0, Math.PI*2);
     ctx.fill();
   }
 }
@@ -563,9 +478,58 @@ function drawNameTag(px, py, name, isHost){
 }
 
 // ===================
+// ACTION UI (simple)
+// ===================
+let actionBtn = null;
+
+function ensureActionBtn(){
+  if (actionBtn) return actionBtn;
+
+  actionBtn = document.createElement("button");
+  actionBtn.id = "btnAction";
+  actionBtn.textContent = "ACTION";
+  actionBtn.style.position = "fixed";
+  actionBtn.style.left = "50%";
+  actionBtn.style.bottom = "110px";
+  actionBtn.style.transform = "translateX(-50%)";
+  actionBtn.style.zIndex = "200";
+  actionBtn.style.padding = "14px 18px";
+  actionBtn.style.borderRadius = "999px";
+  actionBtn.style.border = "0";
+  actionBtn.style.fontWeight = "900";
+  actionBtn.style.display = "none";
+  document.body.appendChild(actionBtn);
+
+  actionBtn.addEventListener("click", () => {
+    const z = getNearbyZone();
+    if (!z) return;
+    alert(`Zone: ${z.label}`);
+  });
+
+  return actionBtn;
+}
+
+function drawActionUI(){
+  const btn = ensureActionBtn();
+  const z = getNearbyZone();
+
+  if (!gameStarted || !z){
+    btn.style.display = "none";
+    return;
+  }
+
+  btn.style.display = "";
+  btn.textContent = z.label;
+  btn.style.background = "linear-gradient(180deg, #48c6ff 0%, #1479ff 100%)";
+  btn.style.color = "#fff";
+}
+
+// ===================
 // UPDATE / DRAW / LOOP
 // ===================
 function update(dt){
+  if (!gameStarted) return;
+
   const dtNorm = Math.min(2, dt / 16.6667);
 
   const nx = player.x + move.x * player.speed * dtNorm;
@@ -585,7 +549,7 @@ function update(dt){
     }
   } else {
     walkTimer = 0;
-    walkIndex = 1;
+    walkIndex = 0;
   }
 
   if (canMoveWorld(nx, ny)){
@@ -608,15 +572,55 @@ function update(dt){
   settleRemoteIdle();
 }
 
+function draw(){
+  ctx.clearRect(0,0,window.innerWidth, window.innerHeight);
+
+  camX += (player.x - camX) * CAM_LERP;
+  camY += (player.y - camY) * CAM_LERP;
+
+  const halfW = (window.innerWidth  / ZOOM) / 2;
+  const halfH = (window.innerHeight / ZOOM) / 2;
+  camX = clamp(camX, halfW, MAP_W - halfW);
+  camY = clamp(camY, halfH, MAP_H - halfH);
+
+  ctx.save();
+  ctx.translate(window.innerWidth/2, window.innerHeight/2);
+  ctx.scale(ZOOM, ZOOM);
+  ctx.translate(-camX, -camY);
+
+  if (mapImg.complete && mapImg.naturalWidth > 0){
+    ctx.drawImage(mapImg, 0, 0, MAP_W, MAP_H);
+  }
+
+  const arr = Array.from(playersMap.values())
+    .map(p => ({
+      ...p,
+      drawX: (p.uid === myUid) ? player.x : (typeof p.x === "number" ? p.x : player.x),
+      drawY: (p.uid === myUid) ? player.y : (typeof p.y === "number" ? p.y : player.y),
+    }))
+    .sort((a,b) => a.drawY - b.drawY);
+
+  for (const p of arr){
+    const sprite = (p.uid === myUid) ? getLocalSprite() : getRemoteSprite(p);
+    drawPlayerSprite(p.drawX, p.drawY, sprite);
+    drawNameTag(p.drawX, p.drawY, p.name, !!p.isHost);
+  }
+
+  ctx.restore();
+
+  drawActionUI();
+}
+
 let lastT = performance.now();
 function loop(t){
   const dt = t - lastT;
   lastT = t;
+
   update(dt);
   draw();
+
   requestAnimationFrame(loop);
 }
-requestAnimationFrame(loop);
 
 // ===================
 // JOYSTICK
@@ -634,6 +638,7 @@ function setStick(dx, dy){
 }
 
 joy?.addEventListener("pointerdown", (e) => {
+  if (!gameStarted) return;
   active = true;
   joy.setPointerCapture?.(e.pointerId);
 
@@ -659,7 +664,7 @@ window.addEventListener("pointercancel", () => {
 });
 
 window.addEventListener("pointermove", (e) => {
-  if (!active) return;
+  if (!active || !gameStarted) return;
 
   let dx = e.clientX - center.x;
   let dy = e.clientY - center.y;
@@ -678,15 +683,6 @@ window.addEventListener("pointermove", (e) => {
 // ===================
 // CHAT
 // ===================
-function escapeHTML(s=""){
-  return String(s)
-    .replaceAll("&","&amp;")
-    .replaceAll("<","&lt;")
-    .replaceAll(">","&gt;")
-    .replaceAll('"',"&quot;")
-    .replaceAll("'","&#039;");
-}
-
 function renderChat(messages){
   if (!chatMessagesEl) return;
   chatMessagesEl.innerHTML = "";
@@ -717,18 +713,17 @@ async function sendChat(text){
 }
 
 // ===================
-// ROLE SPINNER (corrigé: role-open au lieu de chat-open)
+// ROLE SPINNER
 // ===================
 const ROLE_IMG = {
   innocent: "./assets/tinocent.png",
   truant:   "./assets/titruant.png",
 };
 
-let myRole = null;
+let overlayShown = false;
 let spinTimer = null;
 let spinStart = 0;
 let pendingStopRole = null;
-let overlayShown = false;
 
 const SPIN_MS = 70;
 const MIN_SPIN_TOTAL = 1400;
@@ -768,7 +763,6 @@ function startSpinner(){
 
 function stopSpinner(finalRole){
   if (!finalRole) return;
-  myRole = finalRole;
 
   const elapsed = performance.now() - spinStart;
   const wait = Math.max(0, MIN_SPIN_TOTAL - elapsed);
@@ -804,6 +798,14 @@ function computeTruants(count){
   return 1;
 }
 
+function getSpawnPosition(){
+  const baseX = MAP_W * 0.50;
+  const baseY = MAP_H * 0.45;
+  const offsetX = Math.floor(Math.random() * 60) - 30;
+  const offsetY = Math.floor(Math.random() * 60) - 30;
+  return { x: baseX + offsetX, y: baseY + offsetY };
+}
+
 // ===================
 // FIREBASE
 // ===================
@@ -813,7 +815,7 @@ onAuthStateChanged(auth, async (u) => {
 
   myUid = u.uid;
 
-  // ✅ écoute rôle privé
+  // rôle privé
   onSnapshot(doc(db, "rooms", roomId, "privateRoles", myUid), (snap) => {
     if (!snap.exists()) return;
     const data = snap.data();
@@ -823,7 +825,7 @@ onAuthStateChanged(auth, async (u) => {
     stopSpinner(data.role);
   });
 
-  // ✅ chat live
+  // chat live
   if (chatForm && chatInput){
     const q = query(
       collection(db, "rooms", roomId, "messages"),
@@ -835,15 +837,13 @@ onAuthStateChanged(auth, async (u) => {
       const msgs = snap.docs.map(d => d.data());
       renderChat(msgs);
 
-      // ✅ pastille rouge si nouveau msg d'un autre + chat fermé
       if (msgs.length && !chatOverlay?.classList.contains("open")){
         const last = msgs[msgs.length - 1];
         if (last?.uid && last.uid !== myUid){
           chatFab?.classList.add("has-unread");
+          if (chatBadge) chatBadge.hidden = false;
         }
       }
-    }, (err) => {
-      console.log("chat snapshot error:", err);
     });
 
     chatForm.addEventListener("submit", async (e) => {
@@ -866,12 +866,15 @@ onAuthStateChanged(auth, async (u) => {
     const room = snap.data() || {};
     const status = room.status;
 
+    myIsHost = (room.hostUid === myUid);
+    if (btnStart) btnStart.style.display = myIsHost ? "" : "none";
+
+    if (status === "started") setGameMode();
+    else setLobbyMode();
+
     if ((status === "starting" || status === "started") && !overlayShown){
       startSpinner();
     }
-
-    myIsHost = (room.hostUid === myUid);
-    if (btnStart) btnStart.style.display = myIsHost ? "" : "none";
   });
 
   // players
@@ -890,8 +893,6 @@ onAuthStateChanged(auth, async (u) => {
     if (me?.name) myName = me.name;
 
     if (me){
-      ensurePlayerState(me);
-
       if (typeof me.x !== "number" || typeof me.y !== "number"){
         const spawn = getSpawnPosition();
         player.x = spawn.x;
@@ -905,7 +906,12 @@ onAuthStateChanged(auth, async (u) => {
         player.x = me.x;
         player.y = me.y;
       }
+
+      ensurePlayerState({ ...me, x: player.x, y: player.y });
     }
+
+    // ✅ on dessine même en lobby (juste sans bouger)
+    startLoopOnce();
   });
 
   // host start
@@ -955,7 +961,6 @@ onAuthStateChanged(auth, async (u) => {
 
   // leave
   btnLeave?.addEventListener("click", async ()=>{
-    overlayShown = false;
     try{
       await deleteDoc(doc(db,"rooms",roomId,"players",myUid));
 
