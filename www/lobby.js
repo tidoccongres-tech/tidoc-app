@@ -340,7 +340,6 @@ if (walking){
   }
 
   settleRemoteIdle();
-}
 
 function drawPlayerSprite(px, py, img){
   const W = SPRITE_SIZE;
@@ -633,6 +632,79 @@ if (chatForm && chatInput){
 }
   });
 
+const ROLE_IMG = {
+  innocent: "./assets/tinocent.png",
+  truant:   "./assets/titruant.png",
+};
+
+let myRole = null;                 // "innocent" | "truant"
+let spinTimer = null;
+let spinStart = 0;
+let pendingStopRole = null;
+let overlayShown = false;
+
+const SPIN_MS = 70;                // vitesse switch
+const MIN_SPIN_TOTAL = 1400;       // au moins 1.4s de roulette
+
+function openRoleOverlay(){
+  if (!roleOverlay) return;
+  roleOverlay.classList.add("open");
+  roleOverlay.setAttribute("aria-hidden","false");
+  document.body.classList.add("chat-open"); // bloque joystick/canvas events
+}
+
+function closeRoleOverlay(){
+  if (!roleOverlay) return;
+  roleOverlay.classList.remove("open");
+  roleOverlay.setAttribute("aria-hidden","true");
+  document.body.classList.remove("chat-open");
+}
+
+function startSpinner(){
+  if (!roleImg) return;
+  overlayShown = true;
+  openRoleOverlay();
+
+  roleTitle.textContent = "Tirage au sort…";
+  roleSub.textContent   = "Ça tourne…";
+  btnRoleOk.style.display = "none";
+
+  spinStart = performance.now();
+  let toggle = false;
+
+  clearInterval(spinTimer);
+  spinTimer = setInterval(() => {
+    toggle = !toggle;
+    roleImg.src = toggle ? ROLE_IMG.truant : ROLE_IMG.innocent;
+  }, SPIN_MS);
+}
+
+function stopSpinner(finalRole){
+  if (!finalRole) return;
+  myRole = finalRole;
+
+  const elapsed = performance.now() - spinStart;
+  const wait = Math.max(0, MIN_SPIN_TOTAL - elapsed);
+
+  pendingStopRole = finalRole;
+
+  setTimeout(() => {
+    clearInterval(spinTimer);
+    spinTimer = null;
+
+    roleImg.src = ROLE_IMG[pendingStopRole];
+    roleTitle.textContent = pendingStopRole === "truant" ? "TI’TRUANT" : "TI’NOCENT";
+    roleSub.textContent   = "Garde ton rôle secret 🤫";
+
+    btnRoleOk.style.display = "";
+  }, wait);
+}
+
+btnRoleOk?.addEventListener("click", () => {
+  closeRoleOverlay();
+});
+
+  
   btnStart?.addEventListener("click", async ()=>{
     await updateDoc(doc(db,"rooms",roomId), { status:"started", startedAt: serverTimestamp() });
     alert("Partie lancée (status=started)");
