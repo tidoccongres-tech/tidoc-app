@@ -540,24 +540,33 @@ onAuthStateChanged(auth, async (u) => {
 
   myUid = u.uid;
 
-  // ---- CHAT LIVE
+ // ---- CHAT LIVE
 if (chatForm && chatInput){
   const q = query(
     collection(db, "rooms", roomId, "messages"),
-    orderBy("createdAt", "asc"),
-    limit(80)
+    orderBy("createdAtMs", "asc"),
+    limit(120)
   );
 
   onSnapshot(q, (snap) => {
     const msgs = snap.docs.map(d => d.data());
     renderChat(msgs);
+  }, (err) => {
+    console.log("chat snapshot error:", err);
   });
 
   chatForm.addEventListener("submit", async (e) => {
     e.preventDefault();
+
     const val = chatInput.value;
     chatInput.value = "";
-    try { await sendChat(val); } catch (err) { console.log("chat send error:", err); }
+
+    try {
+      await sendChat(val);
+    } catch (err) {
+      console.log("chat send error:", err);
+      alert("Message non envoyé (permissions Firestore ?). Regarde la console.");
+    }
   });
 }
   
