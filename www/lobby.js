@@ -1,10 +1,10 @@
-// lobby.js (MODULE) — Lobby (lobby.png) -> Game (map.png) quand status="started"
+// lobby.js (MODULE) — Lobby (lobby.png + lobby-NB.png) -> Game (map.png + collisions.png) quand status="started"
 
 import * as AuthMod from "./auth.js";
 import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.4/firebase-auth.js";
 import {
-  doc, getDoc, getDocs, updateDoc, onSnapshot, collection, deleteDoc, serverTimestamp,
-  addDoc, query, orderBy, limit, writeBatch
+  doc, getDoc, updateDoc, onSnapshot, collection, deleteDoc, serverTimestamp,
+  addDoc, query, orderBy, limit
 } from "https://www.gstatic.com/firebasejs/10.12.4/firebase-firestore.js";
 
 const auth = AuthMod.auth;
@@ -21,7 +21,7 @@ const playersEl  = document.getElementById("playersList");
 const btnStart   = document.getElementById("btnStart");
 const btnLeave   = document.getElementById("btnLeave");
 
-// ROLE OVERLAY
+// ROLE OVERLAY (pas utilisé ici, mais on garde si tu t'en sers ailleurs)
 const roleOverlay = document.getElementById("roleOverlay");
 const roleImg     = document.getElementById("roleImg");
 const roleTitle   = document.getElementById("roleTitle");
@@ -91,14 +91,8 @@ chatFab?.addEventListener("click", () => {
 });
 
 btnChatClose?.addEventListener("click", closeChat);
-
-chatOverlay?.addEventListener("click", (e) => {
-  if (e.target === chatOverlay) closeChat();
-});
-
-window.addEventListener("keydown", (e) => {
-  if (e.key === "Escape") closeChat();
-});
+chatOverlay?.addEventListener("click", (e) => { if (e.target === chatOverlay) closeChat(); });
+window.addEventListener("keydown", (e) => { if (e.key === "Escape") closeChat(); });
 
 // ===================
 // CANVAS SETUP (DPR SAFE iPhone)
@@ -114,7 +108,7 @@ function resize(){
   canvas.height = Math.floor(window.innerHeight * DPR);
   canvas.style.width = window.innerWidth + "px";
   canvas.style.height = window.innerHeight + "px";
-  ctx.setTransform(DPR, 0, 0, DPR, 0, 0); // coords en px CSS
+  ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
 }
 resize();
 window.addEventListener("resize", resize);
@@ -128,7 +122,6 @@ let loopRunning = false;
 function setLobbyMode(){
   gameStarted = false;
   joy?.classList.remove("is-hidden");
-  if (actionBtn) actionBtn.style.display = "none";
 }
 
 function setGameMode(){
@@ -149,22 +142,32 @@ function startLoopOnce(){
 const lobbyBgImg = new Image();
 lobbyBgImg.src = "./assets/lobby.png";
 
+const lobbyMaskImg = new Image();          // ✅ collisions lobby
+lobbyMaskImg.src = "./assets/lobby-NB.png";
+
 const mapImg = new Image();
 mapImg.src = "./assets/map.png";
 
-const collisionImg = new Image();
+const collisionImg = new Image();          // ✅ collisions map
 collisionImg.src = "./assets/collisions.png";
 
-let collisionData = null;
+// ===================
+// WORLD SIZES
+// ===================
+// On travaille dans un "monde" unique : MAP_W / MAP_H
+// Les collisions lobby (lobby-NB.png) sont mappées vers ce monde.
+// Les collisions game (collisions.png) définissent MAP_W/H si dispo.
 let MAP_W = 1536;
 let MAP_H = 1024;
 
+// map (visuel)
 mapImg.onload = () => {
   MAP_W = mapImg.width || MAP_W;
   MAP_H = mapImg.height || MAP_H;
 };
 
-// collisions = source de taille monde
+// collisions map
+let collisionData = null;
 collisionImg.onload = () => {
   MAP_W = collisionImg.width || MAP_W;
   MAP_H = collisionImg.height || MAP_H;
@@ -179,6 +182,23 @@ collisionImg.onload = () => {
   buildZonesFromCollision();
 };
 
+// collisions lobby
+let lobbyMaskData = null;
+let LOBBY_W = 0;
+let LOBBY_H = 0;
+
+lobbyMaskImg.onload = () => {
+  LOBBY_W = lobbyMaskImg.width;
+  LOBBY_H = lobbyMaskImg.height;
+
+  const tmp = document.createElement("canvas");
+  tmp.width = LOBBY_W;
+  tmp.height = LOBBY_H;
+  const tctx = tmp.getContext("2d");
+  tctx.drawImage(lobbyMaskImg, 0, 0);
+  lobbyMaskData = tctx.getImageData(0, 0, LOBBY_W, LOBBY_H);
+};
+
 // ===================
 // CAMERA + ZOOM (GAME ONLY)
 // ===================
@@ -187,7 +207,7 @@ const CAM_LERP   = 0.12;
 let camX = 0, camY = 0;
 
 // ===================
-// ZONES
+// ZONES (sur collisions.png)
 // ===================
 const ZONE_COLORS = {
   red:     { rgb:[255,0,0],    id:"meeting",   label:"DÉNONCER" },
@@ -258,12 +278,35 @@ function buildZonesFromCollision(){
 }
 
 // ===================
-// PLAYER + COLLISION
+// PLAYER + COLLISIONS
 // ===================
 const player = { x: 220, y: 320, speed: 2.2 };
 let move = { x: 0, y: 0 };
 
-function isWalkableWorld(wx, wy){
+const PLAYER_RADIUS_LOBBY = 20;
+const PLAYER_RADIUS_GAME  = 22;
+
+// ✅ Blanc = walkable (lobby-NB.png)
+function isWalkableLobby(wx, wy){
+  if (!lobbyMaskData || !LOBBY_W || !LOBBY_H) return true;
+
+  // monde (MAP_W/H) -> mask lobby (LOBBY_W/H)
+  const mx = Math.floor(wx * (LOBBY_W / MAP_W));
+  const my = Math.floor(wy * (LOBBY_H / MAP_H));
+
+  if (mx < 0 || my < 0 || mx >= LOBBY_W || my >= LOBBY_H) return false;
+
+  const i = (my * LOBBY_W + mx) * 4;
+  const r = lobbyMaskData.data[i];
+  const g = lobbyMaskData.data[i+1];
+  const b = lobbyMaskData.data[i+2];
+
+  // tolérance blanc
+  return (r > 220 && g > 220 && b > 220);
+}
+
+// ✅ collisions.png : blanc + zones = walkable
+function isWalkableGame(wx, wy){
   if (!collisionData) return true;
 
   const x = Math.floor(wx);
@@ -282,31 +325,38 @@ function isWalkableWorld(wx, wy){
   return false;
 }
 
-const PLAYER_RADIUS = 22;
+function isWalkable(wx, wy){
+  return gameStarted ? isWalkableGame(wx, wy) : isWalkableLobby(wx, wy);
+}
+
 function canMoveWorld(nx, ny){
-  const R = PLAYER_RADIUS;
+  const R = gameStarted ? PLAYER_RADIUS_GAME : PLAYER_RADIUS_LOBBY;
   return (
-    isWalkableWorld(nx, ny) &&
-    isWalkableWorld(nx - R, ny) &&
-    isWalkableWorld(nx + R, ny) &&
-    isWalkableWorld(nx, ny - R) &&
-    isWalkableWorld(nx, ny + R)
+    isWalkable(nx, ny) &&
+    isWalkable(nx - R, ny) &&
+    isWalkable(nx + R, ny) &&
+    isWalkable(nx, ny - R) &&
+    isWalkable(nx, ny + R)
   );
 }
 
-// ✅ Spawn centre “propre” (cherche un point walkable proche du centre)
+// ✅ spawn proche centre selon l'état
 function findSpawnNearCenter(){
   const cx = MAP_W * 0.5;
   const cy = MAP_H * 0.5;
 
-  // si pas de collisionData encore, on spawn direct au centre
-  if (!collisionData) return { x: cx, y: cy };
-
-  // mini recherche en spirale
   const step = 14;
   const maxR = 260;
+
+  // si mask pas prêt -> centre brut
+  if (!isWalkable(cx, cy)) {
+    // si le mask n'est pas prêt, isWalkable renvoie true,
+    // donc ce cas arrive surtout si centre est vraiment bloqué.
+  }
+
+  // spirale
   for (let r = 0; r <= maxR; r += step){
-    for (let a = 0; a < Math.PI * 2; a += Math.PI / 8){
+    for (let a = 0; a < Math.PI * 2; a += Math.PI / 10){
       const x = cx + Math.cos(a) * r;
       const y = cy + Math.sin(a) * r;
       if (canMoveWorld(x, y)) return { x, y };
@@ -318,7 +368,9 @@ function findSpawnNearCenter(){
 // ===================
 // SPRITES
 // ===================
-const SPRITE_SIZE = 96;
+const SPRITE_SIZE_GAME  = 96;
+const SPRITE_SIZE_LOBBY = 112; // ✅ perso un peu plus grand dans le lobby
+
 const FOOT_OFFSET_Y = 16;
 const FOOT_ADJUST = new Map();
 
@@ -433,8 +485,9 @@ async function sendMyPosition(){
 // DRAW HELPERS
 // ===================
 function drawPlayerSprite(px, py, img){
-  const W = SPRITE_SIZE;
-  const H = SPRITE_SIZE;
+  const size = gameStarted ? SPRITE_SIZE_GAME : SPRITE_SIZE_LOBBY;
+  const W = size;
+  const H = size;
 
   const toDraw = (img && img.complete && img.naturalWidth > 0) ? img : spritePose1;
   const foot = FOOT_ADJUST.get(toDraw) ?? FOOT_OFFSET_Y;
@@ -468,7 +521,9 @@ function roundRectPath(ctx, x, y, w, h, r){
 function drawNameTag(px, py, name, isHost){
   if (!name) return;
   const text = isHost ? `${name} 👑` : name;
-  const y = Math.round(py - SPRITE_SIZE - 14);
+
+  const size = gameStarted ? SPRITE_SIZE_GAME : SPRITE_SIZE_LOBBY;
+  const y = Math.round(py - size - 14);
 
   ctx.save();
   ctx.font = "800 14px system-ui, -apple-system, Segoe UI, Roboto, sans-serif";
@@ -520,12 +575,19 @@ function update(dt){
     walkIndex = 0;
   }
 
-  // ✅ mouvement local + envoi position
-  if (canMoveWorld(nx, ny)){
+  // ✅ déplacement "slide" : X puis Y (évite stop/go sur les murs)
+  let moved = false;
+
+  if (canMoveWorld(nx, player.y)){
     player.x = nx;
-    player.y = ny;
-    if (walking || wasWalking) sendMyPosition();
+    moved = true;
   }
+  if (canMoveWorld(player.x, ny)){
+    player.y = ny;
+    moved = true;
+  }
+
+  if (moved && (walking || wasWalking)) sendMyPosition();
 
   // anim remote
   for (const [uid, p] of playersMap){
@@ -547,7 +609,7 @@ function draw(){
   ctx.clearRect(0,0,window.innerWidth, window.innerHeight);
 
   // =========================
-  // LOBBY: cover non déformé + joueurs
+  // LOBBY: lobby.png cover non déformé + joueurs (coords monde -> image)
   // =========================
   if (!gameStarted){
     const bg = (lobbyBgImg.complete && lobbyBgImg.naturalWidth > 0) ? lobbyBgImg : mapImg;
@@ -566,7 +628,7 @@ function draw(){
 
     ctx.drawImage(bg, 0, 0, bw, bh);
 
-    // mapping monde -> image lobby si tailles diff
+    // monde -> image lobby (si sizes diff)
     const scaleX = bw / MAP_W;
     const scaleY = bh / MAP_H;
 
@@ -592,7 +654,7 @@ function draw(){
   }
 
   // =========================
-  // GAME: caméra + zoom
+  // GAME: caméra + zoom (map.png)
   // =========================
   camX += (player.x - camX) * CAM_LERP;
   camY += (player.y - camY) * CAM_LERP;
@@ -699,16 +761,14 @@ joy?.addEventListener("pointerup", (e) => {
   if (pointerId !== null && e.pointerId !== pointerId) return;
   endJoystick();
 });
-
 joy?.addEventListener("pointercancel", (e) => {
   if (pointerId !== null && e.pointerId !== pointerId) return;
   endJoystick();
 });
-
 window.addEventListener("blur", endJoystick);
 
 // ===================
-// CHAT LIVE (stable + pas de reload)
+// CHAT LIVE
 // ===================
 function renderChat(messages){
   if (!chatMessagesEl) return;
@@ -743,7 +803,7 @@ async function sendChat(text){
 // FIREBASE
 // ===================
 let lastStatus = null;
-let localPosReady = false;     // ✅ on ne prend x/y depuis Firestore qu'une fois
+let localPosReady = false;
 let spawning = false;
 
 async function ensureSpawnCenter(){
@@ -788,14 +848,15 @@ onAuthStateChanged(auth, async (u) => {
     myIsHost = (room.hostUid === myUid);
     if (btnStart) btnStart.style.display = myIsHost ? "" : "none";
 
-    // transition
+    const prev = lastStatus;
+
     if (status === "started") setGameMode();
     else setLobbyMode();
 
-    // ✅ si on vient d'arriver en lobby : spawn centre (option)
-    // (Si tu veux uniquement au premier join, commente ce bloc)
-    if (lastStatus !== null && lastStatus === "started" && status !== "started"){
-      // retour lobby -> recentrer
+    // ✅ transitions -> respawn propre
+    // lobby join / retour lobby / passage en game : on recentre
+    if (prev !== status){
+      // sur le tout premier snapshot, prev = null => on va spawn
       ensureSpawnCenter();
     }
 
@@ -817,21 +878,18 @@ onAuthStateChanged(auth, async (u) => {
     const me = players.find(p => p.uid === myUid);
     if (me?.name) myName = me.name;
 
-    // ✅ IMPORTANT: on ne ré-écrase plus player.x/y à chaque snapshot
     if (me){
-      // 1) init position UNE SEULE FOIS
+      // ✅ init position UNE seule fois, sinon la position locale est autoritaire
       if (!localPosReady){
         if (typeof me.x === "number" && typeof me.y === "number"){
           player.x = me.x;
           player.y = me.y;
         } else {
-          // pas de coords -> spawn centre lobby
           await ensureSpawnCenter();
         }
         localPosReady = true;
       }
 
-      // 2) on garde la state locale autoritaire et on alimente le rendu
       ensurePlayerState({ ...me, x: player.x, y: player.y });
     }
 
