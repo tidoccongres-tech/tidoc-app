@@ -21,11 +21,12 @@ const playersEl  = document.getElementById("playersList");
 const btnStart   = document.getElementById("btnStart");
 const btnLeave   = document.getElementById("btnLeave");
 
-// ✅ message start (ajoute <div id="startInfo"></div> dans ton HTML si tu veux l’afficher)
+// ✅ message start (si <div id="startInfo"></div> n'existe pas -> fallback alert + console)
 const startInfo = document.getElementById("startInfo");
 function setStartInfo(msg){
-  if (!startInfo) return;
-  startInfo.textContent = msg || "";
+  console.log("[START INFO]", msg || "");
+  if (startInfo) startInfo.textContent = msg || "";
+  else if (msg) alert(msg);
 }
 
 // ROLE OVERLAY (pas utilisé ici, mais on garde si tu t'en sers ailleurs)
@@ -286,7 +287,7 @@ function buildZonesFromCollision(){
 const player = { x: 220, y: 320, speed: 2.2 };
 let move = { x: 0, y: 0 };
 
-const PLAYER_RADIUS_LOBBY = 22; // ✅ un peu plus "gros" dans le lobby
+const PLAYER_RADIUS_LOBBY = 22; // ✅ un peu plus large dans le lobby
 const PLAYER_RADIUS_GAME  = 22;
 
 // ✅ Blanc = walkable (lobby-NB.png)
@@ -363,7 +364,7 @@ function findSpawnNearCenter(){
 // SPRITES
 // ===================
 const SPRITE_SIZE_GAME  = 96;
-const SPRITE_SIZE_LOBBY = 124; // ✅ agrandi un peu (112 -> 124)
+const SPRITE_SIZE_LOBBY = 124; // ✅ un peu plus grand dans le lobby
 
 const FOOT_OFFSET_Y = 16;
 const FOOT_ADJUST = new Map();
@@ -381,7 +382,7 @@ const spritePose1 = loadImg("./assets/pose-1.png");
 const marche1     = loadImg("./assets/marche1.png");
 const marche2     = loadImg("./assets/marche2.png");
 
-// ✅ ta séquence avec pose-1 au milieu
+// ✅ séquence demandée (pose-1 au milieu)
 const WALK_SEQUENCE = [marche1, spritePose1, marche1, marche2, spritePose1, marche2];
 
 // ===================
@@ -605,7 +606,7 @@ function draw(){
   ctx.clearRect(0,0,window.innerWidth, window.innerHeight);
 
   // =========================
-  // LOBBY: lobby.png cover non déformé + joueurs (coords monde -> image)
+  // LOBBY: lobby.png cover non déformé + joueurs
   // =========================
   if (!gameStarted){
     const bg = (lobbyBgImg.complete && lobbyBgImg.naturalWidth > 0) ? lobbyBgImg : mapImg;
@@ -624,6 +625,7 @@ function draw(){
 
     ctx.drawImage(bg, 0, 0, bw, bh);
 
+    // monde -> image lobby
     const scaleX = bw / MAP_W;
     const scaleY = bh / MAP_H;
 
@@ -649,7 +651,7 @@ function draw(){
   }
 
   // =========================
-  // GAME: caméra + zoom (map.png)
+  // GAME: caméra + zoom
   // =========================
   camX += (player.x - camX) * CAM_LERP;
   camY += (player.y - camY) * CAM_LERP;
@@ -830,13 +832,19 @@ onAuthStateChanged(auth, async (u) => {
   myUid = u.uid;
 
   // ✅ START button: règle 4 joueurs + update room.status
-  btnStart?.addEventListener("click", async () => {
-    if (!myIsHost) return;
+  // (on le met ici pour être sûr que myUid/myIsHost sont définis)
+  btnStart?.addEventListener("click", async (e) => {
+    e.preventDefault();
+
+    console.log("CLICK START", { myIsHost, players: playersMap.size, roomId });
+
+    if (!myIsHost){
+      setStartInfo("Seul l’hôte peut démarrer.");
+      return;
+    }
 
     const n = playersMap.size;
     if (n < 4){
-      // si tu préfères un alert:
-      // alert(`Il faut au moins 4 joueurs (actuellement ${n}).`);
       setStartInfo(`Il faut au moins 4 joueurs pour démarrer (actuellement ${n}).`);
       return;
     }
@@ -848,9 +856,10 @@ onAuthStateChanged(auth, async (u) => {
         status: "started",
         startedAt: serverTimestamp()
       });
-    } catch (e){
-      console.log("start error:", e);
-      setStartInfo("Impossible de démarrer. Réessaie.");
+      console.log("ROOM STARTED OK");
+    } catch (err){
+      console.log("START ERROR:", err);
+      setStartInfo(`Erreur démarrage: ${err?.code || ""} ${err?.message || err}`);
     }
   });
 
@@ -885,7 +894,7 @@ onAuthStateChanged(auth, async (u) => {
     const players = snap.docs.map(d=>d.data());
     renderPlayers(players);
 
-    // clear start message when enough players
+    // ✅ clear message when enough players
     if (myIsHost && players.length >= 4) setStartInfo("");
 
     for (const p of players) ensurePlayerState(p);
