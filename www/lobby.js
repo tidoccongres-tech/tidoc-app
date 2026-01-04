@@ -1,4 +1,5 @@
-// lobby.js (MODULE) — Lobby (lobby.png + lobby-NB.png) -> Game (map.png + collisions.png) quand status="started"
+// lobby.js (MODULE) — Lobby (lobby.png + lobby-NB.png) -> Game (map.png + collisions.png)
+// Phase: lobby -> starting (overlay rôle) -> started (map)
 
 import * as AuthMod from "./auth.js";
 import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.4/firebase-auth.js";
@@ -21,7 +22,7 @@ const playersEl  = document.getElementById("playersList");
 const btnStart   = document.getElementById("btnStart");
 const btnLeave   = document.getElementById("btnLeave");
 
-// ✅ message start (si <div id="startInfo"></div> n'existe pas -> fallback alert + console)
+// message start
 const startInfo = document.getElementById("startInfo");
 function setStartInfo(msg){
   console.log("[START INFO]", msg || "");
@@ -29,7 +30,7 @@ function setStartInfo(msg){
   else if (msg) alert(msg);
 }
 
-// ROLE OVERLAY (pas utilisé ici, mais on garde si tu t'en sers ailleurs)
+// ROLE OVERLAY
 const roleOverlay = document.getElementById("roleOverlay");
 const roleImg     = document.getElementById("roleImg");
 const roleTitle   = document.getElementById("roleTitle");
@@ -97,7 +98,6 @@ chatFab?.addEventListener("click", () => {
   if (chatOverlay.classList.contains("open")) closeChat();
   else openChat();
 });
-
 btnChatClose?.addEventListener("click", closeChat);
 chatOverlay?.addEventListener("click", (e) => { if (e.target === chatOverlay) closeChat(); });
 window.addEventListener("keydown", (e) => { if (e.key === "Escape") closeChat(); });
@@ -107,7 +107,6 @@ window.addEventListener("keydown", (e) => { if (e.key === "Escape") closeChat();
 // ===================
 const canvas = document.getElementById("gameCanvas");
 const ctx = canvas.getContext("2d");
-
 let DPR = window.devicePixelRatio || 1;
 
 function resize(){
@@ -124,16 +123,24 @@ window.addEventListener("resize", resize);
 // ===================
 // GAME STATE
 // ===================
-let gameStarted = false;
+let gameStarted = false;       // rendu map + collisions map
 let loopRunning = false;
+let phase = "lobby";           // "lobby" | "starting" | "started"
+let lastRoomStatus = null;
 
 function setLobbyMode(){
   gameStarted = false;
+  phase = "lobby";
   joy?.classList.remove("is-hidden");
 }
-
+function setStartingMode(){
+  gameStarted = false;         // on reste sur lobby visuel pendant overlay
+  phase = "starting";
+  joy?.classList.add("is-hidden"); // option: pas bouger pendant tirage
+}
 function setGameMode(){
   gameStarted = true;
+  phase = "started";
   joy?.classList.remove("is-hidden");
 }
 
@@ -150,13 +157,13 @@ function startLoopOnce(){
 const lobbyBgImg = new Image();
 lobbyBgImg.src = "./assets/lobby.png";
 
-const lobbyMaskImg = new Image();          // ✅ collisions lobby
+const lobbyMaskImg = new Image(); // collisions lobby
 lobbyMaskImg.src = "./assets/lobby-NB.png";
 
 const mapImg = new Image();
 mapImg.src = "./assets/map.png";
 
-const collisionImg = new Image();          // ✅ collisions map
+const collisionImg = new Image(); // collisions map
 collisionImg.src = "./assets/collisions.png";
 
 // ===================
@@ -230,12 +237,12 @@ function colorDist(r,g,b, tr,tg,tb){
   const dr = r-tr, dg=g-tg, db=b-tb;
   return Math.sqrt(dr*dr + dg*dg + db*db);
 }
-function isZoneColor(r,g,b){
+function zoneKeyFromColor(r,g,b){
   for (const k of Object.keys(ZONE_COLORS)){
     const [tr,tg,tb] = ZONE_COLORS[k].rgb;
-    if (colorDist(r,g,b,tr,tg,tb) < COLOR_TOL) return true;
+    if (colorDist(r,g,b,tr,tg,tb) < COLOR_TOL) return k;
   }
-  return false;
+  return null;
 }
 
 function buildZonesFromCollision(){
@@ -256,14 +263,11 @@ function buildZonesFromCollision(){
 
       if (r > 220 && g > 220 && b > 220) continue;
 
-      for (const k of Object.keys(ZONE_COLORS)){
-        const [tr,tg,tb] = ZONE_COLORS[k].rgb;
-        if (colorDist(r,g,b,tr,tg,tb) < COLOR_TOL){
-          sums[k].x += x;
-          sums[k].y += y;
-          counts[k] += 1;
-          break;
-        }
+      const k = zoneKeyFromColor(r,g,b);
+      if (k){
+        sums[k].x += x;
+        sums[k].y += y;
+        counts[k] += 1;
       }
     }
   }
@@ -287,10 +291,10 @@ function buildZonesFromCollision(){
 const player = { x: 220, y: 320, speed: 2.2 };
 let move = { x: 0, y: 0 };
 
-const PLAYER_RADIUS_LOBBY = 22; // ✅ un peu plus large dans le lobby
+const PLAYER_RADIUS_LOBBY = 22;
 const PLAYER_RADIUS_GAME  = 22;
 
-// ✅ Blanc = walkable (lobby-NB.png)
+// Blanc = walkable (lobby-NB.png)
 function isWalkableLobby(wx, wy){
   if (!lobbyMaskData || !LOBBY_W || !LOBBY_H) return true;
 
@@ -307,7 +311,7 @@ function isWalkableLobby(wx, wy){
   return (r > 220 && g > 220 && b > 220);
 }
 
-// ✅ collisions.png : blanc + zones = walkable
+// collisions.png : blanc = walkable, COULEURS = OBSTACLES (✅ demandé)
 function isWalkableGame(wx, wy){
   if (!collisionData) return true;
 
@@ -322,8 +326,12 @@ function isWalkableGame(wx, wy){
 
   const isWhite = (r > 220 && g > 220 && b > 220);
   if (isWhite) return true;
-  if (isZoneColor(r,g,b)) return true;
 
+  // ✅ zone color = obstacle
+  const k = zoneKeyFromColor(r,g,b);
+  if (k) return false;
+
+  // tout le reste = mur
   return false;
 }
 
@@ -342,7 +350,6 @@ function canMoveWorld(nx, ny){
   );
 }
 
-// ✅ spawn proche centre selon l'état
 function findSpawnNearCenter(){
   const cx = MAP_W * 0.5;
   const cy = MAP_H * 0.5;
@@ -364,13 +371,12 @@ function findSpawnNearCenter(){
 // SPRITES
 // ===================
 const SPRITE_SIZE_GAME  = 96;
-const SPRITE_SIZE_LOBBY = 124; // ✅ un peu plus grand dans le lobby
+const SPRITE_SIZE_LOBBY = 124;
 
 const FOOT_OFFSET_Y = 16;
 const FOOT_ADJUST = new Map();
 
 const SEND_EVERY_MS = 90;
-const WALK_SWAP_MS  = 120;
 
 function loadImg(src){
   const im = new Image();
@@ -382,8 +388,22 @@ const spritePose1 = loadImg("./assets/pose-1.png");
 const marche1     = loadImg("./assets/marche1.png");
 const marche2     = loadImg("./assets/marche2.png");
 
-// ✅ séquence demandée (pose-1 au milieu)
+// ✅ séquence demandée
 const WALK_SEQUENCE = [marche1, spritePose1, marche1, marche2, spritePose1, marche2];
+
+// local walk anim
+let walking = false;
+let walkTimer = 0;
+let walkIndex = 0;
+
+function getLocalSprite(){
+  if (!walking) return spritePose1;
+  return WALK_SEQUENCE[walkIndex];
+}
+function getRemoteSprite(p){
+  if (!p.moving) return spritePose1;
+  return WALK_SEQUENCE[p.walkIndex % WALK_SEQUENCE.length];
+}
 
 // ===================
 // PLAYERS STATE
@@ -445,20 +465,6 @@ function settleRemoteIdle(){
   }
 }
 
-// local walk anim
-let walking = false;
-let walkTimer = 0;
-let walkIndex = 0;
-
-function getLocalSprite(){
-  if (!walking) return spritePose1;
-  return WALK_SEQUENCE[walkIndex];
-}
-function getRemoteSprite(p){
-  if (!p.moving) return spritePose1;
-  return WALK_SEQUENCE[p.walkIndex % WALK_SEQUENCE.length];
-}
-
 let lastSend = 0;
 async function sendMyPosition(){
   if (!myUid || !roomId) return;
@@ -479,12 +485,86 @@ async function sendMyPosition(){
 }
 
 // ===================
+// ROLE OVERLAY FLOW
+// ===================
+let myRole = null;
+let roleSeen = false;
+
+function showRoleOverlaySpinning(){
+  if (!roleOverlay) return;
+  roleSeen = false;
+  roleOverlay.classList.add("open");
+  roleOverlay.setAttribute("aria-hidden","false");
+  if (btnRoleOk) btnRoleOk.style.display = "none";
+  if (roleTitle) roleTitle.textContent = "Tirage au sort…";
+  if (roleSub) roleSub.textContent = "Ça tourne…";
+  if (roleImg) roleImg.src = "./assets/tinocent.png";
+}
+
+function showRoleResult(role){
+  if (!roleOverlay) return;
+
+  const isTruant = (role === "titruant" || role === "truant" || role === true);
+
+  if (roleTitle) roleTitle.textContent = "Ton rôle";
+  if (roleSub) roleSub.textContent = isTruant ? "Tu es Ti’Truant 😈" : "Tu es Ti’Nocent 😇";
+  if (roleImg) roleImg.src = isTruant ? "./assets/titruant.png" : "./assets/tinocent.png";
+
+  if (btnRoleOk){
+    btnRoleOk.style.display = "";
+    btnRoleOk.onclick = async () => {
+      roleSeen = true;
+      roleOverlay.classList.remove("open");
+      roleOverlay.setAttribute("aria-hidden","true");
+
+      // une fois que chacun a vu, on passe en started (l’hôte peut le faire)
+      if (myIsHost){
+        try{
+          await updateDoc(doc(db,"rooms",roomId), {
+            status: "started",
+            startedAt: serverTimestamp()
+          });
+        } catch(e){
+          console.log("final start error:", e);
+          setStartInfo("Erreur: impossible de lancer la partie.");
+        }
+      }
+    };
+  }
+}
+
+async function waitMyPrivateRoleThenShow(){
+  // on affiche l'overlay "spinning"
+  showRoleOverlaySpinning();
+
+  // on lit le doc privateRoles/myUid (créé par l’hôte au tirage)
+  const ref = doc(db, "rooms", roomId, "privateRoles", myUid);
+
+  // écoute jusqu’à ce qu’on ait le role
+  const unsub = onSnapshot(ref, (snap) => {
+    if (!snap.exists()) return;
+
+    const data = snap.data() || {};
+    const role = data.role ?? data.type ?? data.name ?? data.isTruant;
+
+    if (role == null) return;
+
+    myRole = role;
+    showRoleResult(role);
+    unsub();
+  }, (err) => {
+    console.log("privateRoles snapshot error:", err);
+    setStartInfo("Erreur rôle. Réessaie.");
+    try { unsub(); } catch {}
+  });
+}
+
+// ===================
 // DRAW HELPERS
 // ===================
 function drawPlayerSprite(px, py, img){
   const size = gameStarted ? SPRITE_SIZE_GAME : SPRITE_SIZE_LOBBY;
-  const W = size;
-  const H = size;
+  const W = size, H = size;
 
   const toDraw = (img && img.complete && img.naturalWidth > 0) ? img : spritePose1;
   const foot = FOOT_ADJUST.get(toDraw) ?? FOOT_OFFSET_Y;
@@ -550,6 +630,11 @@ function drawNameTag(px, py, name, isHost){
 // UPDATE / DRAW / LOOP
 // ===================
 function update(dt){
+  if (phase === "starting") {
+    // on bloque le mouvement pendant l'overlay si tu veux
+    move.x = 0; move.y = 0;
+  }
+
   const dtNorm = Math.min(2, dt / 16.6667);
 
   const nx = player.x + move.x * player.speed * dtNorm;
@@ -558,6 +643,7 @@ function update(dt){
   const wasWalking = walking;
   walking = (Math.abs(move.x) + Math.abs(move.y)) > 0.15;
 
+  // anim local
   const speed01 = Math.min(1, (Math.abs(move.x) + Math.abs(move.y)) / 1.4);
   const swapMs  = 140 - speed01 * 70;
 
@@ -572,27 +658,24 @@ function update(dt){
     walkIndex = 0;
   }
 
-  // ✅ déplacement "slide" : X puis Y
+  // déplacement slide
   let moved = false;
-
   if (canMoveWorld(nx, player.y)){
-    player.x = nx;
-    moved = true;
+    player.x = nx; moved = true;
   }
   if (canMoveWorld(player.x, ny)){
-    player.y = ny;
-    moved = true;
+    player.y = ny; moved = true;
   }
 
   if (moved && (walking || wasWalking)) sendMyPosition();
 
-  // anim remote
+  // anim remote (simple)
   for (const [uid, p] of playersMap){
     if (uid === myUid) continue;
     if (!p.moving) continue;
 
     p.walkTimer += dt;
-    if (p.walkTimer > WALK_SWAP_MS){
+    if (p.walkTimer > 120){
       p.walkTimer = 0;
       p.walkIndex = (p.walkIndex + 1) % WALK_SEQUENCE.length;
     }
@@ -605,9 +688,7 @@ function draw(){
   ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
   ctx.clearRect(0,0,window.innerWidth, window.innerHeight);
 
-  // =========================
-  // LOBBY: lobby.png cover non déformé + joueurs
-  // =========================
+  // LOBBY VISUEL (lobby.png) tant qu'on n'est pas started
   if (!gameStarted){
     const bg = (lobbyBgImg.complete && lobbyBgImg.naturalWidth > 0) ? lobbyBgImg : mapImg;
     if (!(bg.complete && bg.naturalWidth > 0)) return;
@@ -625,7 +706,6 @@ function draw(){
 
     ctx.drawImage(bg, 0, 0, bw, bh);
 
-    // monde -> image lobby
     const scaleX = bw / MAP_W;
     const scaleY = bh / MAP_H;
 
@@ -650,9 +730,7 @@ function draw(){
     return;
   }
 
-  // =========================
-  // GAME: caméra + zoom
-  // =========================
+  // GAME: map + camera
   camX += (player.x - camX) * CAM_LERP;
   camY += (player.y - camY) * CAM_LERP;
 
@@ -697,7 +775,7 @@ function loop(t){
 }
 
 // ===================
-// JOYSTICK (actif lobby + game)
+// JOYSTICK
 // ===================
 const joy = document.getElementById("joystick");
 const stick = joy?.querySelector(".stick");
@@ -722,6 +800,7 @@ function endJoystick(){
 
 joy?.addEventListener("pointerdown", (e) => {
   if (!joy) return;
+  if (phase === "starting") return;
 
   active = true;
   pointerId = e.pointerId;
@@ -799,7 +878,6 @@ async function sendChat(text){
 // ===================
 // FIREBASE
 // ===================
-let lastStatus = null;
 let localPosReady = false;
 let spawning = false;
 
@@ -831,12 +909,9 @@ onAuthStateChanged(auth, async (u) => {
 
   myUid = u.uid;
 
-  // ✅ START button: règle 4 joueurs + update room.status
-  // (on le met ici pour être sûr que myUid/myIsHost sont définis)
+  // ✅ START button: passe en "starting" (pas started direct)
   btnStart?.addEventListener("click", async (e) => {
     e.preventDefault();
-
-    console.log("CLICK START", { myIsHost, players: playersMap.size, roomId });
 
     if (!myIsHost){
       setStartInfo("Seul l’hôte peut démarrer.");
@@ -852,11 +927,12 @@ onAuthStateChanged(auth, async (u) => {
     setStartInfo("");
 
     try{
+      // 1) on demande la phase "starting"
+      // 2) ton backend/host logic doit générer les privateRoles quand status="starting"
       await updateDoc(doc(db, "rooms", roomId), {
-        status: "started",
-        startedAt: serverTimestamp()
+        status: "starting",
+        startingAt: serverTimestamp()
       });
-      console.log("ROOM STARTED OK");
     } catch (err){
       console.log("START ERROR:", err);
       setStartInfo(`Erreur démarrage: ${err?.code || ""} ${err?.message || err}`);
@@ -877,16 +953,24 @@ onAuthStateChanged(auth, async (u) => {
     myIsHost = (room.hostUid === myUid);
     if (btnStart) btnStart.style.display = myIsHost ? "" : "none";
 
-    const prev = lastStatus;
+    // transitions
+    if (status === "starting"){
+      if (lastRoomStatus !== "starting"){
+        setStartingMode();
+        // chaque joueur lance son overlay et attend son privateRole
+        waitMyPrivateRoleThenShow();
+      }
+    } else if (status === "started"){
+      setGameMode();
+    } else {
+      setLobbyMode();
+    }
 
-    if (status === "started") setGameMode();
-    else setLobbyMode();
-
-    if (prev !== status){
+    if (lastRoomStatus !== status){
       ensureSpawnCenter();
     }
 
-    lastStatus = status;
+    lastRoomStatus = status;
   });
 
   // players
@@ -894,7 +978,6 @@ onAuthStateChanged(auth, async (u) => {
     const players = snap.docs.map(d=>d.data());
     renderPlayers(players);
 
-    // ✅ clear message when enough players
     if (myIsHost && players.length >= 4) setStartInfo("");
 
     for (const p of players) ensurePlayerState(p);
@@ -917,7 +1000,6 @@ onAuthStateChanged(auth, async (u) => {
         }
         localPosReady = true;
       }
-
       ensurePlayerState({ ...me, x: player.x, y: player.y });
     }
 
