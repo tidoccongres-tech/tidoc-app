@@ -15,13 +15,16 @@
     <div class="ui">
       <div class="code">Code : <span id="roomCode">----</span></div>
       <div class="players" id="playersList"></div>
+
+      <!-- ✅ Message sous "Démarrer" -->
+      <div id="startInfo" class="start-info" aria-live="polite"></div>
+
       <button id="btnStart" class="btn-start" type="button">Démarrer</button>
       <button id="btnLeave" class="btn-leave" type="button">Quitter</button>
     </div>
 
     <!-- ✅ Bouton chat -->
     <button id="btnChatToggle" class="chat-fab" type="button" aria-label="Ouvrir le chat">
-      <!-- ✅ Pastille rouge (pilotée par .chat-fab.has-unread) -->
       <span class="badge" id="chatBadge" aria-hidden="true"></span>
 
       <svg width="26" height="26" viewBox="0 0 24 24" fill="none"
