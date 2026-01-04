@@ -4,12 +4,17 @@
 // + Vignette (noir autour) sur MAP uniquement
 // + HUD rôle en haut à droite
 // + Chat: lobby = toujours / map = seulement si room.chatEnabled === true
+// + ✅ Expulser (Ti’Truant) + cooldown 60s
+// + ✅ Joueur expulsé = ne bouge plus + sprite pleur.png
+// + ✅ Rapporter (près d’un joueur expulsé)
+// + ✅ Bouton activité (Ti’Nocent) selon zones (rouge = dénoncer)
+// + ✅ Personnages visibles uniquement dans le champ de vision (map visible partout)
 
 import * as AuthMod from "./auth.js";
 import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.4/firebase-auth.js";
 import {
   doc, getDoc, updateDoc, onSnapshot, collection, deleteDoc, serverTimestamp,
-  addDoc, query, orderBy, limit, getDocs
+  addDoc, query, orderBy, limit, getDocs, setDoc
 } from "https://www.gstatic.com/firebasejs/10.12.4/firebase-firestore.js";
 
 const auth = AuthMod.auth;
@@ -115,6 +120,75 @@ function shuffleInPlace(arr){
   return arr;
 }
 
+function dist(a,b,c,d){ return Math.hypot(a-c, b-d); }
+
+// ===================
+// ACTION UI (Expulser / Rapporter / Activité)
+// ===================
+const actionWrap = document.createElement("div");
+actionWrap.id = "actionWrap";
+actionWrap.style.cssText = `
+  position: fixed;
+  left: 50%;
+  bottom: calc(18px + env(safe-area-inset-bottom));
+  transform: translateX(-50%);
+  z-index: 60;
+  display: none;
+  gap: 10px;
+  align-items: center;
+  justify-content: center;
+  pointer-events: auto;
+`;
+document.body.appendChild(actionWrap);
+
+const actionBtn = document.createElement("button");
+actionBtn.id = "actionBtn";
+actionBtn.type = "button";
+actionBtn.style.cssText = `
+  appearance: none;
+  border: 0;
+  padding: 14px 18px;
+  border-radius: 16px;
+  font: 900 14px system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+  letter-spacing: .2px;
+  color: #fff;
+  background: rgba(0,0,0,.55);
+  border: 1px solid rgba(255,255,255,.14);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  box-shadow: 0 8px 22px rgba(0,0,0,.22);
+`;
+actionWrap.appendChild(actionBtn);
+
+const actionHint = document.createElement("div");
+actionHint.id = "actionHint";
+actionHint.style.cssText = `
+  padding: 10px 12px;
+  border-radius: 14px;
+  font: 700 12px system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+  color: rgba(255,255,255,.9);
+  background: rgba(0,0,0,.35);
+  border: 1px solid rgba(255,255,255,.10);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  display: none;
+`;
+actionWrap.appendChild(actionHint);
+
+function setActionUI({ show=false, label="", disabled=false, hint="" }){
+  actionWrap.style.display = show ? "flex" : "none";
+  actionBtn.textContent = label || "";
+  actionBtn.disabled = !!disabled;
+  actionBtn.style.opacity = disabled ? "0.65" : "1";
+  actionHint.style.display = hint ? "" : "none";
+  actionHint.textContent = hint || "";
+}
+
+const EXPULSE_RANGE = 78;
+const REPORT_RANGE  = 86;
+const ZONE_RANGE    = 92;
+const EXPEL_COOLDOWN_MS = 60_000;
+
 // ===================
 // CHAT OPEN/CLOSE + GATING
 // ===================
@@ -144,10 +218,9 @@ chatFab?.addEventListener("click", () => {
   if (!chatOverlay) return;
 
   if (!chatAllowedNow){
-    // pas d'ouverture, et pas de badge
     chatFab.classList.remove("has-unread");
     if (chatBadge) chatBadge.hidden = true;
-    openChat(); // affichera le message via setStartInfo
+    openChat();
     return;
   }
 
@@ -195,22 +268,21 @@ function setLobbyMode(){
   phase = "lobby";
   joy?.classList.remove("is-hidden");
   chatAllowedNow = true; // lobby toujours
+  setActionUI({ show:false });
 }
 function setStartingMode(){
   gameStarted = false;
   phase = "starting";
   joy?.classList.add("is-hidden");
-  chatAllowedNow = true; // tu peux discuter pendant le tirage si tu veux (sinon mets false)
+  chatAllowedNow = true;
+  setActionUI({ show:false });
 }
 function setGameMode(){
   gameStarted = true;
   phase = "started";
   joy?.classList.remove("is-hidden");
 
-  // map: chat seulement si roomChatEnabled
   chatAllowedNow = !!roomChatEnabled;
-
-  // si le chat est ouvert mais plus autorisé, on ferme
   if (!chatAllowedNow && chatOverlay?.classList.contains("open")) closeChat();
 }
 
@@ -239,6 +311,10 @@ collisionImg.src = "./assets/collisions.png";
 // rôle images
 const tinocentImgSrc = "./assets/tinocent.png";
 const titruantImgSrc = "./assets/titruant.png";
+
+// expulsé sprite (⚠️ ton fichier = pleur.png)
+const pleurImg = new Image();
+pleurImg.src = "./assets/pleure.png";
 
 // ===================
 // WORLD SIZES
@@ -291,12 +367,19 @@ const ZOOM_GAME  = 1.7;
 const CAM_LERP   = 0.12;
 let camX = 0, camY = 0;
 
+// champ de vision (monde)
+function getVisionRadiusWorld(){
+  // ~ cercle qui couvre une partie de l’écran, converti en monde via zoom
+  const rScreen = Math.min(window.innerWidth, window.innerHeight) * 0.24;
+  return rScreen / ZOOM_GAME;
+}
+
 // ===================
 // ZONES (sur collisions.png)
 // ===================
 const ZONE_COLORS = {
   red:     { rgb:[255,0,0],    id:"meeting",   label:"DÉNONCER" },
-  blue:    { rgb:[0,0,255],    id:"labo",      label:"MISSION LABO" },
+  blue:    { rgb:[0,0,255],    id:"labo",      label:"LABO" },
   green:   { rgb:[0,128,0],    id:"imagerie",  label:"IMAGERIE" },
   yellow:  { rgb:[255,255,0],  id:"pharma",    label:"PHARMA" },
   orange:  { rgb:[255,128,0],  id:"exam",      label:"ANAMNÈSE" },
@@ -385,7 +468,7 @@ function isWalkableLobby(wx, wy){
   return (r > 220 && g > 220 && b > 220);
 }
 
-// collisions.png : blanc = walkable, COULEURS = OBSTACLES (✅)
+// collisions.png : blanc = walkable, COULEURS = OBSTACLES
 function isWalkableGame(wx, wy){
   if (!collisionData) return true;
 
@@ -401,7 +484,6 @@ function isWalkableGame(wx, wy){
   const isWhite = (r > 220 && g > 220 && b > 220);
   if (isWhite) return true;
 
-  // zone color = obstacle
   const k = zoneKeyFromColor(r,g,b);
   if (k) return false;
 
@@ -460,8 +542,6 @@ function loadImg(src){
 const spritePose1 = loadImg("./assets/pose-1.png");
 const marche1     = loadImg("./assets/marche1.png");
 const marche2     = loadImg("./assets/marche2.png");
-
-// ✅ séquence demandée
 const WALK_SEQUENCE = [marche1, spritePose1, marche1, marche2, spritePose1, marche2];
 
 // local walk anim
@@ -485,6 +565,10 @@ let myUid = null;
 let myName = "";
 let myIsHost = false;
 
+let myRole = null;        // "tinocent" | "titruant"
+let myDead = false;       // expulsé ?
+let myLastExpelAtMs = 0;  // cooldown
+
 const playersMap = new Map();
 
 function ensurePlayerState(p){
@@ -492,12 +576,17 @@ function ensurePlayerState(p){
   const x = (typeof p.x === "number") ? p.x : undefined;
   const y = (typeof p.y === "number") ? p.y : undefined;
 
+  const isDead = !!p.isDead;
+  const deadAtMs = (typeof p.deadAtMs === "number") ? p.deadAtMs : 0;
+
   if (!prev){
     playersMap.set(p.uid, {
       uid: p.uid,
       name: p.name || "Joueur",
       isHost: !!p.isHost,
       x, y,
+      isDead,
+      deadAtMs,
       lastX: x, lastY: y,
       moving: false,
       walkIndex: 0,
@@ -509,15 +598,17 @@ function ensurePlayerState(p){
 
   prev.name = p.name || prev.name;
   prev.isHost = !!p.isHost;
+  prev.isDead = isDead;
+  prev.deadAtMs = deadAtMs;
 
   if (typeof x === "number" && typeof y === "number"){
     prev.x = x; prev.y = y;
 
     const dx = (prev.lastX ?? x) - x;
     const dy = (prev.lastY ?? y) - y;
-    const dist = Math.hypot(dx, dy);
+    const d = Math.hypot(dx, dy);
 
-    if (dist > 0.6){
+    if (d > 0.6){
       prev.moving = true;
       prev.lastMoveAt = performance.now();
     }
@@ -541,6 +632,7 @@ function settleRemoteIdle(){
 let lastSend = 0;
 async function sendMyPosition(){
   if (!myUid || !roomId) return;
+  if (myDead) return;
 
   const now = performance.now();
   if (now - lastSend < SEND_EVERY_MS) return;
@@ -560,13 +652,8 @@ async function sendMyPosition(){
 // ===================
 // ROLE / TIRAGE AU SORT (HOST écrit privateRoles + tous jouent l'anim)
 // ===================
-let myRole = null;
-
-// animation state
 let spinRunning = false;
-let spinIntervalId = null;
 
-// affiche overlay (ouverture)
 function showRoleOverlayBase(){
   if (!roleOverlay) return;
   roleOverlay.classList.add("open");
@@ -575,37 +662,29 @@ function showRoleOverlayBase(){
   if (roleTitle) roleTitle.textContent = "Tirage au sort…";
   if (roleSub) roleSub.textContent = "Ça tourne…";
 }
-
-// ferme overlay
 function hideRoleOverlay(){
   if (!roleOverlay) return;
   roleOverlay.classList.remove("open");
   roleOverlay.setAttribute("aria-hidden","true");
 }
-
-// change rapidement image
 function setOverlayFace(which){
   if (!roleImg) return;
   roleImg.src = (which === "titruant") ? titruantImgSrc : tinocentImgSrc;
 }
-
 function setOverlayFinal(role){
   const isTruant = (role === "titruant");
   if (roleTitle) roleTitle.textContent = "Ton rôle";
   if (roleSub) roleSub.textContent = isTruant ? "Tu es Ti’Truant 😈" : "Tu es Ti’Nocent 😇";
   setOverlayFace(isTruant ? "titruant" : "tinocent");
 }
-
-// anim: très vite puis ralentit sur le rôle
 async function playSpinThenReveal(finalRole){
   if (!roleOverlay) return;
 
   showRoleOverlayBase();
   spinRunning = true;
 
-  // phase 1: ultra rapide
   let flip = false;
-  let delay = 45; // ms
+  let delay = 45;
   const startT = performance.now();
   while (performance.now() - startT < 900 && spinRunning){
     flip = !flip;
@@ -613,8 +692,6 @@ async function playSpinThenReveal(finalRole){
     await sleep(delay);
   }
 
-  // phase 2: ralentissement progressif
-  // (on monte de 60ms -> 250ms sur ~1.2s)
   const slowStart = performance.now();
   while (performance.now() - slowStart < 1200 && spinRunning){
     flip = !flip;
@@ -624,7 +701,6 @@ async function playSpinThenReveal(finalRole){
     await sleep(delay);
   }
 
-  // final
   if (!spinRunning) return;
   setOverlayFinal(finalRole);
   await sleep(900);
@@ -641,7 +717,7 @@ function listenMyRole(){
     if (!snap.exists()) return;
 
     const d = snap.data() || {};
-    const role = d.role; // attendu: "tinocent" | "titruant"
+    const role = d.role; // "tinocent" | "titruant"
     if (!role) return;
 
     if (!myRole){
@@ -654,36 +730,6 @@ function listenMyRole(){
 }
 
 // HOST: crée les roles (1 truant si 4-8, sinon 2)
-async function hostAssignRolesAndStart(players){
-  // players = array docs data
-  const uids = players.map(p => p.uid).filter(Boolean);
-  if (uids.length < 4) throw new Error("not_enough_players");
-
-  const nbPlayers = uids.length;
-  const truantsCount = (nbPlayers >= 4 && nbPlayers <= 8) ? 1 : 2;
-
-  const pool = shuffleInPlace([...uids]);
-  const truants = new Set(pool.slice(0, truantsCount));
-
-  // écrit privateRoles
-  for (const uid of uids){
-    const role = truants.has(uid) ? "titruant" : "tinocent";
-    await updateDoc(doc(db, "rooms", roomId, "privateRoles", uid), {
-      role,
-      updatedAt: serverTimestamp()
-    }).catch(async () => {
-      // si le doc n'existe pas encore, updateDoc échoue -> on fait create via set/update
-      // (mais tu n'as pas importé setDoc ici, donc on fait un "update" room-friendly:
-      // on crée d'abord en ajoutant un champ via updateDoc en fallback => pas possible sans setDoc)
-      // => on utilise une astuce: try create by updateDoc sur doc vide ne marche pas.
-      // Donc on importe setDoc proprement.
-    });
-  }
-}
-
-// on a besoin de setDoc pour créer privateRoles si absent
-import { setDoc } from "https://www.gstatic.com/firebasejs/10.12.4/firebase-firestore.js";
-
 async function hostAssignRoles(players){
   const uids = players.map(p => p.uid).filter(Boolean);
   if (uids.length < 4) throw new Error("not_enough_players");
@@ -703,7 +749,6 @@ async function hostAssignRoles(players){
     }, { merge: true });
   }
 
-  // garde aussi dans room si tu veux
   await updateDoc(doc(db, "rooms", roomId), {
     playersCount: nbPlayers,
     truantsCount: truantsCount
@@ -711,7 +756,146 @@ async function hostAssignRoles(players){
 }
 
 // ===================
-// DRAW HELPERS + VIGNETTE MAP
+// ACTION LOGIC (Expulser / Rapporter / Zones)
+// ===================
+function getClosestAliveTargetForExpel(){
+  // retourne le joueur (state) le plus proche, vivant, autre que moi
+  let best = null;
+  let bestD = Infinity;
+
+  for (const p of playersMap.values()){
+    if (!p || p.uid === myUid) continue;
+    if (p.isDead) continue;
+    const px = (typeof p.x === "number") ? p.x : null;
+    const py = (typeof p.y === "number") ? p.y : null;
+    if (px == null || py == null) continue;
+
+    const d = dist(player.x, player.y, px, py);
+    if (d < bestD){
+      bestD = d;
+      best = p;
+    }
+  }
+
+  if (best && bestD <= EXPULSE_RANGE) return { target: best, d: bestD };
+  return null;
+}
+
+function getClosestDeadBody(){
+  let best = null;
+  let bestD = Infinity;
+
+  for (const p of playersMap.values()){
+    if (!p || p.uid === myUid) continue;
+    if (!p.isDead) continue;
+
+    const px = (typeof p.x === "number") ? p.x : null;
+    const py = (typeof p.y === "number") ? p.y : null;
+    if (px == null || py == null) continue;
+
+    const d = dist(player.x, player.y, px, py);
+    if (d < bestD){
+      bestD = d;
+      best = p;
+    }
+  }
+
+  if (best && bestD <= REPORT_RANGE) return { body: best, d: bestD };
+  return null;
+}
+
+function getClosestZoneNearMe(){
+  if (!zones?.length) return null;
+  let best = null;
+  let bestD = Infinity;
+
+  for (const z of zones){
+    const d = dist(player.x, player.y, z.cx, z.cy);
+    if (d < bestD){
+      bestD = d;
+      best = z;
+    }
+  }
+  if (best && bestD <= ZONE_RANGE) return { zone: best, d: bestD };
+  return null;
+}
+
+async function doExpulse(targetUid){
+  if (!myUid || !roomId) return;
+  if (phase !== "started") return;
+  if (myDead) return;
+
+  const now = Date.now();
+  const remain = EXPEL_COOLDOWN_MS - (now - (myLastExpelAtMs || 0));
+  if (remain > 0){
+    setStartInfo(`Cooldown expulsion: ${Math.ceil(remain/1000)}s`);
+    return;
+  }
+
+  // write: victim dead + killer cooldown
+  try{
+    await updateDoc(doc(db, "rooms", roomId, "players", targetUid), {
+      isDead: true,
+      deadAtMs: now,
+      deadBy: myUid
+    });
+
+    await updateDoc(doc(db, "rooms", roomId, "players", myUid), {
+      lastExpelAtMs: now
+    });
+
+    // local optimistic
+    myLastExpelAtMs = now;
+
+  } catch(e){
+    console.log("expulse error:", e);
+    setStartInfo("Erreur expulsion.");
+  }
+}
+
+async function doReport(bodyUid){
+  // pour l’instant: on active chat + flag report (tu brancheras ensuite vote/meeting)
+  try{
+    await updateDoc(doc(db, "rooms", roomId), {
+      chatEnabled: true,
+      meetingType: "report",
+      meetingAt: serverTimestamp(),
+      meetingBy: myUid,
+      reportedBodyUid: bodyUid
+    });
+    setStartInfo("Rapport envoyé.");
+  } catch(e){
+    console.log("report error:", e);
+    setStartInfo("Erreur rapport.");
+  }
+}
+
+async function doZoneAction(zone){
+  // rouge = dénoncer / réunion
+  if (!zone) return;
+
+  if (zone.id === "meeting"){
+    try{
+      await updateDoc(doc(db, "rooms", roomId), {
+        chatEnabled: true,
+        meetingType: "meeting",
+        meetingAt: serverTimestamp(),
+        meetingBy: myUid
+      });
+      setStartInfo("Réunion lancée (chat activé).");
+    } catch(e){
+      console.log("meeting error:", e);
+      setStartInfo("Erreur réunion.");
+    }
+    return;
+  }
+
+  // autres zones: placeholder mini-jeu
+  setStartInfo(`Activité: ${zone.label} (mini-jeu à brancher)`);
+}
+
+// ===================
+// DRAW HELPERS + VIGNETTE MAP + CLIP PERSONNAGES
 // ===================
 function drawPlayerSprite(px, py, img){
   const size = gameStarted ? SPRITE_SIZE_GAME : SPRITE_SIZE_LOBBY;
@@ -778,7 +962,6 @@ function drawNameTag(px, py, name, isHost){
 }
 
 function drawVignette(){
-  // noir autour pour réduire le champ de vision (MAP uniquement)
   const w = window.innerWidth;
   const h = window.innerHeight;
   const cx = w / 2;
@@ -805,7 +988,9 @@ function drawVignette(){
 // ===================
 function update(dt){
   if (phase === "starting") {
-    // bloque le mouvement pendant l'anim
+    move.x = 0; move.y = 0;
+  }
+  if (myDead && phase === "started"){
     move.x = 0; move.y = 0;
   }
 
@@ -815,9 +1000,8 @@ function update(dt){
   const ny = player.y + move.y * player.speed * dtNorm;
 
   const wasWalking = walking;
-  walking = (Math.abs(move.x) + Math.abs(move.y)) > 0.15;
+  walking = !myDead && (Math.abs(move.x) + Math.abs(move.y)) > 0.15;
 
-  // anim local
   const speed01 = Math.min(1, (Math.abs(move.x) + Math.abs(move.y)) / 1.4);
   const swapMs  = 140 - speed01 * 70;
 
@@ -832,13 +1016,15 @@ function update(dt){
     walkIndex = 0;
   }
 
-  // déplacement slide
   let moved = false;
-  if (canMoveWorld(nx, player.y)){
-    player.x = nx; moved = true;
-  }
-  if (canMoveWorld(player.x, ny)){
-    player.y = ny; moved = true;
+
+  if (!myDead){
+    if (canMoveWorld(nx, player.y)){
+      player.x = nx; moved = true;
+    }
+    if (canMoveWorld(player.x, ny)){
+      player.y = ny; moved = true;
+    }
   }
 
   if (moved && (walking || wasWalking)) sendMyPosition();
@@ -847,6 +1033,7 @@ function update(dt){
   for (const [uid, p] of playersMap){
     if (uid === myUid) continue;
     if (!p.moving) continue;
+    if (p.isDead) continue;
 
     p.walkTimer += dt;
     if (p.walkTimer > 120){
@@ -856,13 +1043,70 @@ function update(dt){
   }
 
   settleRemoteIdle();
+
+  // ===== ACTION UI refresh (map uniquement)
+  if (phase === "started"){
+    const now = Date.now();
+
+    // priorité 1: Rapporter si proche d’un expulsé
+    const bodyHit = getClosestDeadBody();
+    if (bodyHit){
+      setActionUI({ show:true, label:"Rapporter", disabled:false, hint:"Près d’un joueur expulsé" });
+      actionBtn.onclick = () => doReport(bodyHit.body.uid);
+      return;
+    }
+
+    // priorité 2: Expulser si Ti’Truant proche d’un vivant
+    const isTruant = (myRole === "titruant");
+    if (isTruant && !myDead){
+      const hit = getClosestAliveTargetForExpel();
+      if (hit){
+        const remain = EXPEL_COOLDOWN_MS - (now - (myLastExpelAtMs || 0));
+        if (remain > 0){
+          setActionUI({
+            show:true,
+            label:`Expulser (${Math.ceil(remain/1000)}s)`,
+            disabled:true,
+            hint:"Cooldown"
+          });
+          actionBtn.onclick = null;
+        } else {
+          setActionUI({
+            show:true,
+            label:"Expulser",
+            disabled:false,
+            hint:"Proche d’un joueur"
+          });
+          actionBtn.onclick = () => doExpulse(hit.target.uid);
+        }
+        return;
+      }
+    }
+
+    // priorité 3: Activité (Ti’Nocent) si proche d’une zone
+    const isNocent = (myRole === "tinocent");
+    if (isNocent && !myDead){
+      const nearZone = getClosestZoneNearMe();
+      if (nearZone){
+        const z = nearZone.zone;
+        const label = (z.id === "meeting") ? "Dénoncer" : `Faire: ${z.label}`;
+        setActionUI({ show:true, label, disabled:false, hint:"Zone activité" });
+        actionBtn.onclick = () => doZoneAction(z);
+        return;
+      }
+    }
+
+    setActionUI({ show:false });
+  } else {
+    setActionUI({ show:false });
+  }
 }
 
 function draw(){
   ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
   ctx.clearRect(0,0,window.innerWidth, window.innerHeight);
 
-  // LOBBY VISUEL (lobby.png) tant qu'on n'est pas started
+  // LOBBY VISUEL
   if (!gameStarted){
     const bg = (lobbyBgImg.complete && lobbyBgImg.naturalWidth > 0) ? lobbyBgImg : mapImg;
     if (!(bg.complete && bg.naturalWidth > 0)) return;
@@ -895,7 +1139,10 @@ function draw(){
       const ix = p.wx * scaleX;
       const iy = p.wy * scaleY;
 
-      const sprite = (p.uid === myUid) ? getLocalSprite() : getRemoteSprite(p);
+      const sprite = (p.isDead)
+        ? pleurImg
+        : ((p.uid === myUid) ? getLocalSprite() : getRemoteSprite(p));
+
       drawPlayerSprite(ix, iy, sprite);
       drawNameTag(ix, iy, p.name, !!p.isHost);
     }
@@ -913,6 +1160,7 @@ function draw(){
   camX = clamp(camX, halfW, MAP_W - halfW);
   camY = clamp(camY, halfH, MAP_H - halfH);
 
+  // 1) draw map (visible partout)
   ctx.save();
   ctx.translate(window.innerWidth/2, window.innerHeight/2);
   ctx.scale(ZOOM_GAME, ZOOM_GAME);
@@ -921,6 +1169,13 @@ function draw(){
   if (mapImg.complete && mapImg.naturalWidth > 0){
     ctx.drawImage(mapImg, 0, 0, MAP_W, MAP_H);
   }
+
+  // 2) clip personnages au champ de vision (monde)
+  const visR = getVisionRadiusWorld();
+  ctx.save();
+  ctx.beginPath();
+  ctx.arc(camX, camY, visR, 0, Math.PI * 2);
+  ctx.clip();
 
   const arr = Array.from(playersMap.values())
     .map(p => ({
@@ -931,14 +1186,18 @@ function draw(){
     .sort((a,b) => a.drawY - b.drawY);
 
   for (const p of arr){
-    const sprite = (p.uid === myUid) ? getLocalSprite() : getRemoteSprite(p);
+    const sprite = (p.isDead)
+      ? pleurImg
+      : ((p.uid === myUid) ? getLocalSprite() : getRemoteSprite(p));
+
     drawPlayerSprite(p.drawX, p.drawY, sprite);
     drawNameTag(p.drawX, p.drawY, p.name, !!p.isHost);
   }
 
-  ctx.restore();
+  ctx.restore(); // end clip
+  ctx.restore(); // end world
 
-  // ✅ vignette sur map
+  // 3) vignette écran (noir autour)
   drawVignette();
 }
 
@@ -978,6 +1237,7 @@ function endJoystick(){
 joy?.addEventListener("pointerdown", (e) => {
   if (!joy) return;
   if (phase === "starting") return;
+  if (myDead && phase === "started") return;
 
   active = true;
   pointerId = e.pointerId;
@@ -997,10 +1257,10 @@ joy?.addEventListener("pointermove", (e) => {
   let dx = e.clientX - center.x;
   let dy = e.clientY - center.y;
 
-  const dist = Math.hypot(dx, dy);
-  if (dist > max){
-    dx = dx * (max / dist);
-    dy = dy * (max / dist);
+  const d = Math.hypot(dx, dy);
+  if (d > max){
+    dx = dx * (max / d);
+    dy = dy * (max / d);
   }
 
   setStick(dx, dy);
@@ -1110,21 +1370,16 @@ onAuthStateChanged(auth, async (u) => {
     setStartInfo("");
 
     try{
-      // 1) starting
       await updateDoc(doc(db, "rooms", roomId), {
         status: "starting",
         startingAt: serverTimestamp(),
-        // sur map: chat fermé par défaut
         chatEnabled: false
       });
 
-      // 2) récupère les players live et assigne les roles
       const snapPlayers = await getDocs(collection(db, "rooms", roomId, "players"));
       const players = snapPlayers.docs.map(d => d.data());
       await hostAssignRoles(players);
 
-      // 3) auto start après le temps d’animation
-      // (tout le monde aura eu le temps de voir son rôle)
       await sleep(3200);
 
       await updateDoc(doc(db, "rooms", roomId), {
@@ -1149,27 +1404,23 @@ onAuthStateChanged(auth, async (u) => {
     const room = snap.data() || {};
     const status = room.status;
 
-    // chat map: activable via room.chatEnabled = true (à mettre lors d’expulsion/dénonciation)
     roomChatEnabled = !!room.chatEnabled;
 
     myIsHost = (room.hostUid === myUid);
     if (btnStart) btnStart.style.display = myIsHost ? "" : "none";
 
-    // transitions
     if (status === "starting"){
       if (lastRoomStatus !== "starting"){
         setStartingMode();
         startTriggeredLocal = false;
       }
 
-      // lance l’anim une fois dès qu’on a mon rôle (ou sinon “attente”)
       if (!startTriggeredLocal){
         startTriggeredLocal = true;
 
-        // on affiche un spin même si rôle pas encore reçu
         showRoleOverlayBase();
         spinRunning = true;
-        // mini boucle rapide en attendant le rôle
+
         (async ()=>{
           let flip = false;
           while (spinRunning && !myRole){
@@ -1177,11 +1428,9 @@ onAuthStateChanged(auth, async (u) => {
             setOverlayFace(flip ? "titruant" : "tinocent");
             await sleep(55);
           }
-          // dès que rôle dispo -> anim complète -> reveal -> auto close
           if (myRole){
             await playSpinThenReveal(myRole);
           } else {
-            // sécurité
             hideRoleOverlay();
             spinRunning = false;
           }
@@ -1189,18 +1438,15 @@ onAuthStateChanged(auth, async (u) => {
       }
 
     } else if (status === "started"){
-      // stop anim si encore active
       spinRunning = false;
       hideRoleOverlay();
       setGameMode();
     } else {
-      // lobby
       spinRunning = false;
       hideRoleOverlay();
       setLobbyMode();
     }
 
-    // chat gating update si on est en map
     if (status === "started"){
       chatAllowedNow = !!roomChatEnabled;
       if (!chatAllowedNow && chatOverlay?.classList.contains("open")) closeChat();
@@ -1232,7 +1478,11 @@ onAuthStateChanged(auth, async (u) => {
     const me = players.find(p => p.uid === myUid);
     if (me?.name) myName = me.name;
 
+    // ✅ récupère mon état "mort" + cooldown
     if (me){
+      myDead = !!me.isDead;
+      myLastExpelAtMs = (typeof me.lastExpelAtMs === "number") ? me.lastExpelAtMs : (myLastExpelAtMs || 0);
+
       if (!localPosReady){
         if (typeof me.x === "number" && typeof me.y === "number"){
           player.x = me.x;
@@ -1242,13 +1492,14 @@ onAuthStateChanged(auth, async (u) => {
         }
         localPosReady = true;
       }
+
       ensurePlayerState({ ...me, x: player.x, y: player.y });
     }
 
     startLoopOnce();
   });
 
-  // chat snapshot + submit (toujours actif, mais l’UI est “gated” sur map)
+  // chat snapshot + submit
   if (chatForm && chatInput){
     const q = query(
       collection(db, "rooms", roomId, "messages"),
@@ -1260,7 +1511,6 @@ onAuthStateChanged(auth, async (u) => {
       const msgs = snap.docs.map(d => d.data());
       renderChat(msgs);
 
-      // badge uniquement si chat autorisé OU si on est lobby
       const canBadge = (phase !== "started") ? true : chatAllowedNow;
 
       if (msgs.length && canBadge && !chatOverlay?.classList.contains("open")){
