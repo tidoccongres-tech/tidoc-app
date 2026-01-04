@@ -89,6 +89,7 @@ chatFab?.addEventListener("click", () => {
   if (chatOverlay.classList.contains("open")) closeChat();
   else openChat();
 });
+
 btnChatClose?.addEventListener("click", closeChat);
 
 chatOverlay?.addEventListener("click", (e) => {
@@ -100,18 +101,20 @@ window.addEventListener("keydown", (e) => {
 });
 
 // ===================
-// CANVAS SETUP
+// CANVAS SETUP (DPR SAFE iPhone)
 // ===================
 const canvas = document.getElementById("gameCanvas");
 const ctx = canvas.getContext("2d");
 
+let DPR = window.devicePixelRatio || 1;
+
 function resize(){
-  const dpr = window.devicePixelRatio || 1;
-  canvas.width  = Math.floor(window.innerWidth * dpr);
-  canvas.height = Math.floor(window.innerHeight * dpr);
+  DPR = window.devicePixelRatio || 1;
+  canvas.width  = Math.floor(window.innerWidth * DPR);
+  canvas.height = Math.floor(window.innerHeight * DPR);
   canvas.style.width = window.innerWidth + "px";
   canvas.style.height = window.innerHeight + "px";
-  ctx.setTransform(dpr, 0, 0, dpr, 0, 0); // coords en px CSS
+  ctx.setTransform(DPR, 0, 0, DPR, 0, 0); // coords en px CSS
 }
 resize();
 window.addEventListener("resize", resize);
@@ -124,8 +127,7 @@ let loopRunning = false;
 
 function setLobbyMode(){
   gameStarted = false;
-  joy?.classList.remove("is-hidden");      // ✅ joystick visible en lobby
-  // pas de bouton action en lobby
+  joy?.classList.remove("is-hidden"); // joystick visible en lobby
   if (actionBtn) actionBtn.style.display = "none";
 }
 
@@ -162,7 +164,7 @@ mapImg.onload = () => {
   MAP_H = mapImg.height || MAP_H;
 };
 
-// si collisions donne la vraie taille monde, c’est la meilleure source
+// collisions = source de taille monde
 collisionImg.onload = () => {
   MAP_W = collisionImg.width || MAP_W;
   MAP_H = collisionImg.height || MAP_H;
@@ -178,7 +180,7 @@ collisionImg.onload = () => {
 };
 
 // ===================
-// CAMERA + ZOOM (game seulement)
+// CAMERA + ZOOM (GAME ONLY)
 // ===================
 const ZOOM_GAME  = 1.7;
 const CAM_LERP   = 0.12;
@@ -475,7 +477,7 @@ function drawNameTag(px, py, name, isHost){
 // UPDATE / DRAW / LOOP
 // ===================
 function update(dt){
-  // ✅ mouvement autorisé lobby + game
+  // mouvement autorisé lobby + game
   const dtNorm = Math.min(2, dt / 16.6667);
 
   const nx = player.x + move.x * player.speed * dtNorm;
@@ -519,51 +521,60 @@ function update(dt){
 }
 
 function draw(){
+  // ✅ DPR safe : on remet le repère "CSS pixels" à chaque frame
+  ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
   ctx.clearRect(0,0,window.innerWidth, window.innerHeight);
 
   // =========================
-// LOBBY: image cover NON déformée + joueurs dans le même repère
-// =========================
-if (!gameStarted){
-  const bg = (lobbyBgImg.complete && lobbyBgImg.naturalWidth > 0) ? lobbyBgImg : mapImg;
-  if (!(bg.complete && bg.naturalWidth > 0)) return;
+  // LOBBY: lobby.png en cover NON déformé + joueurs dans le même repère
+  // =========================
+  if (!gameStarted){
+    const bg = (lobbyBgImg.complete && lobbyBgImg.naturalWidth > 0) ? lobbyBgImg : mapImg;
+    if (!(bg.complete && bg.naturalWidth > 0)) return;
 
-  // ✅ IMPORTANT: on prend la taille réelle de l'image, pas MAP_W/H
-  const bw = bg.naturalWidth;
-  const bh = bg.naturalHeight;
+    // ✅ taille réelle de l'image affichée
+    const bw = bg.naturalWidth;
+    const bh = bg.naturalHeight;
 
-  // cover sans déformation
-  const s = Math.max(window.innerWidth / bw, window.innerHeight / bh);
-  const ox = (window.innerWidth  - bw * s) / 2;
-  const oy = (window.innerHeight - bh * s) / 2;
+    // cover sans déformation
+    const s  = Math.max(window.innerWidth / bw, window.innerHeight / bh);
+    const ox = (window.innerWidth  - bw * s) / 2;
+    const oy = (window.innerHeight - bh * s) / 2;
 
-  // Transform global (monde = pixels de l'image)
-  ctx.setTransform(s, 0, 0, s, ox, oy);
+    // empile transform (sans casser DPR)
+    ctx.save();
+    ctx.translate(ox, oy);
+    ctx.scale(s, s);
 
-  // fond
-  ctx.drawImage(bg, 0, 0);
+    // draw bg
+    ctx.drawImage(bg, 0, 0, bw, bh);
 
-  // joueurs (coords "image")
-  const arr = Array.from(playersMap.values())
-    .map(p => ({
-      ...p,
-      x: (p.uid === myUid) ? player.x : (typeof p.x === "number" ? p.x : player.x),
-      y: (p.uid === myUid) ? player.y : (typeof p.y === "number" ? p.y : player.y),
-    }))
-    .sort((a,b) => a.y - b.y);
+    // mapping monde -> lobby si tailles différentes
+    const scaleX = bw / MAP_W;
+    const scaleY = bh / MAP_H;
 
-  for (const p of arr){
-    const sprite = (p.uid === myUid) ? getLocalSprite() : getRemoteSprite(p);
-    drawPlayerSprite(p.x, p.y, sprite);
-    drawNameTag(p.x, p.y, p.name, !!p.isHost);
+    const arr = Array.from(playersMap.values())
+      .map(p => ({
+        ...p,
+        wx: (p.uid === myUid) ? player.x : (typeof p.x === "number" ? p.x : player.x),
+        wy: (p.uid === myUid) ? player.y : (typeof p.y === "number" ? p.y : player.y),
+      }))
+      .sort((a,b) => a.wy - b.wy);
+
+    for (const p of arr){
+      const ix = p.wx * scaleX;
+      const iy = p.wy * scaleY;
+
+      const sprite = (p.uid === myUid) ? getLocalSprite() : getRemoteSprite(p);
+      drawPlayerSprite(ix, iy, sprite);
+      drawNameTag(ix, iy, p.name, !!p.isHost);
+    }
+
+    ctx.restore();
+
+    if (actionBtn) actionBtn.style.display = "none";
+    return;
   }
-
-  // reset pour l'UI en coordonnées écran
-  ctx.setTransform(1,0,0,1,0,0);
-
-  if (actionBtn) actionBtn.style.display = "none";
-  return;
-}
 
   // =========================
   // GAME: caméra + zoom
@@ -600,8 +611,6 @@ if (!gameStarted){
   }
 
   ctx.restore();
-
-  // si tu veux remettre action UI en game plus tard, appelle drawActionUI() ici
 }
 
 let lastT = performance.now();
@@ -684,40 +693,36 @@ joy?.addEventListener("pointercancel", (e) => {
 window.addEventListener("blur", endJoystick);
 
 // ===================
-// CHAT live (à remettre)
+// CHAT LIVE (stable + pas de reload)
 // ===================
-if (chatForm && chatInput){
-  const q = query(
-    collection(db, "rooms", roomId, "messages"),
-    orderBy("createdAtMs", "asc"),
-    limit(120)
-  );
+function renderChat(messages){
+  if (!chatMessagesEl) return;
+  chatMessagesEl.innerHTML = "";
 
-  onSnapshot(q, (snap) => {
-    const msgs = snap.docs.map(d => d.data());
-    renderChat(msgs);
-
-    if (msgs.length && !chatOverlay?.classList.contains("open")){
-      const last = msgs[msgs.length - 1];
-      if (last?.uid && last.uid !== myUid){
-        chatFab?.classList.add("has-unread");
-        if (chatBadge) chatBadge.hidden = false;
-      }
-    }
-  });
-
-  chatForm.addEventListener("submit", async (e) => {
-    e.preventDefault();                 // ✅ empêche le reload
-    e.stopPropagation();
-
-    const val = chatInput.value;
-    chatInput.value = "";
-
-    try { await sendChat(val); }
-    catch (err) { console.log("chat send error:", err); }
-  });
+  for (const m of messages){
+    const div = document.createElement("div");
+    div.className = "chat-msg" + (m.uid === myUid ? " me" : "");
+    div.innerHTML = `
+      <div class="chat-meta">${escapeHTML(m.name || "Joueur")}</div>
+      <div class="chat-text">${escapeHTML(m.text || "")}</div>
+    `;
+    chatMessagesEl.appendChild(div);
+  }
+  chatMessagesEl.scrollTop = chatMessagesEl.scrollHeight;
 }
 
+async function sendChat(text){
+  const t = (text || "").trim();
+  if (!t || !roomId || !myUid) return;
+
+  await addDoc(collection(db, "rooms", roomId, "messages"), {
+    uid: myUid,
+    name: myName || "Joueur",
+    text: t,
+    createdAt: serverTimestamp(),
+    createdAtMs: Date.now()
+  });
+}
 
 // ===================
 // FIREBASE
@@ -728,6 +733,7 @@ onAuthStateChanged(auth, async (u) => {
 
   myUid = u.uid;
 
+  // room status + host
   onSnapshot(doc(db,"rooms",roomId), (snap)=>{
     if (!snap.exists()){
       alert("Partie supprimée");
@@ -745,6 +751,7 @@ onAuthStateChanged(auth, async (u) => {
     else setLobbyMode();
   });
 
+  // players
   onSnapshot(collection(db,"rooms",roomId,"players"), async (snap)=>{
     const players = snap.docs.map(d=>d.data());
     renderPlayers(players);
@@ -770,6 +777,40 @@ onAuthStateChanged(auth, async (u) => {
     startLoopOnce();
   });
 
+  // chat snapshot + submit
+  if (chatForm && chatInput){
+    const q = query(
+      collection(db, "rooms", roomId, "messages"),
+      orderBy("createdAtMs", "asc"),
+      limit(120)
+    );
+
+    onSnapshot(q, (snap) => {
+      const msgs = snap.docs.map(d => d.data());
+      renderChat(msgs);
+
+      // notif si nouveau msg d'un autre + chat fermé
+      if (msgs.length && !chatOverlay?.classList.contains("open")){
+        const last = msgs[msgs.length - 1];
+        if (last?.uid && last.uid !== myUid){
+          chatFab?.classList.add("has-unread");
+          if (chatBadge) chatBadge.hidden = false;
+        }
+      }
+    }, (err) => console.log("chat snapshot error:", err));
+
+    chatForm.addEventListener("submit", async (e) => {
+      e.preventDefault();       // ✅ empêche reload (cause déconnexion)
+      e.stopPropagation();
+
+      const val = chatInput.value;
+      chatInput.value = "";
+      try { await sendChat(val); }
+      catch (err) { console.log("chat send error:", err); }
+    });
+  }
+
+  // leave
   btnLeave?.addEventListener("click", async ()=>{
     try{
       await deleteDoc(doc(db,"rooms",roomId,"players",myUid));
