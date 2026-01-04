@@ -1,11 +1,15 @@
 // lobby.js (MODULE) — Lobby (lobby.png + lobby-NB.png) -> Game (map.png + collisions.png)
-// Phase: lobby -> starting (overlay rôle) -> started (map)
+// + Tirage au sort animé (rapide -> ralenti -> rôle final) + auto start
+// + Zones activité = obstacles
+// + Vignette (noir autour) sur MAP uniquement
+// + HUD rôle en haut à droite
+// + Chat: lobby = toujours / map = seulement si room.chatEnabled === true
 
 import * as AuthMod from "./auth.js";
 import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.4/firebase-auth.js";
 import {
   doc, getDoc, updateDoc, onSnapshot, collection, deleteDoc, serverTimestamp,
-  addDoc, query, orderBy, limit
+  addDoc, query, orderBy, limit, getDocs
 } from "https://www.gstatic.com/firebasejs/10.12.4/firebase-firestore.js";
 
 const auth = AuthMod.auth;
@@ -22,7 +26,7 @@ const playersEl  = document.getElementById("playersList");
 const btnStart   = document.getElementById("btnStart");
 const btnLeave   = document.getElementById("btnLeave");
 
-// message start
+// message start (si absent => alert fallback)
 const startInfo = document.getElementById("startInfo");
 function setStartInfo(msg){
   console.log("[START INFO]", msg || "");
@@ -30,12 +34,12 @@ function setStartInfo(msg){
   else if (msg) alert(msg);
 }
 
-// ROLE OVERLAY
+// ROLE OVERLAY (déjà dans ton HTML)
 const roleOverlay = document.getElementById("roleOverlay");
 const roleImg     = document.getElementById("roleImg");
 const roleTitle   = document.getElementById("roleTitle");
 const roleSub     = document.getElementById("roleSub");
-const btnRoleOk   = document.getElementById("btnRoleOk");
+const btnRoleOk   = document.getElementById("btnRoleOk"); // pas utilisé (auto)
 
 // chat
 const chatFab      = document.getElementById("btnChatToggle");
@@ -47,6 +51,35 @@ const btnChatClose = document.getElementById("btnChatClose");
 const chatMessagesEl = document.getElementById("chatMessages");
 const chatForm  = document.getElementById("chatForm");
 const chatInput = document.getElementById("chatInput");
+
+// HUD rôle (créé dynamiquement)
+const roleHud = document.createElement("div");
+roleHud.id = "roleHud";
+roleHud.style.cssText = `
+  position: fixed;
+  top: calc(12px + env(safe-area-inset-top));
+  right: calc(12px + env(safe-area-inset-right));
+  z-index: 50;
+  padding: 10px 12px;
+  border-radius: 14px;
+  font: 800 13px system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+  letter-spacing: .2px;
+  color: #fff;
+  background: rgba(0,0,0,.45);
+  border: 1px solid rgba(255,255,255,.12);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  display: none;
+  pointer-events: none;
+`;
+document.body.appendChild(roleHud);
+
+function setRoleHud(role){
+  if (!role) { roleHud.style.display = "none"; roleHud.textContent = ""; return; }
+  const isTruant = (role === "titruant" || role === "truant" || role === true);
+  roleHud.textContent = `Rôle : ${isTruant ? "Ti’Truant 😈" : "Ti’Nocent 😇"}`;
+  roleHud.style.display = "";
+}
 
 if (roomCodeEl) roomCodeEl.textContent = roomId || "----";
 
@@ -72,11 +105,29 @@ function renderPlayers(players){
   }).join("");
 }
 
+function sleep(ms){ return new Promise(r => setTimeout(r, ms)); }
+
+function shuffleInPlace(arr){
+  for (let i = arr.length - 1; i > 0; i--){
+    const j = Math.floor(Math.random() * (i + 1));
+    [arr[i], arr[j]] = [arr[j], arr[i]];
+  }
+  return arr;
+}
+
 // ===================
-// CHAT OPEN/CLOSE
+// CHAT OPEN/CLOSE + GATING
 // ===================
+let chatAllowedNow = true; // lobby true, map dépend room.chatEnabled
+
 function openChat(){
   if (!chatOverlay) return;
+
+  if (!chatAllowedNow){
+    setStartInfo("Chat dispo sur la map seulement pendant expulsion / dénonciation.");
+    return;
+  }
+
   chatOverlay.classList.add("open");
   chatOverlay.setAttribute("aria-hidden", "false");
   document.body.classList.add("chat-open");
@@ -91,6 +142,14 @@ function closeChat(){
 
 chatFab?.addEventListener("click", () => {
   if (!chatOverlay) return;
+
+  if (!chatAllowedNow){
+    // pas d'ouverture, et pas de badge
+    chatFab.classList.remove("has-unread");
+    if (chatBadge) chatBadge.hidden = true;
+    openChat(); // affichera le message via setStartInfo
+    return;
+  }
 
   chatFab.classList.remove("has-unread");
   if (chatBadge) chatBadge.hidden = true;
@@ -128,20 +187,31 @@ let loopRunning = false;
 let phase = "lobby";           // "lobby" | "starting" | "started"
 let lastRoomStatus = null;
 
+// room flags (chat map)
+let roomChatEnabled = false;
+
 function setLobbyMode(){
   gameStarted = false;
   phase = "lobby";
   joy?.classList.remove("is-hidden");
+  chatAllowedNow = true; // lobby toujours
 }
 function setStartingMode(){
-  gameStarted = false;         // on reste sur lobby visuel pendant overlay
+  gameStarted = false;
   phase = "starting";
-  joy?.classList.add("is-hidden"); // option: pas bouger pendant tirage
+  joy?.classList.add("is-hidden");
+  chatAllowedNow = true; // tu peux discuter pendant le tirage si tu veux (sinon mets false)
 }
 function setGameMode(){
   gameStarted = true;
   phase = "started";
   joy?.classList.remove("is-hidden");
+
+  // map: chat seulement si roomChatEnabled
+  chatAllowedNow = !!roomChatEnabled;
+
+  // si le chat est ouvert mais plus autorisé, on ferme
+  if (!chatAllowedNow && chatOverlay?.classList.contains("open")) closeChat();
 }
 
 function startLoopOnce(){
@@ -165,6 +235,10 @@ mapImg.src = "./assets/map.png";
 
 const collisionImg = new Image(); // collisions map
 collisionImg.src = "./assets/collisions.png";
+
+// rôle images
+const tinocentImgSrc = "./assets/tinocent.png";
+const titruantImgSrc = "./assets/titruant.png";
 
 // ===================
 // WORLD SIZES
@@ -311,7 +385,7 @@ function isWalkableLobby(wx, wy){
   return (r > 220 && g > 220 && b > 220);
 }
 
-// collisions.png : blanc = walkable, COULEURS = OBSTACLES (✅ demandé)
+// collisions.png : blanc = walkable, COULEURS = OBSTACLES (✅)
 function isWalkableGame(wx, wy){
   if (!collisionData) return true;
 
@@ -327,11 +401,10 @@ function isWalkableGame(wx, wy){
   const isWhite = (r > 220 && g > 220 && b > 220);
   if (isWhite) return true;
 
-  // ✅ zone color = obstacle
+  // zone color = obstacle
   const k = zoneKeyFromColor(r,g,b);
   if (k) return false;
 
-  // tout le reste = mur
   return false;
 }
 
@@ -485,82 +558,160 @@ async function sendMyPosition(){
 }
 
 // ===================
-// ROLE OVERLAY FLOW
+// ROLE / TIRAGE AU SORT (HOST écrit privateRoles + tous jouent l'anim)
 // ===================
 let myRole = null;
-let roleSeen = false;
 
-function showRoleOverlaySpinning(){
+// animation state
+let spinRunning = false;
+let spinIntervalId = null;
+
+// affiche overlay (ouverture)
+function showRoleOverlayBase(){
   if (!roleOverlay) return;
-  roleSeen = false;
   roleOverlay.classList.add("open");
   roleOverlay.setAttribute("aria-hidden","false");
   if (btnRoleOk) btnRoleOk.style.display = "none";
   if (roleTitle) roleTitle.textContent = "Tirage au sort…";
   if (roleSub) roleSub.textContent = "Ça tourne…";
-  if (roleImg) roleImg.src = "./assets/tinocent.png";
 }
 
-function showRoleResult(role){
+// ferme overlay
+function hideRoleOverlay(){
   if (!roleOverlay) return;
+  roleOverlay.classList.remove("open");
+  roleOverlay.setAttribute("aria-hidden","true");
+}
 
-  const isTruant = (role === "titruant" || role === "truant" || role === true);
+// change rapidement image
+function setOverlayFace(which){
+  if (!roleImg) return;
+  roleImg.src = (which === "titruant") ? titruantImgSrc : tinocentImgSrc;
+}
 
+function setOverlayFinal(role){
+  const isTruant = (role === "titruant");
   if (roleTitle) roleTitle.textContent = "Ton rôle";
   if (roleSub) roleSub.textContent = isTruant ? "Tu es Ti’Truant 😈" : "Tu es Ti’Nocent 😇";
-  if (roleImg) roleImg.src = isTruant ? "./assets/titruant.png" : "./assets/tinocent.png";
-
-  if (btnRoleOk){
-    btnRoleOk.style.display = "";
-    btnRoleOk.onclick = async () => {
-      roleSeen = true;
-      roleOverlay.classList.remove("open");
-      roleOverlay.setAttribute("aria-hidden","true");
-
-      // une fois que chacun a vu, on passe en started (l’hôte peut le faire)
-      if (myIsHost){
-        try{
-          await updateDoc(doc(db,"rooms",roomId), {
-            status: "started",
-            startedAt: serverTimestamp()
-          });
-        } catch(e){
-          console.log("final start error:", e);
-          setStartInfo("Erreur: impossible de lancer la partie.");
-        }
-      }
-    };
-  }
+  setOverlayFace(isTruant ? "titruant" : "tinocent");
 }
 
-async function waitMyPrivateRoleThenShow(){
-  // on affiche l'overlay "spinning"
-  showRoleOverlaySpinning();
+// anim: très vite puis ralentit sur le rôle
+async function playSpinThenReveal(finalRole){
+  if (!roleOverlay) return;
 
-  // on lit le doc privateRoles/myUid (créé par l’hôte au tirage)
+  showRoleOverlayBase();
+  spinRunning = true;
+
+  // phase 1: ultra rapide
+  let flip = false;
+  let delay = 45; // ms
+  const startT = performance.now();
+  while (performance.now() - startT < 900 && spinRunning){
+    flip = !flip;
+    setOverlayFace(flip ? "titruant" : "tinocent");
+    await sleep(delay);
+  }
+
+  // phase 2: ralentissement progressif
+  // (on monte de 60ms -> 250ms sur ~1.2s)
+  const slowStart = performance.now();
+  while (performance.now() - slowStart < 1200 && spinRunning){
+    flip = !flip;
+    setOverlayFace(flip ? "titruant" : "tinocent");
+    const t = (performance.now() - slowStart) / 1200;
+    delay = 60 + t * 190;
+    await sleep(delay);
+  }
+
+  // final
+  if (!spinRunning) return;
+  setOverlayFinal(finalRole);
+  await sleep(900);
+  hideRoleOverlay();
+  spinRunning = false;
+}
+
+// écoute mon privateRole
+function listenMyRole(){
+  if (!myUid || !roomId) return () => {};
   const ref = doc(db, "rooms", roomId, "privateRoles", myUid);
 
-  // écoute jusqu’à ce qu’on ait le role
   const unsub = onSnapshot(ref, (snap) => {
     if (!snap.exists()) return;
 
-    const data = snap.data() || {};
-    const role = data.role ?? data.type ?? data.name ?? data.isTruant;
+    const d = snap.data() || {};
+    const role = d.role; // attendu: "tinocent" | "titruant"
+    if (!role) return;
 
-    if (role == null) return;
-
-    myRole = role;
-    showRoleResult(role);
-    unsub();
-  }, (err) => {
-    console.log("privateRoles snapshot error:", err);
-    setStartInfo("Erreur rôle. Réessaie.");
-    try { unsub(); } catch {}
+    if (!myRole){
+      myRole = role;
+      setRoleHud(myRole);
+    }
   });
+
+  return unsub;
+}
+
+// HOST: crée les roles (1 truant si 4-8, sinon 2)
+async function hostAssignRolesAndStart(players){
+  // players = array docs data
+  const uids = players.map(p => p.uid).filter(Boolean);
+  if (uids.length < 4) throw new Error("not_enough_players");
+
+  const nbPlayers = uids.length;
+  const truantsCount = (nbPlayers >= 4 && nbPlayers <= 8) ? 1 : 2;
+
+  const pool = shuffleInPlace([...uids]);
+  const truants = new Set(pool.slice(0, truantsCount));
+
+  // écrit privateRoles
+  for (const uid of uids){
+    const role = truants.has(uid) ? "titruant" : "tinocent";
+    await updateDoc(doc(db, "rooms", roomId, "privateRoles", uid), {
+      role,
+      updatedAt: serverTimestamp()
+    }).catch(async () => {
+      // si le doc n'existe pas encore, updateDoc échoue -> on fait create via set/update
+      // (mais tu n'as pas importé setDoc ici, donc on fait un "update" room-friendly:
+      // on crée d'abord en ajoutant un champ via updateDoc en fallback => pas possible sans setDoc)
+      // => on utilise une astuce: try create by updateDoc sur doc vide ne marche pas.
+      // Donc on importe setDoc proprement.
+    });
+  }
+}
+
+// on a besoin de setDoc pour créer privateRoles si absent
+import { setDoc } from "https://www.gstatic.com/firebasejs/10.12.4/firebase-firestore.js";
+
+async function hostAssignRoles(players){
+  const uids = players.map(p => p.uid).filter(Boolean);
+  if (uids.length < 4) throw new Error("not_enough_players");
+
+  const nbPlayers = uids.length;
+  const truantsCount = (nbPlayers >= 4 && nbPlayers <= 8) ? 1 : 2;
+
+  const pool = shuffleInPlace([...uids]);
+  const truants = new Set(pool.slice(0, truantsCount));
+
+  for (const uid of uids){
+    const role = truants.has(uid) ? "titruant" : "tinocent";
+    await setDoc(doc(db, "rooms", roomId, "privateRoles", uid), {
+      uid,
+      role,
+      updatedAt: serverTimestamp()
+    }, { merge: true });
+  }
+
+  // garde aussi dans room si tu veux
+  await updateDoc(doc(db, "rooms", roomId), {
+    playersCount: nbPlayers,
+    truantsCount: truantsCount
+  }).catch(()=>{});
 }
 
 // ===================
-// DRAW HELPERS
+// DRAW HELPERS + VIGNETTE MAP
 // ===================
 function drawPlayerSprite(px, py, img){
   const size = gameStarted ? SPRITE_SIZE_GAME : SPRITE_SIZE_LOBBY;
@@ -626,12 +777,35 @@ function drawNameTag(px, py, name, isHost){
   ctx.restore();
 }
 
+function drawVignette(){
+  // noir autour pour réduire le champ de vision (MAP uniquement)
+  const w = window.innerWidth;
+  const h = window.innerHeight;
+  const cx = w / 2;
+  const cy = h / 2;
+
+  const rInner = Math.min(w, h) * 0.22;
+  const rOuter = Math.min(w, h) * 0.60;
+
+  ctx.save();
+  ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+
+  const g = ctx.createRadialGradient(cx, cy, rInner, cx, cy, rOuter);
+  g.addColorStop(0.0, "rgba(0,0,0,0)");
+  g.addColorStop(0.55, "rgba(0,0,0,0.25)");
+  g.addColorStop(1.0, "rgba(0,0,0,0.75)");
+
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, w, h);
+  ctx.restore();
+}
+
 // ===================
 // UPDATE / DRAW / LOOP
 // ===================
 function update(dt){
   if (phase === "starting") {
-    // on bloque le mouvement pendant l'overlay si tu veux
+    // bloque le mouvement pendant l'anim
     move.x = 0; move.y = 0;
   }
 
@@ -669,7 +843,7 @@ function update(dt){
 
   if (moved && (walking || wasWalking)) sendMyPosition();
 
-  // anim remote (simple)
+  // anim remote
   for (const [uid, p] of playersMap){
     if (uid === myUid) continue;
     if (!p.moving) continue;
@@ -763,6 +937,9 @@ function draw(){
   }
 
   ctx.restore();
+
+  // ✅ vignette sur map
+  drawVignette();
 }
 
 let lastT = performance.now();
@@ -865,7 +1042,6 @@ function renderChat(messages){
 async function sendChat(text){
   const t = (text || "").trim();
   if (!t || !roomId || !myUid) return;
-
   await addDoc(collection(db, "rooms", roomId, "messages"), {
     uid: myUid,
     name: myName || "Joueur",
@@ -880,6 +1056,8 @@ async function sendChat(text){
 // ===================
 let localPosReady = false;
 let spawning = false;
+let unsubMyRole = null;
+let startTriggeredLocal = false;
 
 async function ensureSpawnCenter(){
   if (!myUid || !roomId) return;
@@ -909,7 +1087,12 @@ onAuthStateChanged(auth, async (u) => {
 
   myUid = u.uid;
 
-  // ✅ START button: passe en "starting" (pas started direct)
+  // écoute mon role (dès connexion)
+  if (!unsubMyRole){
+    unsubMyRole = listenMyRole();
+  }
+
+  // ✅ START button: status="starting" + host assign roles + auto pass "started"
   btnStart?.addEventListener("click", async (e) => {
     e.preventDefault();
 
@@ -927,20 +1110,36 @@ onAuthStateChanged(auth, async (u) => {
     setStartInfo("");
 
     try{
-      // 1) on demande la phase "starting"
-      // 2) ton backend/host logic doit générer les privateRoles quand status="starting"
+      // 1) starting
       await updateDoc(doc(db, "rooms", roomId), {
         status: "starting",
-        startingAt: serverTimestamp()
+        startingAt: serverTimestamp(),
+        // sur map: chat fermé par défaut
+        chatEnabled: false
       });
+
+      // 2) récupère les players live et assigne les roles
+      const snapPlayers = await getDocs(collection(db, "rooms", roomId, "players"));
+      const players = snapPlayers.docs.map(d => d.data());
+      await hostAssignRoles(players);
+
+      // 3) auto start après le temps d’animation
+      // (tout le monde aura eu le temps de voir son rôle)
+      await sleep(3200);
+
+      await updateDoc(doc(db, "rooms", roomId), {
+        status: "started",
+        startedAt: serverTimestamp()
+      });
+
     } catch (err){
       console.log("START ERROR:", err);
       setStartInfo(`Erreur démarrage: ${err?.code || ""} ${err?.message || err}`);
     }
   });
 
-  // room status + host
-  onSnapshot(doc(db,"rooms",roomId), (snap)=>{
+  // room status + host + flags
+  onSnapshot(doc(db,"rooms",roomId), async (snap)=>{
     if (!snap.exists()){
       alert("Partie supprimée");
       location.href="./game.html";
@@ -950,6 +1149,9 @@ onAuthStateChanged(auth, async (u) => {
     const room = snap.data() || {};
     const status = room.status;
 
+    // chat map: activable via room.chatEnabled = true (à mettre lors d’expulsion/dénonciation)
+    roomChatEnabled = !!room.chatEnabled;
+
     myIsHost = (room.hostUid === myUid);
     if (btnStart) btnStart.style.display = myIsHost ? "" : "none";
 
@@ -957,13 +1159,53 @@ onAuthStateChanged(auth, async (u) => {
     if (status === "starting"){
       if (lastRoomStatus !== "starting"){
         setStartingMode();
-        // chaque joueur lance son overlay et attend son privateRole
-        waitMyPrivateRoleThenShow();
+        startTriggeredLocal = false;
       }
+
+      // lance l’anim une fois dès qu’on a mon rôle (ou sinon “attente”)
+      if (!startTriggeredLocal){
+        startTriggeredLocal = true;
+
+        // on affiche un spin même si rôle pas encore reçu
+        showRoleOverlayBase();
+        spinRunning = true;
+        // mini boucle rapide en attendant le rôle
+        (async ()=>{
+          let flip = false;
+          while (spinRunning && !myRole){
+            flip = !flip;
+            setOverlayFace(flip ? "titruant" : "tinocent");
+            await sleep(55);
+          }
+          // dès que rôle dispo -> anim complète -> reveal -> auto close
+          if (myRole){
+            await playSpinThenReveal(myRole);
+          } else {
+            // sécurité
+            hideRoleOverlay();
+            spinRunning = false;
+          }
+        })();
+      }
+
     } else if (status === "started"){
+      // stop anim si encore active
+      spinRunning = false;
+      hideRoleOverlay();
       setGameMode();
     } else {
+      // lobby
+      spinRunning = false;
+      hideRoleOverlay();
       setLobbyMode();
+    }
+
+    // chat gating update si on est en map
+    if (status === "started"){
+      chatAllowedNow = !!roomChatEnabled;
+      if (!chatAllowedNow && chatOverlay?.classList.contains("open")) closeChat();
+    } else {
+      chatAllowedNow = true;
     }
 
     if (lastRoomStatus !== status){
@@ -1006,7 +1248,7 @@ onAuthStateChanged(auth, async (u) => {
     startLoopOnce();
   });
 
-  // chat snapshot + submit
+  // chat snapshot + submit (toujours actif, mais l’UI est “gated” sur map)
   if (chatForm && chatInput){
     const q = query(
       collection(db, "rooms", roomId, "messages"),
@@ -1018,7 +1260,10 @@ onAuthStateChanged(auth, async (u) => {
       const msgs = snap.docs.map(d => d.data());
       renderChat(msgs);
 
-      if (msgs.length && !chatOverlay?.classList.contains("open")){
+      // badge uniquement si chat autorisé OU si on est lobby
+      const canBadge = (phase !== "started") ? true : chatAllowedNow;
+
+      if (msgs.length && canBadge && !chatOverlay?.classList.contains("open")){
         const last = msgs[msgs.length - 1];
         if (last?.uid && last.uid !== myUid){
           chatFab?.classList.add("has-unread");
@@ -1030,6 +1275,11 @@ onAuthStateChanged(auth, async (u) => {
     chatForm.addEventListener("submit", async (e) => {
       e.preventDefault();
       e.stopPropagation();
+
+      if (phase === "started" && !chatAllowedNow){
+        setStartInfo("Chat dispo sur la map seulement pendant expulsion / dénonciation.");
+        return;
+      }
 
       const val = chatInput.value;
       chatInput.value = "";
