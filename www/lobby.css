@@ -1,4 +1,7 @@
-html, body {
+/* =========================
+   BASE + ROOT
+========================= */
+html, body{
   margin:0;
   padding:0;
   width:100%;
@@ -6,53 +9,41 @@ html, body {
   overflow:hidden;
 }
 
-.lobby-root {
+.lobby-root{
   position:relative;
   width:100vw;
   height:100vh;
-  background:black;
+  background:#000;
 }
 
-canvas {
+/* Canvas plein écran */
+canvas{
   position:absolute;
   inset:0;
   z-index: 1;
+  pointer-events:none; /* le canvas ne capte rien, joystick OK */
 }
 
-/* UI */
+/* =========================
+   UI TOP LEFT
+========================= */
 .ui{
   position:absolute;
   top: calc(12px + env(safe-area-inset-top));
   left: 12px;
-  z-index:20;
-  color:white;
+  z-index: 20;
+  color:#fff;
   font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
   text-shadow: 0 2px 6px rgba(0,0,0,.35);
 }
 
-.players { margin-top:10px; font-size:14px; }
-
-.btn-start{
+.players{
   margin-top:10px;
-  border:0;
-  padding: 12px 18px;
-  border-radius: 999px;
-  font-weight: 900;
-  letter-spacing: .2px;
-  color: white;
-  cursor: pointer;
-  background: linear-gradient(180deg, #48c6ff 0%, #1479ff 100%);
-  box-shadow:
-    0 10px 18px rgba(0,0,0,.28),
-    inset 0 2px 0 rgba(255,255,255,.35);
-}
-.btn-start:active{
-  transform: translateY(1px) scale(.98);
-  box-shadow:
-    0 8px 14px rgba(0,0,0,.26),
-    inset 0 2px 0 rgba(255,255,255,.25);
+  font-size:14px;
 }
 
+/* Buttons */
+.btn-start,
 .btn-leave{
   margin-top:10px;
   border:0;
@@ -60,13 +51,19 @@ canvas {
   border-radius: 999px;
   font-weight: 900;
   letter-spacing: .2px;
-  color: white;
-  cursor: pointer;
-  background: linear-gradient(180deg, #ff6b6b 0%, #d81b60 100%);
+  color:#fff;
+  cursor:pointer;
   box-shadow:
     0 10px 18px rgba(0,0,0,.28),
     inset 0 2px 0 rgba(255,255,255,.25);
 }
+.btn-start{
+  background: linear-gradient(180deg, #48c6ff 0%, #1479ff 100%);
+}
+.btn-leave{
+  background: linear-gradient(180deg, #ff6b6b 0%, #d81b60 100%);
+}
+.btn-start:active,
 .btn-leave:active{
   transform: translateY(1px) scale(.98);
   box-shadow:
@@ -74,7 +71,9 @@ canvas {
     inset 0 2px 0 rgba(255,255,255,.18);
 }
 
-/* Joystick */
+/* =========================
+   JOYSTICK
+========================= */
 .joystick{
   position:absolute;
   left: 18px;
@@ -82,38 +81,77 @@ canvas {
   width:120px;
   height:120px;
   border-radius:50%;
-  background:rgba(255,255,255,0.10);
+  background: rgba(255,255,255,0.10);
   backdrop-filter: blur(6px);
   -webkit-backdrop-filter: blur(6px);
   touch-action:none;
   z-index: 30;
+  pointer-events:auto;
 }
 .stick{
   position:absolute;
   width:52px;
   height:52px;
-  background:rgba(255,255,255,0.90);
+  background: rgba(255,255,255,0.90);
   border-radius:50%;
   left:34px;
   top:34px;
   box-shadow: 0 10px 18px rgba(0,0,0,.25);
 }
 
-/* ✅ Chat fullscreen overlay */
+/* =========================
+   CHAT BUTTON (FAB)
+========================= */
+.chat-fab{
+  position:absolute;
+  right: 14px;
+  top: calc(14px + env(safe-area-inset-top));
+  width: 54px;
+  height: 54px;
+  border: 0;
+  border-radius: 999px;
+  cursor: pointer;
+  z-index: 70;
+  color:#fff;
+
+  background: rgba(0,0,0,.35);
+  border: 1px solid rgba(255,255,255,.15);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  box-shadow: 0 14px 26px rgba(0,0,0,.25);
+}
+.chat-fab:active{ transform: scale(.98); }
+.chat-fab svg{ display:block; margin:auto; }
+
+.chat-fab .badge{
+  position:absolute;
+  top: 9px;
+  right: 9px;
+  width: 12px;
+  height: 12px;
+  border-radius: 999px;
+  background: #ff2d2d;
+  border: 2px solid rgba(0,0,0,.6);
+  display:none;
+}
+.chat-fab.has-unread .badge{ display:block; }
+
+/* =========================
+   CHAT OVERLAY (FULLSCREEN)
+========================= */
 .chat-overlay{
   position: fixed;
   inset: 0;
-  z-index: 60;
+  z-index: 80;
   display: none;
   background: rgba(0,0,0,.55);
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
-  padding: calc(12px + env(safe-area-inset-top)) 12px calc(12px + env(safe-area-inset-bottom));
+  padding:
+    calc(12px + env(safe-area-inset-top)) 12px
+    calc(12px + env(safe-area-inset-bottom)) 12px;
 }
-
-.chat-overlay.open{
-  display: block;
-}
+.chat-overlay.open{ display:block; }
 
 .chat-sheet{
   height: 100%;
@@ -144,14 +182,15 @@ canvas {
 
 .chat-close{
   border:0;
-  background: rgba(255,255,255,.10);
+  background: rgba(255,255,255,.12);
   color:#fff;
   width: 40px;
   height: 40px;
   border-radius: 12px;
   cursor:pointer;
-  font-size: 18px;
+  font-weight: 900;
 }
+.chat-close:active{ transform: scale(.98); }
 
 .chat-messages{
   flex:1;
@@ -169,7 +208,6 @@ canvas {
   background: rgba(255,255,255,.10);
   border: 1px solid rgba(255,255,255,.08);
 }
-
 .chat-msg.me{
   margin-left:auto;
   background: rgba(72,198,255,.18);
@@ -182,7 +220,6 @@ canvas {
   opacity: .9;
   margin-bottom: 2px;
 }
-
 .chat-text{
   font-size: 14px;
   line-height: 1.25;
@@ -195,7 +232,6 @@ canvas {
   padding: 12px;
   border-top: 1px solid rgba(255,255,255,.10);
 }
-
 .chat-input{
   flex:1;
   border: 1px solid rgba(255,255,255,.12);
@@ -219,163 +255,15 @@ canvas {
               inset 0 2px 0 rgba(255,255,255,.25);
 }
 
-/* ✅ Quand chat ouvert : on évite que le joystick/canvas capte des events */
+/* Quand chat ouvert : on évite que joystick/canvas capte */
 body.chat-open .joystick,
 body.chat-open canvas{
-  pointer-events: none;
+  pointer-events:none;
 }
 
-/* ✅ bouton flottant (SVG) */
-.chat-fab{
-  position:absolute;
-  right: 14px;
-  bottom: calc(18px + env(safe-area-inset-bottom));
-  width: 54px;
-  height: 54px;
-  border: 0;
-  border-radius: 999px;
-  cursor: pointer;
-  z-index: 40;
-  color: white;
-
-  background: rgba(0,0,0,.35);
-  border: 1px solid rgba(255,255,255,.15);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
-  box-shadow: 0 14px 26px rgba(0,0,0,.25);
-}
-.chat-fab:active{ transform: scale(.98); }
-.chat-fab svg{ display:block; margin:auto; }
-
-/* en-tête */
-.chat-title{
-  display:flex;
-  align-items:center;
-  justify-content:space-between;
-  font-weight: 900;
-  letter-spacing: .2px;
-  padding: 6px 2px 10px 2px;
-}
-
-.chat-close{
-  border:0;
-  background: rgba(255,255,255,.12);
-  color:#fff;
-  border-radius: 10px;
-  padding: 8px 10px;
-  font-weight: 900;
-  cursor:pointer;
-}
-.chat-close:active{ transform: scale(.98); }
-
-/* messages + form tu peux garder tes styles, ça marche pareil */
-.chat-messages{
-  flex:1;
-  overflow:auto;
-  display:flex;
-  flex-direction:column;
-  gap:8px;
-  padding-right: 6px;
-}
-
-/* ✅ Bouton flottant (SVG) */
-.chat-fab{
-  position: absolute;
-  right: 14px;
-  top: calc(14px + env(safe-area-inset-top));
-  bottom: auto;
-
-  width: 54px;
-  height: 54px;
-  border: 0;
-  border-radius: 999px;
-  cursor: pointer;
-  z-index: 70;
-  color: white;
-
-  background: rgba(0,0,0,.35);
-  border: 1px solid rgba(255,255,255,.15);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
-  box-shadow: 0 14px 26px rgba(0,0,0,.25);
-}
-.chat-fab svg{ display:block; margin:auto; }
-
-/* ✅ Overlay chat fullscreen */
-.chat-overlay{
-  position: fixed;
-  inset: 0;
-  z-index: 80;          /* ✅ au-dessus du bouton */
-  display: none;        /* caché par défaut */
-  background: rgba(0,0,0,.55);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
-  padding: calc(12px + env(safe-area-inset-top)) 12px
-           calc(12px + env(safe-area-inset-bottom)) 12px;
-}
-
-.chat-overlay.open{
-  display: block;
-}
-
-.chat-sheet{
-  height: 100%;
-  width: 100%;
-  border-radius: 18px;
-  border: 1px solid rgba(255,255,255,.12);
-  background: rgba(0,0,0,.38);
-  display:flex;
-  flex-direction:column;
-  overflow:hidden;
-  color:#fff;
-  font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
-  box-shadow: 0 18px 36px rgba(0,0,0,.35);
-}
-
-.chat-badge{
-  position:absolute;
-  top: 8px;
-  right: 8px;
-  width: 12px;
-  height: 12px;
-  background: #ff3b3b;
-  border-radius: 50%;
-  border: 2px solid rgba(0,0,0,.6);
-  box-shadow: 0 0 6px rgba(255,0,0,.8);
-  pointer-events: none;
-}
-
-/* ✅ Pastille rouge notif sur bouton chat */
-.chat-fab{
-  position:absolute;
-  right: 14px;
-  top: calc(14px + env(safe-area-inset-top));
-  bottom:auto;
-  width:54px;height:54px;border-radius:999px;
-  border:1px solid rgba(255,255,255,.15);
-  background: rgba(0,0,0,.35);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
-  box-shadow: 0 14px 26px rgba(0,0,0,.25);
-  z-index: 70;
-  color: #fff;
-}
-.chat-fab svg{ display:block; margin:auto; }
-
-.chat-fab .badge{
-  position:absolute;
-  top: 9px;
-  right: 9px;
-  width: 12px;
-  height: 12px;
-  border-radius: 999px;
-  background: #ff2d2d;
-  border: 2px solid rgba(0,0,0,.6);
-  display:none;
-}
-.chat-fab.has-unread .badge{ display:block; }
-
-/* ✅ Overlay rôle (roulette) */
+/* =========================
+   ROLE OVERLAY
+========================= */
 .role-overlay{
   position: fixed;
   inset: 0;
@@ -386,7 +274,9 @@ body.chat-open canvas{
   background: rgba(0,0,0,.65);
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
-  padding: calc(12px + env(safe-area-inset-top)) 12px calc(12px + env(safe-area-inset-bottom));
+  padding:
+    calc(12px + env(safe-area-inset-top)) 12px
+    calc(12px + env(safe-area-inset-bottom)) 12px;
 }
 .role-overlay.open{ display:flex; }
 
@@ -431,10 +321,5 @@ body.chat-open canvas{
   background: linear-gradient(180deg, #48c6ff 0%, #1479ff 100%);
 }
 
+/* Utils */
 .is-hidden{ display:none !important; }
-
-.chat-badge{ display:none; }
-.chat-fab.has-unread .chat-badge{ display:block; }
-
-.joystick { pointer-events: auto; }
-canvas { pointer-events: none; } /* le canvas ne capte rien, joystick OK */
