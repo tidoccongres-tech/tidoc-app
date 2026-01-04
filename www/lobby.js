@@ -127,7 +127,7 @@ let loopRunning = false;
 
 function setLobbyMode(){
   gameStarted = false;
-  joy?.classList.remove("is-hidden"); // joystick visible en lobby
+  joy?.classList.remove("is-hidden");
   if (actionBtn) actionBtn.style.display = "none";
 }
 
@@ -292,6 +292,27 @@ function canMoveWorld(nx, ny){
     isWalkableWorld(nx, ny - R) &&
     isWalkableWorld(nx, ny + R)
   );
+}
+
+// ✅ Spawn centre “propre” (cherche un point walkable proche du centre)
+function findSpawnNearCenter(){
+  const cx = MAP_W * 0.5;
+  const cy = MAP_H * 0.5;
+
+  // si pas de collisionData encore, on spawn direct au centre
+  if (!collisionData) return { x: cx, y: cy };
+
+  // mini recherche en spirale
+  const step = 14;
+  const maxR = 260;
+  for (let r = 0; r <= maxR; r += step){
+    for (let a = 0; a < Math.PI * 2; a += Math.PI / 8){
+      const x = cx + Math.cos(a) * r;
+      const y = cy + Math.sin(a) * r;
+      if (canMoveWorld(x, y)) return { x, y };
+    }
+  }
+  return { x: cx, y: cy };
 }
 
 // ===================
@@ -477,7 +498,6 @@ function drawNameTag(px, py, name, isHost){
 // UPDATE / DRAW / LOOP
 // ===================
 function update(dt){
-  // mouvement autorisé lobby + game
   const dtNorm = Math.min(2, dt / 16.6667);
 
   const nx = player.x + move.x * player.speed * dtNorm;
@@ -500,12 +520,14 @@ function update(dt){
     walkIndex = 0;
   }
 
+  // ✅ mouvement local + envoi position
   if (canMoveWorld(nx, ny)){
     player.x = nx;
     player.y = ny;
     if (walking || wasWalking) sendMyPosition();
   }
 
+  // anim remote
   for (const [uid, p] of playersMap){
     if (uid === myUid) continue;
     if (!p.moving) continue;
@@ -521,35 +543,30 @@ function update(dt){
 }
 
 function draw(){
-  // ✅ DPR safe : on remet le repère "CSS pixels" à chaque frame
   ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
   ctx.clearRect(0,0,window.innerWidth, window.innerHeight);
 
   // =========================
-  // LOBBY: lobby.png en cover NON déformé + joueurs dans le même repère
+  // LOBBY: cover non déformé + joueurs
   // =========================
   if (!gameStarted){
     const bg = (lobbyBgImg.complete && lobbyBgImg.naturalWidth > 0) ? lobbyBgImg : mapImg;
     if (!(bg.complete && bg.naturalWidth > 0)) return;
 
-    // ✅ taille réelle de l'image affichée
     const bw = bg.naturalWidth;
     const bh = bg.naturalHeight;
 
-    // cover sans déformation
     const s  = Math.max(window.innerWidth / bw, window.innerHeight / bh);
     const ox = (window.innerWidth  - bw * s) / 2;
     const oy = (window.innerHeight - bh * s) / 2;
 
-    // empile transform (sans casser DPR)
     ctx.save();
     ctx.translate(ox, oy);
     ctx.scale(s, s);
 
-    // draw bg
     ctx.drawImage(bg, 0, 0, bw, bh);
 
-    // mapping monde -> lobby si tailles différentes
+    // mapping monde -> image lobby si tailles diff
     const scaleX = bw / MAP_W;
     const scaleY = bh / MAP_H;
 
@@ -571,8 +588,6 @@ function draw(){
     }
 
     ctx.restore();
-
-    if (actionBtn) actionBtn.style.display = "none";
     return;
   }
 
@@ -727,6 +742,32 @@ async function sendChat(text){
 // ===================
 // FIREBASE
 // ===================
+let lastStatus = null;
+let localPosReady = false;     // ✅ on ne prend x/y depuis Firestore qu'une fois
+let spawning = false;
+
+async function ensureSpawnCenter(){
+  if (!myUid || !roomId) return;
+  if (spawning) return;
+  spawning = true;
+
+  const spawn = findSpawnNearCenter();
+  player.x = spawn.x;
+  player.y = spawn.y;
+
+  try{
+    await updateDoc(doc(db,"rooms",roomId,"players",myUid), {
+      x: player.x,
+      y: player.y,
+      updatedAt: serverTimestamp()
+    });
+  } catch (e){
+    console.log("spawn write error:", e);
+  } finally {
+    spawning = false;
+  }
+}
+
 onAuthStateChanged(auth, async (u) => {
   if (!u) { location.href = "./login.html"; return; }
   if (!roomId) { location.href = "./game.html"; return; }
@@ -747,8 +788,18 @@ onAuthStateChanged(auth, async (u) => {
     myIsHost = (room.hostUid === myUid);
     if (btnStart) btnStart.style.display = myIsHost ? "" : "none";
 
+    // transition
     if (status === "started") setGameMode();
     else setLobbyMode();
+
+    // ✅ si on vient d'arriver en lobby : spawn centre (option)
+    // (Si tu veux uniquement au premier join, commente ce bloc)
+    if (lastStatus !== null && lastStatus === "started" && status !== "started"){
+      // retour lobby -> recentrer
+      ensureSpawnCenter();
+    }
+
+    lastStatus = status;
   });
 
   // players
@@ -766,11 +817,21 @@ onAuthStateChanged(auth, async (u) => {
     const me = players.find(p => p.uid === myUid);
     if (me?.name) myName = me.name;
 
+    // ✅ IMPORTANT: on ne ré-écrase plus player.x/y à chaque snapshot
     if (me){
-      if (typeof me.x === "number" && typeof me.y === "number"){
-        player.x = me.x;
-        player.y = me.y;
+      // 1) init position UNE SEULE FOIS
+      if (!localPosReady){
+        if (typeof me.x === "number" && typeof me.y === "number"){
+          player.x = me.x;
+          player.y = me.y;
+        } else {
+          // pas de coords -> spawn centre lobby
+          await ensureSpawnCenter();
+        }
+        localPosReady = true;
       }
+
+      // 2) on garde la state locale autoritaire et on alimente le rendu
       ensurePlayerState({ ...me, x: player.x, y: player.y });
     }
 
@@ -789,7 +850,6 @@ onAuthStateChanged(auth, async (u) => {
       const msgs = snap.docs.map(d => d.data());
       renderChat(msgs);
 
-      // notif si nouveau msg d'un autre + chat fermé
       if (msgs.length && !chatOverlay?.classList.contains("open")){
         const last = msgs[msgs.length - 1];
         if (last?.uid && last.uid !== myUid){
@@ -800,7 +860,7 @@ onAuthStateChanged(auth, async (u) => {
     }, (err) => console.log("chat snapshot error:", err));
 
     chatForm.addEventListener("submit", async (e) => {
-      e.preventDefault();       // ✅ empêche reload (cause déconnexion)
+      e.preventDefault();
       e.stopPropagation();
 
       const val = chatInput.value;
