@@ -21,6 +21,13 @@ const playersEl  = document.getElementById("playersList");
 const btnStart   = document.getElementById("btnStart");
 const btnLeave   = document.getElementById("btnLeave");
 
+// ✅ message start (ajoute <div id="startInfo"></div> dans ton HTML si tu veux l’afficher)
+const startInfo = document.getElementById("startInfo");
+function setStartInfo(msg){
+  if (!startInfo) return;
+  startInfo.textContent = msg || "";
+}
+
 // ROLE OVERLAY (pas utilisé ici, mais on garde si tu t'en sers ailleurs)
 const roleOverlay = document.getElementById("roleOverlay");
 const roleImg     = document.getElementById("roleImg");
@@ -154,13 +161,9 @@ collisionImg.src = "./assets/collisions.png";
 // ===================
 // WORLD SIZES
 // ===================
-// On travaille dans un "monde" unique : MAP_W / MAP_H
-// Les collisions lobby (lobby-NB.png) sont mappées vers ce monde.
-// Les collisions game (collisions.png) définissent MAP_W/H si dispo.
 let MAP_W = 1536;
 let MAP_H = 1024;
 
-// map (visuel)
 mapImg.onload = () => {
   MAP_W = mapImg.width || MAP_W;
   MAP_H = mapImg.height || MAP_H;
@@ -283,14 +286,13 @@ function buildZonesFromCollision(){
 const player = { x: 220, y: 320, speed: 2.2 };
 let move = { x: 0, y: 0 };
 
-const PLAYER_RADIUS_LOBBY = 20;
+const PLAYER_RADIUS_LOBBY = 22; // ✅ un peu plus "gros" dans le lobby
 const PLAYER_RADIUS_GAME  = 22;
 
 // ✅ Blanc = walkable (lobby-NB.png)
 function isWalkableLobby(wx, wy){
   if (!lobbyMaskData || !LOBBY_W || !LOBBY_H) return true;
 
-  // monde (MAP_W/H) -> mask lobby (LOBBY_W/H)
   const mx = Math.floor(wx * (LOBBY_W / MAP_W));
   const my = Math.floor(wy * (LOBBY_H / MAP_H));
 
@@ -301,7 +303,6 @@ function isWalkableLobby(wx, wy){
   const g = lobbyMaskData.data[i+1];
   const b = lobbyMaskData.data[i+2];
 
-  // tolérance blanc
   return (r > 220 && g > 220 && b > 220);
 }
 
@@ -348,13 +349,6 @@ function findSpawnNearCenter(){
   const step = 14;
   const maxR = 260;
 
-  // si mask pas prêt -> centre brut
-  if (!isWalkable(cx, cy)) {
-    // si le mask n'est pas prêt, isWalkable renvoie true,
-    // donc ce cas arrive surtout si centre est vraiment bloqué.
-  }
-
-  // spirale
   for (let r = 0; r <= maxR; r += step){
     for (let a = 0; a < Math.PI * 2; a += Math.PI / 10){
       const x = cx + Math.cos(a) * r;
@@ -369,7 +363,7 @@ function findSpawnNearCenter(){
 // SPRITES
 // ===================
 const SPRITE_SIZE_GAME  = 96;
-const SPRITE_SIZE_LOBBY = 112; // ✅ perso un peu plus grand dans le lobby
+const SPRITE_SIZE_LOBBY = 124; // ✅ agrandi un peu (112 -> 124)
 
 const FOOT_OFFSET_Y = 16;
 const FOOT_ADJUST = new Map();
@@ -386,7 +380,9 @@ function loadImg(src){
 const spritePose1 = loadImg("./assets/pose-1.png");
 const marche1     = loadImg("./assets/marche1.png");
 const marche2     = loadImg("./assets/marche2.png");
-const WALK_SEQUENCE = [marche1, marche2, marche1, marche2];
+
+// ✅ ta séquence avec pose-1 au milieu
+const WALK_SEQUENCE = [marche1, spritePose1, marche1, marche2, spritePose1, marche2];
 
 // ===================
 // PLAYERS STATE
@@ -575,7 +571,7 @@ function update(dt){
     walkIndex = 0;
   }
 
-  // ✅ déplacement "slide" : X puis Y (évite stop/go sur les murs)
+  // ✅ déplacement "slide" : X puis Y
   let moved = false;
 
   if (canMoveWorld(nx, player.y)){
@@ -628,7 +624,6 @@ function draw(){
 
     ctx.drawImage(bg, 0, 0, bw, bh);
 
-    // monde -> image lobby (si sizes diff)
     const scaleX = bw / MAP_W;
     const scaleY = bh / MAP_H;
 
@@ -834,6 +829,31 @@ onAuthStateChanged(auth, async (u) => {
 
   myUid = u.uid;
 
+  // ✅ START button: règle 4 joueurs + update room.status
+  btnStart?.addEventListener("click", async () => {
+    if (!myIsHost) return;
+
+    const n = playersMap.size;
+    if (n < 4){
+      // si tu préfères un alert:
+      // alert(`Il faut au moins 4 joueurs (actuellement ${n}).`);
+      setStartInfo(`Il faut au moins 4 joueurs pour démarrer (actuellement ${n}).`);
+      return;
+    }
+
+    setStartInfo("");
+
+    try{
+      await updateDoc(doc(db, "rooms", roomId), {
+        status: "started",
+        startedAt: serverTimestamp()
+      });
+    } catch (e){
+      console.log("start error:", e);
+      setStartInfo("Impossible de démarrer. Réessaie.");
+    }
+  });
+
   // room status + host
   onSnapshot(doc(db,"rooms",roomId), (snap)=>{
     if (!snap.exists()){
@@ -853,10 +873,7 @@ onAuthStateChanged(auth, async (u) => {
     if (status === "started") setGameMode();
     else setLobbyMode();
 
-    // ✅ transitions -> respawn propre
-    // lobby join / retour lobby / passage en game : on recentre
     if (prev !== status){
-      // sur le tout premier snapshot, prev = null => on va spawn
       ensureSpawnCenter();
     }
 
@@ -867,6 +884,9 @@ onAuthStateChanged(auth, async (u) => {
   onSnapshot(collection(db,"rooms",roomId,"players"), async (snap)=>{
     const players = snap.docs.map(d=>d.data());
     renderPlayers(players);
+
+    // clear start message when enough players
+    if (myIsHost && players.length >= 4) setStartInfo("");
 
     for (const p of players) ensurePlayerState(p);
 
@@ -879,7 +899,6 @@ onAuthStateChanged(auth, async (u) => {
     if (me?.name) myName = me.name;
 
     if (me){
-      // ✅ init position UNE seule fois, sinon la position locale est autoritaire
       if (!localPosReady){
         if (typeof me.x === "number" && typeof me.y === "number"){
           player.x = me.x;
