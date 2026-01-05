@@ -16,12 +16,19 @@
 // + ✅ Tirage équitable (host = même proba)
 // + ✅ Hint “Zone activité” supprimé
 // + ✅ Système de tâches Ti’Nocent: liste aléatoire + flèche + jauge globale (progression commune)
+// + ✅ FIX: expulsion “revient debout” -> deadUids persistant côté room
+// + ✅ FIX: bouton Expulser qui clignote -> hystérésis + lock cible
+// + ✅ FIX: FOV téléphone trop petit -> FOV augmenté
+// + ✅ FIX: player caché en bas de map -> FOV centré sur le player (pas sur caméra clamp)
+// + ✅ HUD missions sous le rôle (pas au-dessus des persos)
+// + ✅ Micro-activités (mini overlays) pour chaque zone (style “crew tasks” sans copier)
+// + ✅ Toast: “X a quitté la partie”
 
 import * as AuthMod from "./auth.js";
 import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.4/firebase-auth.js";
 import {
   doc, getDoc, updateDoc, onSnapshot, collection, deleteDoc, serverTimestamp,
-  addDoc, query, orderBy, limit, getDocs, setDoc, increment
+  addDoc, query, orderBy, limit, getDocs, setDoc, increment, arrayUnion
 } from "https://www.gstatic.com/firebasejs/10.12.4/firebase-firestore.js";
 
 const auth = AuthMod.auth;
@@ -64,38 +71,15 @@ const chatMessagesEl = document.getElementById("chatMessages");
 const chatForm  = document.getElementById("chatForm");
 const chatInput = document.getElementById("chatInput");
 
-// HUD rôle (créé dynamiquement)
-const roleHud = document.createElement("div");
-roleHud.id = "roleHud";
-roleHud.style.cssText = `
-  position: fixed;
-  top: calc(12px + env(safe-area-inset-top));
-  right: calc(12px + env(safe-area-inset-right));
-  z-index: 50;
-  padding: 10px 12px;
-  border-radius: 14px;
-  font: 800 13px system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
-  letter-spacing: .2px;
-  color: #fff;
-  background: rgba(0,0,0,.45);
-  border: 1px solid rgba(255,255,255,.12);
-  backdrop-filter: blur(6px);
-  -webkit-backdrop-filter: blur(6px);
-  display: none;
-  pointer-events: none;
-`;
-document.body.appendChild(roleHud);
+// CANVAS
+const canvas = document.getElementById("gameCanvas");
+const ctx = canvas.getContext("2d");
 
-function setRoleHud(role){
-  if (!role) { roleHud.style.display = "none"; roleHud.textContent = ""; return; }
-  const isTruant = (role === "titruant" || role === "truant" || role === true);
-  roleHud.textContent = `Rôle : ${isTruant ? "Ti’Truant 😈" : "Ti’Nocent 😇"}`;
-  roleHud.style.display = "";
-}
+// ===================
+// TOASTS
+// ===================
 
-if (roomCodeEl) roomCodeEl.textContent = roomId || "----";
-
-// ===== Toast “Vous avez été expulsé”
+// Toast “Vous avez été expulsé”
 const expelledToast = document.createElement("div");
 expelledToast.id = "expelledToast";
 expelledToast.style.cssText = `
@@ -128,6 +112,39 @@ function showExpelledToast(ms = 3200){
   }, ms);
 }
 
+// Toast “X a quitté”
+const leaveToast = document.createElement("div");
+leaveToast.id = "leaveToast";
+leaveToast.style.cssText = `
+  position: fixed;
+  left: 50%;
+  top: calc(58px + env(safe-area-inset-top));
+  transform: translateX(-50%);
+  z-index: 119;
+  padding: 10px 12px;
+  border-radius: 14px;
+  font: 900 13px system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+  letter-spacing: .2px;
+  color: #fff;
+  background: rgba(0,0,0,.62);
+  border: 1px solid rgba(255,255,255,.12);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  box-shadow: 0 10px 26px rgba(0,0,0,.22);
+  display: none;
+`;
+document.body.appendChild(leaveToast);
+
+let leaveToastTimer = null;
+function showLeaveToast(text, ms = 2800){
+  leaveToast.textContent = text || "";
+  leaveToast.style.display = "";
+  clearTimeout(leaveToastTimer);
+  leaveToastTimer = setTimeout(() => {
+    leaveToast.style.display = "none";
+  }, ms);
+}
+
 // ===================
 // HELPERS
 // ===================
@@ -152,13 +169,11 @@ function renderPlayers(players){
 
 function sleep(ms){ return new Promise(r => setTimeout(r, ms)); }
 
-// (Optionnel) warning si crypto indispo
 if (!globalThis.crypto?.getRandomValues){
   console.warn("crypto.getRandomValues indisponible → tirage moins fiable");
 }
 
 function cryptoRandInt(maxExclusive){
-  // [0..maxExclusive-1], crypto-safe
   const arr = new Uint32Array(1);
   const limit = Math.floor(0xFFFFFFFF / maxExclusive) * maxExclusive;
   let x;
@@ -190,34 +205,63 @@ function setChatFabVisible(show){
 }
 
 // ===================
+// HUD RÔLE (haut droite)
+// ===================
+const roleHud = document.createElement("div");
+roleHud.id = "roleHud";
+roleHud.style.cssText = `
+  position: fixed;
+  top: calc(12px + env(safe-area-inset-top));
+  right: calc(12px + env(safe-area-inset-right));
+  z-index: 60;
+  padding: 10px 12px;
+  border-radius: 14px;
+  font: 800 13px system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+  letter-spacing: .2px;
+  color: #fff;
+  background: rgba(0,0,0,.45);
+  border: 1px solid rgba(255,255,255,.12);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  display: none;
+  pointer-events: none;
+`;
+document.body.appendChild(roleHud);
+
+function setRoleHud(role){
+  if (!role) { roleHud.style.display = "none"; roleHud.textContent = ""; return; }
+  const isTruant = (role === "titruant" || role === "truant" || role === true);
+  roleHud.textContent = `Rôle : ${isTruant ? "Ti’Truant 😈" : "Ti’Nocent 😇"}`;
+  roleHud.style.display = "";
+}
+
+if (roomCodeEl) roomCodeEl.textContent = roomId || "----";
+
+// ===================
 // TI’NOCENT TASKS (TÂCHES + FLÈCHE + JAUGE)
 // ===================
-
-// total missions “communes” à compléter (tout le monde contribue)
 const TASKS_TOTAL = 40;
 
-// “pool” de tâches (tu peux en ajouter/renommer quand tu veux)
 const TASK_POOL = [
-  { id:"labo",     label:"Analyse au labo",       zoneId:"labo" },
-  { id:"imagerie", label:"Imagerie",             zoneId:"imagerie" },
+  { id:"labo",     label:"Analyse au labo",         zoneId:"labo" },
+  { id:"imagerie", label:"Imagerie",               zoneId:"imagerie" },
   { id:"pharma",   label:"Préparer un traitement", zoneId:"pharma" },
-  { id:"exam",     label:"Anamnèse",             zoneId:"exam" },
-  { id:"soins",    label:"Soins",                zoneId:"soins" },
-  { id:"admin",    label:"Dossiers",             zoneId:"admin" },
-  { id:"rcp",      label:"RCP",                  zoneId:"rcp" },
+  { id:"exam",     label:"Anamnèse",               zoneId:"exam" },
+  { id:"soins",    label:"Soins",                  zoneId:"soins" },
+  { id:"admin",    label:"Dossiers",               zoneId:"admin" },
+  { id:"rcp",      label:"RCP",                    zoneId:"rcp" },
 ];
 
-// combien de tâches par joueur (Ti’Nocent)
 const TASKS_PER_PLAYER = 6;
 
-// HUD: jauge globale + tâche courante + bouton valider
+// HUD missions -> SOUS le rôle (haut droite)
 const tasksHud = document.createElement("div");
 tasksHud.id = "tasksHud";
 tasksHud.style.cssText = `
   position: fixed;
-  left: calc(12px + env(safe-area-inset-left));
-  top: calc(12px + env(safe-area-inset-top));
-  z-index: 55;
+  right: calc(12px + env(safe-area-inset-right));
+  top: calc(58px + env(safe-area-inset-top));
+  z-index: 59;
   padding: 10px 12px;
   border-radius: 14px;
   font: 800 12px system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
@@ -227,11 +271,11 @@ tasksHud.style.cssText = `
   backdrop-filter: blur(6px);
   -webkit-backdrop-filter: blur(6px);
   display: none;
-  max-width: min(420px, calc(100vw - 24px));
+  width: min(320px, calc(100vw - 24px));
 `;
 tasksHud.innerHTML = `
   <div style="display:flex; align-items:center; justify-content:space-between; gap:10px;">
-    <div id="tasksTitle" style="font:900 12px system-ui; opacity:.95;">Missions</div>
+    <div style="font:900 12px system-ui; opacity:.95;">Missions</div>
     <div id="tasksCount" style="font:900 12px system-ui; opacity:.95;">0/40</div>
   </div>
   <div style="height:10px; margin-top:8px; border-radius:999px; background: rgba(255,255,255,.12); overflow:hidden;">
@@ -239,12 +283,14 @@ tasksHud.innerHTML = `
   </div>
 
   <div id="myTaskLine" style="margin-top:10px; display:none; gap:10px; align-items:center;">
-    <div id="myTaskText" style="font:800 12px system-ui; opacity:.95; flex:1;">—</div>
+    <div id="myTaskText" style="font:900 12px system-ui; opacity:.95; flex:1;">—</div>
     <button id="btnTaskDone" type="button" style="
       appearance:none; border:0; padding:10px 12px; border-radius:12px;
       font:900 12px system-ui; color:#000; background: rgba(255,255,255,.85);
     ">Valider</button>
   </div>
+
+  <div id="myTaskList" style="margin-top:8px; display:none; font:800 11px system-ui; opacity:.92; line-height:1.35;"></div>
 `;
 document.body.appendChild(tasksHud);
 
@@ -253,14 +299,13 @@ const tasksBarEl   = tasksHud.querySelector("#tasksBar");
 const myTaskLineEl = tasksHud.querySelector("#myTaskLine");
 const myTaskTextEl = tasksHud.querySelector("#myTaskText");
 const btnTaskDone  = tasksHud.querySelector("#btnTaskDone");
+const myTaskListEl = tasksHud.querySelector("#myTaskList");
 
-// état local tâches
-let roomTasksDone = 0;         // global
-let myTasks = [];              // liste de tâches assignées
-let myTaskIndex = 0;           // tâche courante (index)
+let roomTasksDone = 0;
+let myTasks = [];
+let myTaskIndex = 0;
 let myTasksReady = false;
 
-// helpers tasks
 function showTasksHud(show){
   tasksHud.style.display = show ? "" : "none";
 }
@@ -276,15 +321,31 @@ function currentTask(){
 }
 function updateMyTaskHud(){
   const t = currentTask();
+
+  const showPersonal = (myRole === "tinocent" && !myDead && phase === "started");
+  myTaskLineEl.style.display = showPersonal ? "" : "none";
+  myTaskListEl.style.display = showPersonal ? "" : "none";
+
+  if (!showPersonal) return;
+
   if (!t){
-    myTaskLineEl.style.display = "none";
+    myTaskTextEl.textContent = "Ta mission: —";
+    myTaskListEl.textContent = "";
     return;
   }
-  myTaskLineEl.style.display = "";
+
   myTaskTextEl.textContent = `Ta mission: ${t.label}`;
+
+  // petite liste “à faire”
+  const list = myTasks.map((x, i) => {
+    const done = i < myTaskIndex;
+    const cur  = i === myTaskIndex;
+    const prefix = done ? "✅" : (cur ? "➡️" : "•");
+    return `${prefix} ${x.label}`;
+  }).join("<br/>");
+  myTaskListEl.innerHTML = list;
 }
 
-// crée/assigne les tâches du joueur dans rooms/{roomId}/tasks/{uid}
 async function ensureMyTasksAssigned(){
   if (!myUid || !roomId) return;
   if (myTasksReady) return;
@@ -304,7 +365,6 @@ async function ensureMyTasksAssigned(){
       }
     }
 
-    // assigne aléatoirement depuis TASK_POOL (avec possible doublon entre joueurs, OK)
     const pool = shuffleCryptoInPlace([...TASK_POOL]);
     const list = pool.slice(0, Math.min(TASKS_PER_PLAYER, pool.length));
 
@@ -324,8 +384,190 @@ async function ensureMyTasksAssigned(){
   }
 }
 
-// valider tâche (seulement si tu es Ti’Nocent ET proche de la zone correspondante)
-// + incrémente la jauge globale rooms.tasksDone
+// ===================
+// MICRO-ACTIVITÉS (overlay)
+// ===================
+const activityOverlay = document.createElement("div");
+activityOverlay.id = "activityOverlay";
+activityOverlay.style.cssText = `
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0,0,0,.45);
+  backdrop-filter: blur(3px);
+  -webkit-backdrop-filter: blur(3px);
+`;
+activityOverlay.innerHTML = `
+  <div id="activityCard" style="
+    width: min(560px, calc(100vw - 24px));
+    border-radius: 18px;
+    padding: 14px;
+    background: rgba(0,0,0,.72);
+    border: 1px solid rgba(255,255,255,.14);
+    box-shadow: 0 16px 40px rgba(0,0,0,.35);
+    color: #fff;
+    font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+  ">
+    <div style="display:flex; align-items:center; justify-content:space-between; gap:10px;">
+      <div>
+        <div id="activityTitle" style="font: 1000 14px system-ui; letter-spacing:.2px;">Activité</div>
+        <div id="activitySub" style="margin-top:4px; font: 800 12px system-ui; opacity:.9;">—</div>
+      </div>
+      <button id="activityClose" type="button" style="
+        appearance:none; border:0; padding:10px 12px; border-radius:12px;
+        font:900 12px system-ui; color:#000; background: rgba(255,255,255,.85);
+      ">Fermer</button>
+    </div>
+
+    <div style="margin-top:12px; height:10px; border-radius:999px; background: rgba(255,255,255,.12); overflow:hidden;">
+      <div id="activityBar" style="height:100%; width:0%; background: rgba(255,255,255,.85);"></div>
+    </div>
+
+    <div id="activityBody" style="margin-top:14px;"></div>
+  </div>
+`;
+document.body.appendChild(activityOverlay);
+
+const activityTitleEl = activityOverlay.querySelector("#activityTitle");
+const activitySubEl   = activityOverlay.querySelector("#activitySub");
+const activityBodyEl  = activityOverlay.querySelector("#activityBody");
+const activityBarEl   = activityOverlay.querySelector("#activityBar");
+const activityCloseBtn= activityOverlay.querySelector("#activityClose");
+
+let activityOpen = false;
+let activityDone = false;
+
+function openActivityUI(title, sub){
+  activityOpen = true;
+  activityDone = false;
+  activityOverlay.style.display = "flex";
+  activityTitleEl.textContent = title || "Activité";
+  activitySubEl.textContent = sub || "";
+  activityBodyEl.innerHTML = "";
+  activityBarEl.style.width = "0%";
+}
+function closeActivityUI(){
+  activityOpen = false;
+  activityOverlay.style.display = "none";
+  activityBodyEl.innerHTML = "";
+}
+activityCloseBtn?.addEventListener("click", closeActivityUI);
+activityOverlay.addEventListener("click", (e) => { if (e.target === activityOverlay) closeActivityUI(); });
+
+// mini-jeu: “taper les pastilles dans l’ordre” (6 pastilles)
+function startTapOrderMiniGame({ steps = 6 } = {}){
+  const order = Array.from({length: steps}, (_,i)=>i+1);
+  shuffleCryptoInPlace(order);
+
+  let need = 1;
+
+  const wrap = document.createElement("div");
+  wrap.style.cssText = `display:flex; flex-wrap:wrap; gap:10px; justify-content:center;`;
+
+  function setProgress(){
+    const pct = ((need-1)/steps)*100;
+    activityBarEl.style.width = `${pct}%`;
+    activitySubEl.textContent = `Tape ${need} sur ${steps}`;
+  }
+
+  for (let n=1; n<=steps; n++){
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.textContent = String(n);
+    btn.style.cssText = `
+      width: 64px; height: 64px;
+      border-radius: 16px;
+      appearance:none; border:0;
+      font: 1000 18px system-ui;
+      color: #000;
+      background: rgba(255,255,255,.85);
+      box-shadow: 0 10px 22px rgba(0,0,0,.25);
+    `;
+    btn.addEventListener("click", async () => {
+      if (activityDone) return;
+
+      if (n !== need){
+        // petite pénalité : reset
+        need = 1;
+        setProgress();
+        return;
+      }
+
+      btn.style.opacity = "0.45";
+      btn.disabled = true;
+      need++;
+      setProgress();
+
+      if (need > steps){
+        activityDone = true;
+        activityBarEl.style.width = `100%`;
+        activitySubEl.textContent = "Terminé ✅";
+        await sleep(350);
+        closeActivityUI();
+        await completeCurrentTask(); // valide la mission (et incrémente la jauge globale)
+      }
+    });
+
+    wrap.appendChild(btn);
+  }
+
+  // mélange l’ordre visuel
+  const children = Array.from(wrap.children);
+  children.sort(() => (cryptoRandInt(2) ? 1 : -1));
+  wrap.innerHTML = "";
+  for (const c of children) wrap.appendChild(c);
+
+  activityBodyEl.appendChild(wrap);
+  setProgress();
+}
+
+// micro-activité selon zone
+function startActivityForZone(zoneId){
+  // On reste “crew task vibe” mais simple, rapide, et pas copié.
+  if (zoneId === "imagerie"){
+    openActivityUI("Imagerie", "Scanne les repères dans l’ordre");
+    startTapOrderMiniGame({ steps: 6 });
+    return;
+  }
+  if (zoneId === "labo"){
+    openActivityUI("Labo", "Valide la série d’échantillons");
+    startTapOrderMiniGame({ steps: 5 });
+    return;
+  }
+  if (zoneId === "pharma"){
+    openActivityUI("Pharma", "Prépare la séquence de doses");
+    startTapOrderMiniGame({ steps: 6 });
+    return;
+  }
+  if (zoneId === "exam"){
+    openActivityUI("Anamnèse", "Classe les infos dans l’ordre");
+    startTapOrderMiniGame({ steps: 5 });
+    return;
+  }
+  if (zoneId === "soins"){
+    openActivityUI("Soins", "Stabilise le patient (séquence)");
+    startTapOrderMiniGame({ steps: 6 });
+    return;
+  }
+  if (zoneId === "admin"){
+    openActivityUI("Dossiers", "Valide les documents");
+    startTapOrderMiniGame({ steps: 5 });
+    return;
+  }
+  if (zoneId === "rcp"){
+    openActivityUI("RCP", "Confirme les étapes");
+    startTapOrderMiniGame({ steps: 5 });
+    return;
+  }
+
+  openActivityUI("Activité", "Mini-jeu à brancher");
+  startTapOrderMiniGame({ steps: 5 });
+}
+
+// valider tâche (appelé après mini-jeu)
 async function completeCurrentTask(){
   if (!myUid || !roomId) return;
   if (phase !== "started") return;
@@ -335,12 +577,13 @@ async function completeCurrentTask(){
   const t = currentTask();
   if (!t) return;
 
-  // proche zone ?
   const z = zones.find(z => z.id === t.zoneId);
   if (!z){
     setStartInfo("Zone de mission introuvable.");
     return;
   }
+
+  // proche zone ?
   const d = dist(player.x, player.y, z.cx, z.cy);
   if (d > ZONE_RANGE){
     setStartInfo("Va sur la zone indiquée (flèche).");
@@ -348,7 +591,6 @@ async function completeCurrentTask(){
   }
 
   try{
-    // avance ta liste
     const nextIndex = myTaskIndex + 1;
 
     await updateDoc(doc(db, "rooms", roomId), {
@@ -362,9 +604,7 @@ async function completeCurrentTask(){
 
     myTaskIndex = nextIndex;
 
-    // si fini tes missions perso, on en régénère d’autres (ou tu peux laisser “fini”)
     if (myTaskIndex >= myTasks.length){
-      // re-pioche
       myTasksReady = false;
       myTasks = [];
       myTaskIndex = 0;
@@ -380,7 +620,14 @@ async function completeCurrentTask(){
   }
 }
 
-btnTaskDone?.addEventListener("click", completeCurrentTask);
+// bouton “Valider” => ouvre l’activité (au lieu de valider direct)
+// (ça évite que tu puisses “spam” sans mini-jeu)
+btnTaskDone?.addEventListener("click", () => {
+  if (myRole !== "tinocent" || myDead || phase !== "started") return;
+  const t = currentTask();
+  if (!t) return;
+  startActivityForZone(t.zoneId);
+});
 
 // ===================
 // ACTION UI (Expulser / Rapporter / Activité)
@@ -392,7 +639,7 @@ actionWrap.style.cssText = `
   left: 50%;
   bottom: calc(18px + env(safe-area-inset-bottom));
   transform: translateX(-50%);
-  z-index: 60;
+  z-index: 80;
   display: none;
   gap: 10px;
   align-items: center;
@@ -420,33 +667,25 @@ actionBtn.style.cssText = `
 `;
 actionWrap.appendChild(actionBtn);
 
-const actionHint = document.createElement("div");
-actionHint.id = "actionHint";
-actionHint.style.cssText = `
-  padding: 10px 12px;
-  border-radius: 14px;
-  font: 700 12px system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
-  color: rgba(255,255,255,.9);
-  background: rgba(0,0,0,.35);
-  border: 1px solid rgba(255,255,255,.10);
-  backdrop-filter: blur(6px);
-  -webkit-backdrop-filter: blur(6px);
-  display: none;
-`;
-actionWrap.appendChild(actionHint);
-
-function setActionUI({ show=false, label="", disabled=false, hint="" }){
+function setActionUI({ show=false, label="", disabled=false }){
   actionWrap.style.display = show ? "flex" : "none";
   actionBtn.textContent = label || "";
   actionBtn.disabled = !!disabled;
   actionBtn.style.opacity = disabled ? "0.65" : "1";
-  actionHint.style.display = hint ? "" : "none";
-  actionHint.textContent = hint || "";
 }
 
-const EXPULSE_RANGE = 78;
+// Ranges
 const REPORT_RANGE  = 86;
 const ZONE_RANGE    = 92;
+
+// Expulse anti-flicker (hystérésis + lock)
+const EXPEL_SHOW_RANGE = 84;
+const EXPEL_HIDE_RANGE = 104;
+const EXPEL_LOCK_MS    = 240;
+
+let expelLockedUid = null;
+let expelLockUntil = 0;
+
 const EXPEL_COOLDOWN_MS = 60_000;
 
 // ===================
@@ -456,13 +695,8 @@ let chatAllowedNow = true; // lobby true, map dépend room.chatEnabled
 
 function openChat(){
   if (!chatOverlay) return;
-
-  if (myDead){
-    return; // expulsé => pas de chat
-  }
-  if (!chatAllowedNow){
-    return;
-  }
+  if (myDead) return;
+  if (!chatAllowedNow) return;
 
   chatOverlay.classList.add("open");
   chatOverlay.setAttribute("aria-hidden", "false");
@@ -499,8 +733,6 @@ window.addEventListener("keydown", (e) => { if (e.key === "Escape") closeChat();
 // ===================
 // CANVAS SETUP (DPR SAFE iPhone)
 // ===================
-const canvas = document.getElementById("gameCanvas");
-const ctx = canvas.getContext("2d");
 let DPR = window.devicePixelRatio || 1;
 
 function resize(){
@@ -522,8 +754,11 @@ let loopRunning = false;
 let phase = "lobby";
 let lastRoomStatus = null;
 
-// room flags (chat map)
+// room flags
 let roomChatEnabled = false;
+
+// deadUids persistant (anti “revient debout”)
+let deadUidsSet = new Set();
 
 function setLobbyMode(){
   gameStarted = false;
@@ -533,6 +768,7 @@ function setLobbyMode(){
   setChatFabVisible(true);
   setActionUI({ show:false });
   showTasksHud(false);
+  closeActivityUI();
 }
 function setStartingMode(){
   gameStarted = false;
@@ -542,6 +778,7 @@ function setStartingMode(){
   setChatFabVisible(true);
   setActionUI({ show:false });
   showTasksHud(false);
+  closeActivityUI();
 }
 function setGameMode(){
   gameStarted = true;
@@ -554,15 +791,8 @@ function setGameMode(){
   setChatFabVisible(chatAllowedNow);
   if (!chatAllowedNow && chatOverlay?.classList.contains("open")) closeChat();
 
-  // HUD tâches visible pour tout le monde (Ti’Truant inclus) => jauge commune
   showTasksHud(true);
-
-  // ligne perso uniquement pour Ti’Nocent (vivant)
-  if (myRole === "tinocent" && !myDead) {
-    myTaskLineEl.style.display = "";
-  } else {
-    myTaskLineEl.style.display = "none";
-  }
+  updateMyTaskHud();
 }
 
 function startLoopOnce(){
@@ -643,15 +873,17 @@ lobbyMaskImg.onload = () => {
 };
 
 // ===================
-// CAMERA + ZOOM (GAME ONLY)
+// CAMERA + ZOOM
 // ===================
 const ZOOM_GAME  = 1.7;
 const CAM_LERP   = 0.12;
+
 let camX = 0, camY = 0;
 
-// champ de vision (agrandi)
-const VISION_SCREEN_FACTOR = 0.42;
+// ✅ FOV plus grand (téléphone)
+const VISION_SCREEN_FACTOR = 0.58;
 
+// rayon FOV monde
 function getVisionRadiusWorld(){
   const rScreen = Math.min(window.innerWidth, window.innerHeight) * VISION_SCREEN_FACTOR;
   return rScreen / ZOOM_GAME;
@@ -670,6 +902,7 @@ function ensureSpectateCamInit(){
   }
 }
 
+// drag sur canvas pour bouger la caméra quand expulsé
 canvas?.addEventListener("pointerdown", (e) => {
   if (phase !== "started") return;
   if (!myDead) return;
@@ -789,6 +1022,7 @@ let move = { x: 0, y: 0 };
 const PLAYER_RADIUS_LOBBY = 22;
 const PLAYER_RADIUS_GAME  = 22;
 
+// Blanc = walkable (lobby-NB.png)
 function isWalkableLobby(wx, wy){
   if (!lobbyMaskData || !LOBBY_W || !LOBBY_H) return true;
 
@@ -881,6 +1115,7 @@ const marche1     = loadImg("./assets/marche1.png");
 const marche2     = loadImg("./assets/marche2.png");
 const WALK_SEQUENCE = [marche1, spritePose1, marche1, marche2, spritePose1, marche2];
 
+// local walk anim
 let walking = false;
 let walkTimer = 0;
 let walkIndex = 0;
@@ -901,18 +1136,22 @@ let myUid = null;
 let myName = "";
 let myIsHost = false;
 
-let myRole = null;
-let myDead = false;
-let myLastExpelAtMs = 0;
+let myRole = null;        // "tinocent" | "titruant"
+let myDead = false;       // expulsé ?
+let myLastExpelAtMs = 0;  // cooldown
 
 const playersMap = new Map();
+
+// pour toast départ
+let prevPlayersSnapshot = new Map(); // uid -> name
 
 function ensurePlayerState(p){
   const prev = playersMap.get(p.uid);
   const x = (typeof p.x === "number") ? p.x : undefined;
   const y = (typeof p.y === "number") ? p.y : undefined;
 
-  const isDead = !!p.isDead;
+  // ✅ “dead” = player doc OU deadUids persistant room
+  const isDead = !!p.isDead || deadUidsSet.has(p.uid);
   const deadAtMs = (typeof p.deadAtMs === "number") ? p.deadAtMs : 0;
 
   if (!prev){
@@ -1066,19 +1305,14 @@ function listenMyRole(){
     if (!myRole){
       myRole = role;
       setRoleHud(myRole);
-
-      // tasks line perso si en game
-      if (phase === "started"){
-        if (myRole === "tinocent" && !myDead) myTaskLineEl.style.display = "";
-        else myTaskLineEl.style.display = "none";
-      }
+      updateMyTaskHud();
     }
   });
 
   return unsub;
 }
 
-// HOST: crée les roles (1 truant si 4-8, sinon 2) — ÉQUITABLE (host inclus)
+// HOST: crée les roles (1 truant si 4-8, sinon 2) — ÉQUITABLE
 async function hostAssignRoles(players){
   const uids = players.map(p => p.uid).filter(Boolean);
   if (uids.length < 4) throw new Error("not_enough_players");
@@ -1086,7 +1320,6 @@ async function hostAssignRoles(players){
   const nbPlayers = uids.length;
   const truantsCount = (nbPlayers >= 4 && nbPlayers <= 8) ? 1 : 2;
 
-  // ✅ tirage équitable
   const pool = shuffleCryptoInPlace([...uids]);
   const truants = new Set(pool.slice(0, truantsCount));
 
@@ -1099,39 +1332,55 @@ async function hostAssignRoles(players){
     }, { merge: true });
   }
 
-  // init jauge missions si absent
   await updateDoc(doc(db, "rooms", roomId), {
     playersCount: nbPlayers,
     truantsCount: truantsCount,
     tasksTotal: TASKS_TOTAL,
-    tasksDone: 0
-  }).catch(async ()=>{
-    // si updateDoc échoue parce que doc pas prêt, on ignore ici
-  });
+    tasksDone: 0,
+    deadUids: [] // reset au démarrage
+  }).catch(()=>{});
 }
 
 // ===================
 // ACTION LOGIC (Expulser / Rapporter / Zones)
 // ===================
 function getClosestAliveTargetForExpel(){
+  const now = performance.now();
+
+  // 1) lock courte durée + marge de sortie
+  if (expelLockedUid && now < expelLockUntil){
+    const p = playersMap.get(expelLockedUid);
+    if (p && !p.isDead && typeof p.x === "number" && typeof p.y === "number"){
+      const d = dist(player.x, player.y, p.x, p.y);
+      if (d <= EXPEL_HIDE_RANGE){
+        return { target: p, d };
+      }
+    }
+    expelLockedUid = null;
+  }
+
+  // 2) find best in range d'entrée
   let best = null;
   let bestD = Infinity;
 
   for (const p of playersMap.values()){
     if (!p || p.uid === myUid) continue;
     if (p.isDead) continue;
-    const px = (typeof p.x === "number") ? p.x : null;
-    const py = (typeof p.y === "number") ? p.y : null;
-    if (px == null || py == null) continue;
+    if (typeof p.x !== "number" || typeof p.y !== "number") continue;
 
-    const d = dist(player.x, player.y, px, py);
+    const d = dist(player.x, player.y, p.x, p.y);
     if (d < bestD){
       bestD = d;
       best = p;
     }
   }
 
-  if (best && bestD <= EXPULSE_RANGE) return { target: best, d: bestD };
+  if (best && bestD <= EXPEL_SHOW_RANGE){
+    expelLockedUid = best.uid;
+    expelLockUntil = now + EXPEL_LOCK_MS;
+    return { target: best, d: bestD };
+  }
+
   return null;
 }
 
@@ -1142,12 +1391,9 @@ function getClosestDeadBody(){
   for (const p of playersMap.values()){
     if (!p || p.uid === myUid) continue;
     if (!p.isDead) continue;
+    if (typeof p.x !== "number" || typeof p.y !== "number") continue;
 
-    const px = (typeof p.x === "number") ? p.x : null;
-    const py = (typeof p.y === "number") ? p.y : null;
-    if (px == null || py == null) continue;
-
-    const d = dist(player.x, player.y, px, py);
+    const d = dist(player.x, player.y, p.x, p.y);
     if (d < bestD){
       bestD = d;
       best = p;
@@ -1187,6 +1433,12 @@ async function doExpulse(targetUid){
   }
 
   try{
+    // ✅ persiste dans room.deadUids (anti “revient debout”)
+    await updateDoc(doc(db, "rooms", roomId), {
+      deadUids: arrayUnion(targetUid)
+    }).catch(()=>{});
+
+    // flag sur player doc (compat)
     await updateDoc(doc(db, "rooms", roomId, "players", targetUid), {
       isDead: true,
       deadAtMs: now,
@@ -1240,12 +1492,29 @@ async function doZoneAction(zone){
     return;
   }
 
-  // (activité mini-jeu plus tard)
-  setStartInfo(`Activité: ${zone.label} (mini-jeu à brancher)`);
+  // ✅ ouvrir l’activité uniquement pour Ti’Nocent
+  if (myRole !== "tinocent" || myDead) return;
+
+  // si ce n’est pas ta mission courante, on empêche (sinon ça fait “tout le monde spam”)
+  const t = currentTask();
+  if (!t || t.zoneId !== zone.id){
+    setStartInfo("Ce n’est pas ta mission actuelle.");
+    return;
+  }
+
+  // proche zone (par sécurité)
+  const d = dist(player.x, player.y, zone.cx, zone.cy);
+  if (d > ZONE_RANGE){
+    setStartInfo("Approche-toi encore un peu.");
+    return;
+  }
+
+  // lance mini-jeu
+  startActivityForZone(zone.id);
 }
 
 // ===================
-// DRAW HELPERS + VIGNETTE MAP + CLIP PERSONNAGES + FLÈCHE TÂCHE
+// DRAW HELPERS + VIGNETTE + CLIP + FLÈCHE
 // ===================
 function drawPlayerSprite(px, py, img){
   const size = gameStarted ? SPRITE_SIZE_GAME : SPRITE_SIZE_LOBBY;
@@ -1285,24 +1554,24 @@ function drawNameTag(px, py, name, isHost){
   const text = isHost ? `${name} 👑` : name;
 
   const size = gameStarted ? SPRITE_SIZE_GAME : SPRITE_SIZE_LOBBY;
-  const y = Math.round(py - size - 14);
+  const y = Math.round(py - size - 16);
 
   ctx.save();
-  ctx.font = "800 14px system-ui, -apple-system, Segoe UI, Roboto, sans-serif";
+  ctx.font = "1000 14px system-ui, -apple-system, Segoe UI, Roboto, sans-serif";
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
 
   const metrics = ctx.measureText(text);
   const padX = 10;
   const w = Math.ceil(metrics.width + padX * 2);
-  const h = 22;
+  const h = 24;
 
-  ctx.fillStyle = "rgba(0,0,0,0.45)";
+  ctx.fillStyle = "rgba(0,0,0,0.55)";
   ctx.beginPath();
   roundRectPath(ctx, px - w/2, y - h/2, w, h, 12);
   ctx.fill();
 
-  ctx.strokeStyle = "rgba(255,255,255,0.15)";
+  ctx.strokeStyle = "rgba(255,255,255,0.18)";
   ctx.lineWidth = 1;
   ctx.stroke();
 
@@ -1317,23 +1586,24 @@ function drawVignette(){
   const cx = w / 2;
   const cy = h / 2;
 
-  const rInner = Math.min(w, h) * 0.36;
-  const rOuter = Math.min(w, h) * 0.72;
+  // ✅ vignette plus large (FOV plus grand)
+  const rInner = Math.min(w, h) * 0.50;
+  const rOuter = Math.min(w, h) * 0.94;
 
   ctx.save();
   ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
 
   const g = ctx.createRadialGradient(cx, cy, rInner, cx, cy, rOuter);
   g.addColorStop(0.0, "rgba(0,0,0,0)");
-  g.addColorStop(0.55, "rgba(0,0,0,0.25)");
-  g.addColorStop(1.0, "rgba(0,0,0,0.75)");
+  g.addColorStop(0.62, "rgba(0,0,0,0.18)");
+  g.addColorStop(1.0, "rgba(0,0,0,0.72)");
 
   ctx.fillStyle = g;
   ctx.fillRect(0, 0, w, h);
   ctx.restore();
 }
 
-// flèche “tâche” (Ti’Nocent vivant uniquement)
+// flèche “mission” (Ti’Nocent vivant)
 function drawTaskArrow(){
   if (phase !== "started") return;
   if (myDead) return;
@@ -1345,15 +1615,14 @@ function drawTaskArrow(){
   const z = zones.find(z => z.id === t.zoneId);
   if (!z) return;
 
-  // on calcule l’angle vers la zone depuis le centre caméra
-  const dx = z.cx - camX;
-  const dy = z.cy - camY;
+  // angle vers la zone depuis le player (plus logique que cam)
+  const dx = z.cx - player.x;
+  const dy = z.cy - player.y;
   const ang = Math.atan2(dy, dx);
 
-  // position écran de l’arrow sur un cercle autour du centre
   const cx = window.innerWidth / 2;
   const cy = window.innerHeight / 2;
-  const r  = Math.min(window.innerWidth, window.innerHeight) * 0.28;
+  const r  = Math.min(window.innerWidth, window.innerHeight) * 0.30;
 
   const ax = cx + Math.cos(ang) * r;
   const ay = cy + Math.sin(ang) * r;
@@ -1363,19 +1632,17 @@ function drawTaskArrow(){
   ctx.translate(ax, ay);
   ctx.rotate(ang);
 
-  // flèche simple (semi-transparente)
-  ctx.globalAlpha = 0.55;
+  ctx.globalAlpha = 0.58;
   ctx.fillStyle = "#ffffff";
   ctx.beginPath();
-  ctx.moveTo(18, 0);
+  ctx.moveTo(20, 0);
   ctx.lineTo(-10, -10);
   ctx.lineTo(-6, 0);
   ctx.lineTo(-10, 10);
   ctx.closePath();
   ctx.fill();
 
-  // petit contour doux
-  ctx.globalAlpha = 0.25;
+  ctx.globalAlpha = 0.22;
   ctx.lineWidth = 2;
   ctx.strokeStyle = "#000";
   ctx.stroke();
@@ -1429,6 +1696,7 @@ function update(dt){
 
   if (moved && (walking || wasWalking)) sendMyPosition();
 
+  // anim remote
   for (const [uid, p] of playersMap){
     if (uid === myUid) continue;
     if (!p.moving) continue;
@@ -1445,7 +1713,7 @@ function update(dt){
 
   // ===== ACTION UI refresh (map uniquement)
   if (phase === "started"){
-    if (myDead){
+    if (myDead || activityOpen){
       setActionUI({ show:false });
       return;
     }
@@ -1455,7 +1723,7 @@ function update(dt){
     // priorité 1: Rapporter
     const bodyHit = getClosestDeadBody();
     if (bodyHit){
-      setActionUI({ show:true, label:"Rapporter", disabled:false, hint:"Près d’un joueur expulsé" });
+      setActionUI({ show:true, label:"Rapporter", disabled:false });
       actionBtn.onclick = () => doReport(bodyHit.body.uid);
       return;
     }
@@ -1470,17 +1738,11 @@ function update(dt){
           setActionUI({
             show:true,
             label:`Expulser (${Math.ceil(remain/1000)}s)`,
-            disabled:true,
-            hint:"Cooldown"
+            disabled:true
           });
           actionBtn.onclick = null;
         } else {
-          setActionUI({
-            show:true,
-            label:"Expulser",
-            disabled:false,
-            hint:""
-          });
+          setActionUI({ show:true, label:"Expulser", disabled:false });
           actionBtn.onclick = () => doExpulse(hit.target.uid);
         }
         return;
@@ -1494,8 +1756,7 @@ function update(dt){
       if (nearZone){
         const z = nearZone.zone;
         const label = (z.id === "meeting") ? "Dénoncer" : `Faire: ${z.label}`;
-        // ✅ on enlève “Zone activité”
-        setActionUI({ show:true, label, disabled:false, hint:"" });
+        setActionUI({ show:true, label, disabled:false });
         actionBtn.onclick = () => doZoneAction(z);
         return;
       }
@@ -1578,11 +1839,15 @@ function draw(){
     ctx.drawImage(mapImg, 0, 0, MAP_W, MAP_H);
   }
 
-  // 2) clip personnages au champ de vision
+  // ✅ IMPORTANT: clip FOV centré sur le PLAYER (pas camX/camY)
+  // -> le perso ne disparaît plus quand la caméra est clamp en bas/coins
   const visR = getVisionRadiusWorld();
+  const clipCX = myDead ? camX : player.x; // expulsé: on clip autour cam, vivant: autour player
+  const clipCY = myDead ? camY : player.y;
+
   ctx.save();
   ctx.beginPath();
-  ctx.arc(camX, camY, visR, 0, Math.PI * 2);
+  ctx.arc(clipCX, clipCY, visR, 0, Math.PI * 2);
   ctx.clip();
 
   const arr = Array.from(playersMap.values())
@@ -1605,10 +1870,10 @@ function draw(){
   ctx.restore(); // end clip
   ctx.restore(); // end world
 
-  // 3) vignette écran
+  // 2) vignette écran
   drawVignette();
 
-  // 4) flèche de mission (HUD)
+  // 3) flèche mission
   drawTaskArrow();
 }
 
@@ -1649,6 +1914,7 @@ joy?.addEventListener("pointerdown", (e) => {
   if (!joy) return;
   if (phase === "starting") return;
   if (myDead && phase === "started") return;
+  if (activityOpen) return;
 
   active = true;
   pointerId = e.pointerId;
@@ -1758,7 +2024,6 @@ onAuthStateChanged(auth, async (u) => {
 
   myUid = u.uid;
 
-  // écoute mon role (dès connexion)
   if (!unsubMyRole){
     unsubMyRole = listenMyRole();
   }
@@ -1786,7 +2051,8 @@ onAuthStateChanged(auth, async (u) => {
         startingAt: serverTimestamp(),
         chatEnabled: false,
         tasksTotal: TASKS_TOTAL,
-        tasksDone: 0
+        tasksDone: 0,
+        deadUids: []
       });
 
       const snapPlayers = await getDocs(collection(db, "rooms", roomId, "players"));
@@ -1806,7 +2072,7 @@ onAuthStateChanged(auth, async (u) => {
     }
   });
 
-  // room status + host + flags + tasks progress
+  // room status + flags + tasks + deadUids
   onSnapshot(doc(db,"rooms",roomId), async (snap)=>{
     if (!snap.exists()){
       alert("Partie supprimée");
@@ -1819,12 +2085,15 @@ onAuthStateChanged(auth, async (u) => {
 
     roomChatEnabled = !!room.chatEnabled;
 
+    // deadUids persistant
+    const deadArr = Array.isArray(room.deadUids) ? room.deadUids : [];
+    deadUidsSet = new Set(deadArr);
+
     // tasks global
     roomTasksDone = (typeof room.tasksDone === "number") ? room.tasksDone : 0;
     const tasksTotalRoom = (typeof room.tasksTotal === "number") ? room.tasksTotal : TASKS_TOTAL;
     setGlobalTasksProgress(roomTasksDone, tasksTotalRoom);
 
-    // condition victoire (simple)
     if (status === "started" && roomTasksDone >= tasksTotalRoom){
       setStartInfo("✅ Les Ti’Nocents ont gagné (missions terminées) !");
     }
@@ -1865,7 +2134,6 @@ onAuthStateChanged(auth, async (u) => {
       hideRoleOverlay();
       setGameMode();
 
-      // si je suis Ti’Nocent → assigne mes tâches
       if (myRole === "tinocent" && !myDead){
         await ensureMyTasksAssigned();
         updateMyTaskHud();
@@ -1894,9 +2162,24 @@ onAuthStateChanged(auth, async (u) => {
     lastRoomStatus = status;
   });
 
-  // players
+  // players snapshot
   onSnapshot(collection(db,"rooms",roomId,"players"), async (snap)=>{
     const players = snap.docs.map(d=>d.data());
+
+    // ✅ toast “X a quitté”
+    const nowMap = new Map(players.map(p => [p.uid, p.name || "Joueur"]));
+    if (prevPlayersSnapshot.size){
+      for (const [uid, name] of prevPlayersSnapshot.entries()){
+        if (!nowMap.has(uid)){
+          // évite de spam si c’est toi
+          if (uid !== myUid){
+            showLeaveToast(`${name} a quitté la partie`);
+          }
+        }
+      }
+    }
+    prevPlayersSnapshot = nowMap;
+
     renderPlayers(players);
 
     if (myIsHost && players.length >= 4) setStartInfo("");
@@ -1913,7 +2196,7 @@ onAuthStateChanged(auth, async (u) => {
 
     if (me){
       const wasDead = myDead;
-      myDead = !!me.isDead;
+      myDead = !!me.isDead || deadUidsSet.has(myUid);
       myLastExpelAtMs = (typeof me.lastExpelAtMs === "number") ? me.lastExpelAtMs : (myLastExpelAtMs || 0);
 
       if (!wasDead && myDead){
@@ -1927,7 +2210,8 @@ onAuthStateChanged(auth, async (u) => {
         if (chatOverlay?.classList.contains("open")) closeChat();
 
         joy?.classList.add("is-hidden");
-        myTaskLineEl.style.display = "none";
+        updateMyTaskHud();
+        closeActivityUI();
       }
 
       if (wasDead && !myDead){
@@ -1951,12 +2235,9 @@ onAuthStateChanged(auth, async (u) => {
         setChatFabVisible(chatAllowedNow);
 
         if (myRole === "tinocent" && !myDead){
-          myTaskLineEl.style.display = "";
           await ensureMyTasksAssigned();
-          updateMyTaskHud();
-        } else {
-          myTaskLineEl.style.display = "none";
         }
+        updateMyTaskHud();
       }
     }
 
@@ -1991,9 +2272,7 @@ onAuthStateChanged(auth, async (u) => {
       e.stopPropagation();
 
       if (myDead) return;
-      if (phase === "started" && !chatAllowedNow){
-        return;
-      }
+      if (phase === "started" && !chatAllowedNow) return;
 
       const val = chatInput.value;
       chatInput.value = "";
