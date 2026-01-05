@@ -13,6 +13,9 @@
 // + ✅ Rapporter (près d’un joueur expulsé)
 // + ✅ Bouton activité (Ti’Nocent) selon zones (rouge = dénoncer)
 // + ✅ Personnages visibles uniquement dans le champ de vision (map visible partout)
+// + ✅ Tirage équitable (host = même proba)
+// + ✅ Hint “Zone activité” supprimé
+// + ✅ Système de tâches Ti’Nocent: liste aléatoire + flèche + jauge globale (progression commune)
 
 import * as AuthMod from "./auth.js";
 import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.4/firebase-auth.js";
@@ -149,6 +152,11 @@ function renderPlayers(players){
 
 function sleep(ms){ return new Promise(r => setTimeout(r, ms)); }
 
+// (Optionnel) warning si crypto indispo
+if (!globalThis.crypto?.getRandomValues){
+  console.warn("crypto.getRandomValues indisponible → tirage moins fiable");
+}
+
 function cryptoRandInt(maxExclusive){
   // [0..maxExclusive-1], crypto-safe
   const arr = new Uint32Array(1);
@@ -180,6 +188,199 @@ function setChatFabVisible(show){
     if (chatOverlay?.classList.contains("open")) closeChat();
   }
 }
+
+// ===================
+// TI’NOCENT TASKS (TÂCHES + FLÈCHE + JAUGE)
+// ===================
+
+// total missions “communes” à compléter (tout le monde contribue)
+const TASKS_TOTAL = 40;
+
+// “pool” de tâches (tu peux en ajouter/renommer quand tu veux)
+const TASK_POOL = [
+  { id:"labo",     label:"Analyse au labo",       zoneId:"labo" },
+  { id:"imagerie", label:"Imagerie",             zoneId:"imagerie" },
+  { id:"pharma",   label:"Préparer un traitement", zoneId:"pharma" },
+  { id:"exam",     label:"Anamnèse",             zoneId:"exam" },
+  { id:"soins",    label:"Soins",                zoneId:"soins" },
+  { id:"admin",    label:"Dossiers",             zoneId:"admin" },
+  { id:"rcp",      label:"RCP",                  zoneId:"rcp" },
+];
+
+// combien de tâches par joueur (Ti’Nocent)
+const TASKS_PER_PLAYER = 6;
+
+// HUD: jauge globale + tâche courante + bouton valider
+const tasksHud = document.createElement("div");
+tasksHud.id = "tasksHud";
+tasksHud.style.cssText = `
+  position: fixed;
+  left: calc(12px + env(safe-area-inset-left));
+  top: calc(12px + env(safe-area-inset-top));
+  z-index: 55;
+  padding: 10px 12px;
+  border-radius: 14px;
+  font: 800 12px system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+  color: #fff;
+  background: rgba(0,0,0,.45);
+  border: 1px solid rgba(255,255,255,.12);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  display: none;
+  max-width: min(420px, calc(100vw - 24px));
+`;
+tasksHud.innerHTML = `
+  <div style="display:flex; align-items:center; justify-content:space-between; gap:10px;">
+    <div id="tasksTitle" style="font:900 12px system-ui; opacity:.95;">Missions</div>
+    <div id="tasksCount" style="font:900 12px system-ui; opacity:.95;">0/40</div>
+  </div>
+  <div style="height:10px; margin-top:8px; border-radius:999px; background: rgba(255,255,255,.12); overflow:hidden;">
+    <div id="tasksBar" style="height:100%; width:0%; background: rgba(255,255,255,.85);"></div>
+  </div>
+
+  <div id="myTaskLine" style="margin-top:10px; display:none; gap:10px; align-items:center;">
+    <div id="myTaskText" style="font:800 12px system-ui; opacity:.95; flex:1;">—</div>
+    <button id="btnTaskDone" type="button" style="
+      appearance:none; border:0; padding:10px 12px; border-radius:12px;
+      font:900 12px system-ui; color:#000; background: rgba(255,255,255,.85);
+    ">Valider</button>
+  </div>
+`;
+document.body.appendChild(tasksHud);
+
+const tasksCountEl = tasksHud.querySelector("#tasksCount");
+const tasksBarEl   = tasksHud.querySelector("#tasksBar");
+const myTaskLineEl = tasksHud.querySelector("#myTaskLine");
+const myTaskTextEl = tasksHud.querySelector("#myTaskText");
+const btnTaskDone  = tasksHud.querySelector("#btnTaskDone");
+
+// état local tâches
+let roomTasksDone = 0;         // global
+let myTasks = [];              // liste de tâches assignées
+let myTaskIndex = 0;           // tâche courante (index)
+let myTasksReady = false;
+
+// helpers tasks
+function showTasksHud(show){
+  tasksHud.style.display = show ? "" : "none";
+}
+function setGlobalTasksProgress(done, total){
+  const d = Math.max(0, Math.min(total, done || 0));
+  if (tasksCountEl) tasksCountEl.textContent = `${d}/${total}`;
+  const pct = total > 0 ? (d / total) * 100 : 0;
+  if (tasksBarEl) tasksBarEl.style.width = `${pct}%`;
+}
+function currentTask(){
+  if (!myTasks?.length) return null;
+  return myTasks[clamp(myTaskIndex, 0, myTasks.length - 1)];
+}
+function updateMyTaskHud(){
+  const t = currentTask();
+  if (!t){
+    myTaskLineEl.style.display = "none";
+    return;
+  }
+  myTaskLineEl.style.display = "";
+  myTaskTextEl.textContent = `Ta mission: ${t.label}`;
+}
+
+// crée/assigne les tâches du joueur dans rooms/{roomId}/tasks/{uid}
+async function ensureMyTasksAssigned(){
+  if (!myUid || !roomId) return;
+  if (myTasksReady) return;
+
+  try{
+    const ref = doc(db, "rooms", roomId, "tasks", myUid);
+    const snap = await getDoc(ref);
+
+    if (snap.exists()){
+      const d = snap.data() || {};
+      if (Array.isArray(d.list) && d.list.length){
+        myTasks = d.list;
+        myTaskIndex = (typeof d.index === "number") ? d.index : 0;
+        myTasksReady = true;
+        updateMyTaskHud();
+        return;
+      }
+    }
+
+    // assigne aléatoirement depuis TASK_POOL (avec possible doublon entre joueurs, OK)
+    const pool = shuffleCryptoInPlace([...TASK_POOL]);
+    const list = pool.slice(0, Math.min(TASKS_PER_PLAYER, pool.length));
+
+    await setDoc(ref, {
+      uid: myUid,
+      list,
+      index: 0,
+      updatedAt: serverTimestamp()
+    }, { merge:true });
+
+    myTasks = list;
+    myTaskIndex = 0;
+    myTasksReady = true;
+    updateMyTaskHud();
+  } catch(e){
+    console.log("ensureMyTasksAssigned error:", e);
+  }
+}
+
+// valider tâche (seulement si tu es Ti’Nocent ET proche de la zone correspondante)
+// + incrémente la jauge globale rooms.tasksDone
+async function completeCurrentTask(){
+  if (!myUid || !roomId) return;
+  if (phase !== "started") return;
+  if (myDead) return;
+  if (myRole !== "tinocent") return;
+
+  const t = currentTask();
+  if (!t) return;
+
+  // proche zone ?
+  const z = zones.find(z => z.id === t.zoneId);
+  if (!z){
+    setStartInfo("Zone de mission introuvable.");
+    return;
+  }
+  const d = dist(player.x, player.y, z.cx, z.cy);
+  if (d > ZONE_RANGE){
+    setStartInfo("Va sur la zone indiquée (flèche).");
+    return;
+  }
+
+  try{
+    // avance ta liste
+    const nextIndex = myTaskIndex + 1;
+
+    await updateDoc(doc(db, "rooms", roomId), {
+      tasksDone: increment(1)
+    });
+
+    await updateDoc(doc(db, "rooms", roomId, "tasks", myUid), {
+      index: nextIndex,
+      updatedAt: serverTimestamp()
+    });
+
+    myTaskIndex = nextIndex;
+
+    // si fini tes missions perso, on en régénère d’autres (ou tu peux laisser “fini”)
+    if (myTaskIndex >= myTasks.length){
+      // re-pioche
+      myTasksReady = false;
+      myTasks = [];
+      myTaskIndex = 0;
+      await ensureMyTasksAssigned();
+    } else {
+      updateMyTaskHud();
+    }
+
+    setStartInfo("");
+  } catch(e){
+    console.log("completeCurrentTask error:", e);
+    setStartInfo("Erreur validation mission.");
+  }
+}
+
+btnTaskDone?.addEventListener("click", completeCurrentTask);
 
 // ===================
 // ACTION UI (Expulser / Rapporter / Activité)
@@ -280,7 +481,6 @@ chatFab?.addEventListener("click", () => {
   if (myDead) return;
 
   if (!chatAllowedNow){
-    // en game, si pas autorisé, on fait rien (icône est cachée normalement)
     chatFab.classList.remove("has-unread");
     if (chatBadge) chatBadge.hidden = true;
     return;
@@ -317,9 +517,9 @@ window.addEventListener("resize", resize);
 // ===================
 // GAME STATE
 // ===================
-let gameStarted = false;       // rendu map + collisions map
+let gameStarted = false;
 let loopRunning = false;
-let phase = "lobby";           // "lobby" | "starting" | "started"
+let phase = "lobby";
 let lastRoomStatus = null;
 
 // room flags (chat map)
@@ -329,29 +529,40 @@ function setLobbyMode(){
   gameStarted = false;
   phase = "lobby";
   joy?.classList.remove("is-hidden");
-  chatAllowedNow = true; // lobby toujours
-  setChatFabVisible(true); // visible lobby
+  chatAllowedNow = true;
+  setChatFabVisible(true);
   setActionUI({ show:false });
+  showTasksHud(false);
 }
 function setStartingMode(){
   gameStarted = false;
   phase = "starting";
   joy?.classList.add("is-hidden");
   chatAllowedNow = true;
-  setChatFabVisible(true); // pendant starting ok
+  setChatFabVisible(true);
   setActionUI({ show:false });
+  showTasksHud(false);
 }
 function setGameMode(){
   gameStarted = true;
   phase = "started";
 
-  // joystick: si expulsé => on le cache (spectate drag)
   if (myDead) joy?.classList.add("is-hidden");
   else joy?.classList.remove("is-hidden");
 
   chatAllowedNow = !!roomChatEnabled && !myDead;
-  setChatFabVisible(chatAllowedNow); // visible seulement si chatEnabled
+  setChatFabVisible(chatAllowedNow);
   if (!chatAllowedNow && chatOverlay?.classList.contains("open")) closeChat();
+
+  // HUD tâches visible pour tout le monde (Ti’Truant inclus) => jauge commune
+  showTasksHud(true);
+
+  // ligne perso uniquement pour Ti’Nocent (vivant)
+  if (myRole === "tinocent" && !myDead) {
+    myTaskLineEl.style.display = "";
+  } else {
+    myTaskLineEl.style.display = "none";
+  }
 }
 
 function startLoopOnce(){
@@ -367,23 +578,22 @@ function startLoopOnce(){
 const lobbyBgImg = new Image();
 lobbyBgImg.src = "./assets/lobby.png";
 
-const lobbyMaskImg = new Image(); // collisions lobby
+const lobbyMaskImg = new Image();
 lobbyMaskImg.src = "./assets/lobby-NB.png";
 
 const mapImg = new Image();
 mapImg.src = "./assets/map.png";
 
-const collisionImg = new Image(); // collisions map
+const collisionImg = new Image();
 collisionImg.src = "./assets/collisions.png";
 
 // rôle images
 const tinocentImgSrc = "./assets/tinocent.png";
 const titruantImgSrc = "./assets/titruant.png";
 
-// expulsé sprite (✅ pleur.png)
+// expulsé sprite
 const pleurImg = new Image();
 pleurImg.src = "./assets/pleur.png";
-// fallback si ton fichier s'appelle encore "pleure.png"
 pleurImg.onerror = () => {
   if (pleurImg.src.includes("pleur.png")) pleurImg.src = "./assets/pleure.png";
 };
@@ -439,16 +649,15 @@ const ZOOM_GAME  = 1.7;
 const CAM_LERP   = 0.12;
 let camX = 0, camY = 0;
 
-// ✅ champ de vision (agrandi)
-const VISION_SCREEN_FACTOR = 0.42; // 0.24 -> 0.42
+// champ de vision (agrandi)
+const VISION_SCREEN_FACTOR = 0.42;
 
-// champ de vision (monde)
 function getVisionRadiusWorld(){
   const rScreen = Math.min(window.innerWidth, window.innerHeight) * VISION_SCREEN_FACTOR;
   return rScreen / ZOOM_GAME;
 }
 
-// ===== “spectate pan” si expulsé
+// spectate pan si expulsé
 let specCamX = null, specCamY = null;
 let specDragActive = false;
 let specPointerId = null;
@@ -461,7 +670,6 @@ function ensureSpectateCamInit(){
   }
 }
 
-// drag sur canvas pour bouger la caméra quand expulsé
 canvas?.addEventListener("pointerdown", (e) => {
   if (phase !== "started") return;
   if (!myDead) return;
@@ -484,12 +692,10 @@ canvas?.addEventListener("pointermove", (e) => {
   specLast.x = e.clientX;
   specLast.y = e.clientY;
 
-  // écran -> monde (inverse zoom)
   const scale = 1 / ZOOM_GAME;
   specCamX -= dx * scale;
   specCamY -= dy * scale;
 
-  // clamp
   const halfW = (window.innerWidth  / ZOOM_GAME) / 2;
   const halfH = (window.innerHeight / ZOOM_GAME) / 2;
   specCamX = clamp(specCamX, halfW, MAP_W - halfW);
@@ -583,7 +789,6 @@ let move = { x: 0, y: 0 };
 const PLAYER_RADIUS_LOBBY = 22;
 const PLAYER_RADIUS_GAME  = 22;
 
-// Blanc = walkable (lobby-NB.png)
 function isWalkableLobby(wx, wy){
   if (!lobbyMaskData || !LOBBY_W || !LOBBY_H) return true;
 
@@ -676,7 +881,6 @@ const marche1     = loadImg("./assets/marche1.png");
 const marche2     = loadImg("./assets/marche2.png");
 const WALK_SEQUENCE = [marche1, spritePose1, marche1, marche2, spritePose1, marche2];
 
-// local walk anim
 let walking = false;
 let walkTimer = 0;
 let walkIndex = 0;
@@ -697,9 +901,9 @@ let myUid = null;
 let myName = "";
 let myIsHost = false;
 
-let myRole = null;        // "tinocent" | "titruant"
-let myDead = false;       // expulsé ?
-let myLastExpelAtMs = 0;  // cooldown
+let myRole = null;
+let myDead = false;
+let myLastExpelAtMs = 0;
 
 const playersMap = new Map();
 
@@ -733,7 +937,6 @@ function ensurePlayerState(p){
   prev.isDead = isDead;
   prev.deadAtMs = deadAtMs;
 
-  // si mort => on “freeze” l’anim côté remote
   if (isDead){
     prev.moving = false;
     prev.walkIndex = 0;
@@ -790,7 +993,7 @@ async function sendMyPosition(){
 }
 
 // ===================
-// ROLE / TIRAGE AU SORT (HOST écrit privateRoles + tous jouent l'anim)
+// ROLE / TIRAGE AU SORT
 // ===================
 let spinRunning = false;
 
@@ -857,19 +1060,25 @@ function listenMyRole(){
     if (!snap.exists()) return;
 
     const d = snap.data() || {};
-    const role = d.role; // "tinocent" | "titruant"
+    const role = d.role;
     if (!role) return;
 
     if (!myRole){
       myRole = role;
       setRoleHud(myRole);
+
+      // tasks line perso si en game
+      if (phase === "started"){
+        if (myRole === "tinocent" && !myDead) myTaskLineEl.style.display = "";
+        else myTaskLineEl.style.display = "none";
+      }
     }
   });
 
   return unsub;
 }
 
-// HOST: crée les roles (1 truant si 4-8, sinon 2)
+// HOST: crée les roles (1 truant si 4-8, sinon 2) — ÉQUITABLE (host inclus)
 async function hostAssignRoles(players){
   const uids = players.map(p => p.uid).filter(Boolean);
   if (uids.length < 4) throw new Error("not_enough_players");
@@ -877,7 +1086,8 @@ async function hostAssignRoles(players){
   const nbPlayers = uids.length;
   const truantsCount = (nbPlayers >= 4 && nbPlayers <= 8) ? 1 : 2;
 
-  const pool = shuffleInPlace([...uids]);
+  // ✅ tirage équitable
+  const pool = shuffleCryptoInPlace([...uids]);
   const truants = new Set(pool.slice(0, truantsCount));
 
   for (const uid of uids){
@@ -889,10 +1099,15 @@ async function hostAssignRoles(players){
     }, { merge: true });
   }
 
+  // init jauge missions si absent
   await updateDoc(doc(db, "rooms", roomId), {
     playersCount: nbPlayers,
-    truantsCount: truantsCount
-  }).catch(()=>{});
+    truantsCount: truantsCount,
+    tasksTotal: TASKS_TOTAL,
+    tasksDone: 0
+  }).catch(async ()=>{
+    // si updateDoc échoue parce que doc pas prêt, on ignore ici
+  });
 }
 
 // ===================
@@ -1025,11 +1240,12 @@ async function doZoneAction(zone){
     return;
   }
 
+  // (activité mini-jeu plus tard)
   setStartInfo(`Activité: ${zone.label} (mini-jeu à brancher)`);
 }
 
 // ===================
-// DRAW HELPERS + VIGNETTE MAP + CLIP PERSONNAGES
+// DRAW HELPERS + VIGNETTE MAP + CLIP PERSONNAGES + FLÈCHE TÂCHE
 // ===================
 function drawPlayerSprite(px, py, img){
   const size = gameStarted ? SPRITE_SIZE_GAME : SPRITE_SIZE_LOBBY;
@@ -1101,9 +1317,8 @@ function drawVignette(){
   const cx = w / 2;
   const cy = h / 2;
 
-  // ✅ adapté au FOV plus grand
-  const rInner = Math.min(w, h) * 0.36; // 0.22 -> 0.36
-  const rOuter = Math.min(w, h) * 0.72; // 0.60 -> 0.72
+  const rInner = Math.min(w, h) * 0.36;
+  const rOuter = Math.min(w, h) * 0.72;
 
   ctx.save();
   ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
@@ -1118,6 +1333,56 @@ function drawVignette(){
   ctx.restore();
 }
 
+// flèche “tâche” (Ti’Nocent vivant uniquement)
+function drawTaskArrow(){
+  if (phase !== "started") return;
+  if (myDead) return;
+  if (myRole !== "tinocent") return;
+
+  const t = currentTask();
+  if (!t) return;
+
+  const z = zones.find(z => z.id === t.zoneId);
+  if (!z) return;
+
+  // on calcule l’angle vers la zone depuis le centre caméra
+  const dx = z.cx - camX;
+  const dy = z.cy - camY;
+  const ang = Math.atan2(dy, dx);
+
+  // position écran de l’arrow sur un cercle autour du centre
+  const cx = window.innerWidth / 2;
+  const cy = window.innerHeight / 2;
+  const r  = Math.min(window.innerWidth, window.innerHeight) * 0.28;
+
+  const ax = cx + Math.cos(ang) * r;
+  const ay = cy + Math.sin(ang) * r;
+
+  ctx.save();
+  ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  ctx.translate(ax, ay);
+  ctx.rotate(ang);
+
+  // flèche simple (semi-transparente)
+  ctx.globalAlpha = 0.55;
+  ctx.fillStyle = "#ffffff";
+  ctx.beginPath();
+  ctx.moveTo(18, 0);
+  ctx.lineTo(-10, -10);
+  ctx.lineTo(-6, 0);
+  ctx.lineTo(-10, 10);
+  ctx.closePath();
+  ctx.fill();
+
+  // petit contour doux
+  ctx.globalAlpha = 0.25;
+  ctx.lineWidth = 2;
+  ctx.strokeStyle = "#000";
+  ctx.stroke();
+
+  ctx.restore();
+}
+
 // ===================
 // UPDATE / DRAW / LOOP
 // ===================
@@ -1126,7 +1391,6 @@ function update(dt){
     move.x = 0; move.y = 0;
   }
   if (myDead && phase === "started"){
-    // perso fixe
     move.x = 0; move.y = 0;
   }
 
@@ -1165,7 +1429,6 @@ function update(dt){
 
   if (moved && (walking || wasWalking)) sendMyPosition();
 
-  // anim remote
   for (const [uid, p] of playersMap){
     if (uid === myUid) continue;
     if (!p.moving) continue;
@@ -1189,7 +1452,7 @@ function update(dt){
 
     const now = Date.now();
 
-    // priorité 1: Rapporter si proche d’un expulsé
+    // priorité 1: Rapporter
     const bodyHit = getClosestDeadBody();
     if (bodyHit){
       setActionUI({ show:true, label:"Rapporter", disabled:false, hint:"Près d’un joueur expulsé" });
@@ -1197,7 +1460,7 @@ function update(dt){
       return;
     }
 
-    // priorité 2: Expulser si Ti’Truant proche d’un vivant
+    // priorité 2: Expulser
     const isTruant = (myRole === "titruant");
     if (isTruant){
       const hit = getClosestAliveTargetForExpel();
@@ -1216,7 +1479,7 @@ function update(dt){
             show:true,
             label:"Expulser",
             disabled:false,
-            hint:"" // ✅ on enlève “Proche d’un joueur”
+            hint:""
           });
           actionBtn.onclick = () => doExpulse(hit.target.uid);
         }
@@ -1224,14 +1487,15 @@ function update(dt){
       }
     }
 
-    // priorité 3: Activité (Ti’Nocent) si proche d’une zone
+    // priorité 3: Activité (Ti’Nocent)
     const isNocent = (myRole === "tinocent");
     if (isNocent){
       const nearZone = getClosestZoneNearMe();
       if (nearZone){
         const z = nearZone.zone;
         const label = (z.id === "meeting") ? "Dénoncer" : `Faire: ${z.label}`;
-        setActionUI({ show:true, label, disabled:false, hint:"Zone activité" });
+        // ✅ on enlève “Zone activité”
+        setActionUI({ show:true, label, disabled:false, hint:"" });
         actionBtn.onclick = () => doZoneAction(z);
         return;
       }
@@ -1247,7 +1511,7 @@ function draw(){
   ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
   ctx.clearRect(0,0,window.innerWidth, window.innerHeight);
 
-  // LOBBY VISUEL
+  // LOBBY
   if (!gameStarted){
     const bg = (lobbyBgImg.complete && lobbyBgImg.naturalWidth > 0) ? lobbyBgImg : mapImg;
     if (!(bg.complete && bg.naturalWidth > 0)) return;
@@ -1293,7 +1557,6 @@ function draw(){
   }
 
   // GAME: map + camera
-  // target cam: joueur vivant -> suit player, expulsé -> suit specCam (pan)
   const targetX = myDead ? (specCamX ?? player.x) : player.x;
   const targetY = myDead ? (specCamY ?? player.y) : player.y;
 
@@ -1305,7 +1568,7 @@ function draw(){
   camX = clamp(camX, halfW, MAP_W - halfW);
   camY = clamp(camY, halfH, MAP_H - halfH);
 
-  // 1) draw map (visible partout)
+  // 1) draw map
   ctx.save();
   ctx.translate(window.innerWidth/2, window.innerHeight/2);
   ctx.scale(ZOOM_GAME, ZOOM_GAME);
@@ -1315,7 +1578,7 @@ function draw(){
     ctx.drawImage(mapImg, 0, 0, MAP_W, MAP_H);
   }
 
-  // 2) clip personnages au champ de vision (monde)
+  // 2) clip personnages au champ de vision
   const visR = getVisionRadiusWorld();
   ctx.save();
   ctx.beginPath();
@@ -1342,8 +1605,11 @@ function draw(){
   ctx.restore(); // end clip
   ctx.restore(); // end world
 
-  // 3) vignette écran (noir autour)
+  // 3) vignette écran
   drawVignette();
+
+  // 4) flèche de mission (HUD)
+  drawTaskArrow();
 }
 
 let lastT = performance.now();
@@ -1382,7 +1648,7 @@ function endJoystick(){
 joy?.addEventListener("pointerdown", (e) => {
   if (!joy) return;
   if (phase === "starting") return;
-  if (myDead && phase === "started") return; // expulsé => pas de joystick
+  if (myDead && phase === "started") return;
 
   active = true;
   pointerId = e.pointerId;
@@ -1497,7 +1763,7 @@ onAuthStateChanged(auth, async (u) => {
     unsubMyRole = listenMyRole();
   }
 
-  // ✅ START button: status="starting" + host assign roles + auto pass "started"
+  // START button
   btnStart?.addEventListener("click", async (e) => {
     e.preventDefault();
 
@@ -1518,7 +1784,9 @@ onAuthStateChanged(auth, async (u) => {
       await updateDoc(doc(db, "rooms", roomId), {
         status: "starting",
         startingAt: serverTimestamp(),
-        chatEnabled: false
+        chatEnabled: false,
+        tasksTotal: TASKS_TOTAL,
+        tasksDone: 0
       });
 
       const snapPlayers = await getDocs(collection(db, "rooms", roomId, "players"));
@@ -1538,7 +1806,7 @@ onAuthStateChanged(auth, async (u) => {
     }
   });
 
-  // room status + host + flags
+  // room status + host + flags + tasks progress
   onSnapshot(doc(db,"rooms",roomId), async (snap)=>{
     if (!snap.exists()){
       alert("Partie supprimée");
@@ -1550,6 +1818,16 @@ onAuthStateChanged(auth, async (u) => {
     const status = room.status;
 
     roomChatEnabled = !!room.chatEnabled;
+
+    // tasks global
+    roomTasksDone = (typeof room.tasksDone === "number") ? room.tasksDone : 0;
+    const tasksTotalRoom = (typeof room.tasksTotal === "number") ? room.tasksTotal : TASKS_TOTAL;
+    setGlobalTasksProgress(roomTasksDone, tasksTotalRoom);
+
+    // condition victoire (simple)
+    if (status === "started" && roomTasksDone >= tasksTotalRoom){
+      setStartInfo("✅ Les Ti’Nocents ont gagné (missions terminées) !");
+    }
 
     myIsHost = (room.hostUid === myUid);
     if (btnStart) btnStart.style.display = myIsHost ? "" : "none";
@@ -1586,6 +1864,13 @@ onAuthStateChanged(auth, async (u) => {
       spinRunning = false;
       hideRoleOverlay();
       setGameMode();
+
+      // si je suis Ti’Nocent → assigne mes tâches
+      if (myRole === "tinocent" && !myDead){
+        await ensureMyTasksAssigned();
+        updateMyTaskHud();
+      }
+
     } else {
       spinRunning = false;
       hideRoleOverlay();
@@ -1626,30 +1911,25 @@ onAuthStateChanged(auth, async (u) => {
     const me = players.find(p => p.uid === myUid);
     if (me?.name) myName = me.name;
 
-    // ✅ récupère mon état "mort" + cooldown
     if (me){
       const wasDead = myDead;
       myDead = !!me.isDead;
       myLastExpelAtMs = (typeof me.lastExpelAtMs === "number") ? me.lastExpelAtMs : (myLastExpelAtMs || 0);
 
-      // transition vivant -> expulsé
       if (!wasDead && myDead){
         showExpelledToast(3200);
 
-        // init spectate cam au moment de l’expulsion
         specCamX = (typeof me.x === "number") ? me.x : player.x;
         specCamY = (typeof me.y === "number") ? me.y : player.y;
 
-        // coupe chat + cache icône
         chatAllowedNow = false;
         setChatFabVisible(false);
         if (chatOverlay?.classList.contains("open")) closeChat();
 
-        // cache joystick
         joy?.classList.add("is-hidden");
+        myTaskLineEl.style.display = "none";
       }
 
-      // si redevient vivant (au cas où) => reset
       if (wasDead && !myDead){
         specCamX = null; specCamY = null;
       }
@@ -1666,10 +1946,17 @@ onAuthStateChanged(auth, async (u) => {
 
       ensurePlayerState({ ...me, x: player.x, y: player.y });
 
-      // en game: icône chat seulement si roomChatEnabled ET pas expulsé
       if (phase === "started"){
         chatAllowedNow = !!roomChatEnabled && !myDead;
         setChatFabVisible(chatAllowedNow);
+
+        if (myRole === "tinocent" && !myDead){
+          myTaskLineEl.style.display = "";
+          await ensureMyTasksAssigned();
+          updateMyTaskHud();
+        } else {
+          myTaskLineEl.style.display = "none";
+        }
       }
     }
 
@@ -1688,7 +1975,6 @@ onAuthStateChanged(auth, async (u) => {
       const msgs = snap.docs.map(d => d.data());
       renderChat(msgs);
 
-      // badge uniquement si chat visible/autorisé
       const canBadge = (phase !== "started") ? true : (chatAllowedNow && !myDead);
 
       if (msgs.length && canBadge && !chatOverlay?.classList.contains("open")){
