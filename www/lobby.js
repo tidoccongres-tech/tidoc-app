@@ -6,6 +6,10 @@
 // + Chat: lobby = toujours / map = seulement si room.chatEnabled === true
 // + ✅ Expulser (Ti’Truant) + cooldown 60s
 // + ✅ Joueur expulsé = ne bouge plus + sprite pleur.png
+// + ✅ Message “Vous avez été expulsé” côté expulsé
+// + ✅ Joueur expulsé: perso fixe, MAIS peut “pan” la caméra pour observer (drag sur canvas)
+// + ✅ Joueur expulsé: pas de chat
+// + ✅ Icône chat: visible lobby / en game seulement si room.chatEnabled === true (et joueur non-expulsé)
 // + ✅ Rapporter (près d’un joueur expulsé)
 // + ✅ Bouton activité (Ti’Nocent) selon zones (rouge = dénoncer)
 // + ✅ Personnages visibles uniquement dans le champ de vision (map visible partout)
@@ -88,6 +92,39 @@ function setRoleHud(role){
 
 if (roomCodeEl) roomCodeEl.textContent = roomId || "----";
 
+// ===== Toast “Vous avez été expulsé”
+const expelledToast = document.createElement("div");
+expelledToast.id = "expelledToast";
+expelledToast.style.cssText = `
+  position: fixed;
+  left: 50%;
+  top: calc(18px + env(safe-area-inset-top));
+  transform: translateX(-50%);
+  z-index: 120;
+  padding: 12px 14px;
+  border-radius: 14px;
+  font: 900 14px system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+  letter-spacing: .2px;
+  color: #fff;
+  background: rgba(0,0,0,.70);
+  border: 1px solid rgba(255,255,255,.14);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  box-shadow: 0 10px 26px rgba(0,0,0,.28);
+  display: none;
+`;
+expelledToast.textContent = "Vous avez été expulsé";
+document.body.appendChild(expelledToast);
+
+let expelledToastTimer = null;
+function showExpelledToast(ms = 3200){
+  expelledToast.style.display = "";
+  clearTimeout(expelledToastTimer);
+  expelledToastTimer = setTimeout(() => {
+    expelledToast.style.display = "none";
+  }, ms);
+}
+
 // ===================
 // HELPERS
 // ===================
@@ -121,6 +158,16 @@ function shuffleInPlace(arr){
 }
 
 function dist(a,b,c,d){ return Math.hypot(a-c, b-d); }
+
+function setChatFabVisible(show){
+  if (!chatFab) return;
+  chatFab.style.display = show ? "" : "none";
+  if (!show){
+    chatFab.classList.remove("has-unread");
+    if (chatBadge) chatBadge.hidden = true;
+    if (chatOverlay?.classList.contains("open")) closeChat();
+  }
+}
 
 // ===================
 // ACTION UI (Expulser / Rapporter / Activité)
@@ -197,8 +244,10 @@ let chatAllowedNow = true; // lobby true, map dépend room.chatEnabled
 function openChat(){
   if (!chatOverlay) return;
 
+  if (myDead){
+    return; // expulsé => pas de chat
+  }
   if (!chatAllowedNow){
-    setStartInfo("Chat dispo sur la map seulement pendant expulsion / dénonciation.");
     return;
   }
 
@@ -216,11 +265,12 @@ function closeChat(){
 
 chatFab?.addEventListener("click", () => {
   if (!chatOverlay) return;
+  if (myDead) return;
 
   if (!chatAllowedNow){
+    // en game, si pas autorisé, on fait rien (icône est cachée normalement)
     chatFab.classList.remove("has-unread");
     if (chatBadge) chatBadge.hidden = true;
-    openChat();
     return;
   }
 
@@ -268,6 +318,7 @@ function setLobbyMode(){
   phase = "lobby";
   joy?.classList.remove("is-hidden");
   chatAllowedNow = true; // lobby toujours
+  setChatFabVisible(true); // visible lobby
   setActionUI({ show:false });
 }
 function setStartingMode(){
@@ -275,14 +326,19 @@ function setStartingMode(){
   phase = "starting";
   joy?.classList.add("is-hidden");
   chatAllowedNow = true;
+  setChatFabVisible(true); // pendant starting ok
   setActionUI({ show:false });
 }
 function setGameMode(){
   gameStarted = true;
   phase = "started";
-  joy?.classList.remove("is-hidden");
 
-  chatAllowedNow = !!roomChatEnabled;
+  // joystick: si expulsé => on le cache (spectate drag)
+  if (myDead) joy?.classList.add("is-hidden");
+  else joy?.classList.remove("is-hidden");
+
+  chatAllowedNow = !!roomChatEnabled && !myDead;
+  setChatFabVisible(chatAllowedNow); // visible seulement si chatEnabled
   if (!chatAllowedNow && chatOverlay?.classList.contains("open")) closeChat();
 }
 
@@ -312,9 +368,13 @@ collisionImg.src = "./assets/collisions.png";
 const tinocentImgSrc = "./assets/tinocent.png";
 const titruantImgSrc = "./assets/titruant.png";
 
-// expulsé sprite (⚠️ ton fichier = pleur.png)
+// expulsé sprite (✅ pleur.png)
 const pleurImg = new Image();
-pleurImg.src = "./assets/pleure.png";
+pleurImg.src = "./assets/pleur.png";
+// fallback si ton fichier s'appelle encore "pleure.png"
+pleurImg.onerror = () => {
+  if (pleurImg.src.includes("pleur.png")) pleurImg.src = "./assets/pleure.png";
+};
 
 // ===================
 // WORLD SIZES
@@ -367,12 +427,72 @@ const ZOOM_GAME  = 1.7;
 const CAM_LERP   = 0.12;
 let camX = 0, camY = 0;
 
+// ✅ champ de vision (agrandi)
+const VISION_SCREEN_FACTOR = 0.42; // 0.24 -> 0.42
+
 // champ de vision (monde)
 function getVisionRadiusWorld(){
-  // ~ cercle qui couvre une partie de l’écran, converti en monde via zoom
-  const rScreen = Math.min(window.innerWidth, window.innerHeight) * 0.24;
+  const rScreen = Math.min(window.innerWidth, window.innerHeight) * VISION_SCREEN_FACTOR;
   return rScreen / ZOOM_GAME;
 }
+
+// ===== “spectate pan” si expulsé
+let specCamX = null, specCamY = null;
+let specDragActive = false;
+let specPointerId = null;
+let specLast = { x: 0, y: 0 };
+
+function ensureSpectateCamInit(){
+  if (specCamX == null || specCamY == null){
+    specCamX = player.x;
+    specCamY = player.y;
+  }
+}
+
+// drag sur canvas pour bouger la caméra quand expulsé
+canvas?.addEventListener("pointerdown", (e) => {
+  if (phase !== "started") return;
+  if (!myDead) return;
+
+  ensureSpectateCamInit();
+  specDragActive = true;
+  specPointerId = e.pointerId;
+  specLast.x = e.clientX;
+  specLast.y = e.clientY;
+  canvas.setPointerCapture?.(specPointerId);
+  e.preventDefault();
+}, { passive:false });
+
+canvas?.addEventListener("pointermove", (e) => {
+  if (!specDragActive) return;
+  if (specPointerId !== null && e.pointerId !== specPointerId) return;
+
+  const dx = e.clientX - specLast.x;
+  const dy = e.clientY - specLast.y;
+  specLast.x = e.clientX;
+  specLast.y = e.clientY;
+
+  // écran -> monde (inverse zoom)
+  const scale = 1 / ZOOM_GAME;
+  specCamX -= dx * scale;
+  specCamY -= dy * scale;
+
+  // clamp
+  const halfW = (window.innerWidth  / ZOOM_GAME) / 2;
+  const halfH = (window.innerHeight / ZOOM_GAME) / 2;
+  specCamX = clamp(specCamX, halfW, MAP_W - halfW);
+  specCamY = clamp(specCamY, halfH, MAP_H - halfH);
+
+  e.preventDefault();
+}, { passive:false });
+
+function endSpecDrag(){
+  specDragActive = false;
+  specPointerId = null;
+}
+canvas?.addEventListener("pointerup", endSpecDrag);
+canvas?.addEventListener("pointercancel", endSpecDrag);
+window.addEventListener("blur", endSpecDrag);
 
 // ===================
 // ZONES (sur collisions.png)
@@ -601,6 +721,13 @@ function ensurePlayerState(p){
   prev.isDead = isDead;
   prev.deadAtMs = deadAtMs;
 
+  // si mort => on “freeze” l’anim côté remote
+  if (isDead){
+    prev.moving = false;
+    prev.walkIndex = 0;
+    prev.walkTimer = 0;
+  }
+
   if (typeof x === "number" && typeof y === "number"){
     prev.x = x; prev.y = y;
 
@@ -608,7 +735,7 @@ function ensurePlayerState(p){
     const dy = (prev.lastY ?? y) - y;
     const d = Math.hypot(dx, dy);
 
-    if (d > 0.6){
+    if (!isDead && d > 0.6){
       prev.moving = true;
       prev.lastMoveAt = performance.now();
     }
@@ -621,6 +748,7 @@ function settleRemoteIdle(){
   const now = performance.now();
   for (const [uid, p] of playersMap){
     if (uid === myUid) continue;
+    if (p.isDead) continue;
     if (p.moving && now - p.lastMoveAt > 350){
       p.moving = false;
       p.walkIndex = 0;
@@ -759,7 +887,6 @@ async function hostAssignRoles(players){
 // ACTION LOGIC (Expulser / Rapporter / Zones)
 // ===================
 function getClosestAliveTargetForExpel(){
-  // retourne le joueur (state) le plus proche, vivant, autre que moi
   let best = null;
   let bestD = Infinity;
 
@@ -832,7 +959,6 @@ async function doExpulse(targetUid){
     return;
   }
 
-  // write: victim dead + killer cooldown
   try{
     await updateDoc(doc(db, "rooms", roomId, "players", targetUid), {
       isDead: true,
@@ -844,7 +970,6 @@ async function doExpulse(targetUid){
       lastExpelAtMs: now
     });
 
-    // local optimistic
     myLastExpelAtMs = now;
 
   } catch(e){
@@ -854,7 +979,6 @@ async function doExpulse(targetUid){
 }
 
 async function doReport(bodyUid){
-  // pour l’instant: on active chat + flag report (tu brancheras ensuite vote/meeting)
   try{
     await updateDoc(doc(db, "rooms", roomId), {
       chatEnabled: true,
@@ -871,7 +995,6 @@ async function doReport(bodyUid){
 }
 
 async function doZoneAction(zone){
-  // rouge = dénoncer / réunion
   if (!zone) return;
 
   if (zone.id === "meeting"){
@@ -890,7 +1013,6 @@ async function doZoneAction(zone){
     return;
   }
 
-  // autres zones: placeholder mini-jeu
   setStartInfo(`Activité: ${zone.label} (mini-jeu à brancher)`);
 }
 
@@ -967,8 +1089,9 @@ function drawVignette(){
   const cx = w / 2;
   const cy = h / 2;
 
-  const rInner = Math.min(w, h) * 0.22;
-  const rOuter = Math.min(w, h) * 0.60;
+  // ✅ adapté au FOV plus grand
+  const rInner = Math.min(w, h) * 0.36; // 0.22 -> 0.36
+  const rOuter = Math.min(w, h) * 0.72; // 0.60 -> 0.72
 
   ctx.save();
   ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
@@ -991,6 +1114,7 @@ function update(dt){
     move.x = 0; move.y = 0;
   }
   if (myDead && phase === "started"){
+    // perso fixe
     move.x = 0; move.y = 0;
   }
 
@@ -1046,6 +1170,11 @@ function update(dt){
 
   // ===== ACTION UI refresh (map uniquement)
   if (phase === "started"){
+    if (myDead){
+      setActionUI({ show:false });
+      return;
+    }
+
     const now = Date.now();
 
     // priorité 1: Rapporter si proche d’un expulsé
@@ -1058,7 +1187,7 @@ function update(dt){
 
     // priorité 2: Expulser si Ti’Truant proche d’un vivant
     const isTruant = (myRole === "titruant");
-    if (isTruant && !myDead){
+    if (isTruant){
       const hit = getClosestAliveTargetForExpel();
       if (hit){
         const remain = EXPEL_COOLDOWN_MS - (now - (myLastExpelAtMs || 0));
@@ -1075,7 +1204,7 @@ function update(dt){
             show:true,
             label:"Expulser",
             disabled:false,
-            hint:"Proche d’un joueur"
+            hint:"" // ✅ on enlève “Proche d’un joueur”
           });
           actionBtn.onclick = () => doExpulse(hit.target.uid);
         }
@@ -1085,7 +1214,7 @@ function update(dt){
 
     // priorité 3: Activité (Ti’Nocent) si proche d’une zone
     const isNocent = (myRole === "tinocent");
-    if (isNocent && !myDead){
+    if (isNocent){
       const nearZone = getClosestZoneNearMe();
       if (nearZone){
         const z = nearZone.zone;
@@ -1152,8 +1281,12 @@ function draw(){
   }
 
   // GAME: map + camera
-  camX += (player.x - camX) * CAM_LERP;
-  camY += (player.y - camY) * CAM_LERP;
+  // target cam: joueur vivant -> suit player, expulsé -> suit specCam (pan)
+  const targetX = myDead ? (specCamX ?? player.x) : player.x;
+  const targetY = myDead ? (specCamY ?? player.y) : player.y;
+
+  camX += (targetX - camX) * CAM_LERP;
+  camY += (targetY - camY) * CAM_LERP;
 
   const halfW = (window.innerWidth  / ZOOM_GAME) / 2;
   const halfH = (window.innerHeight / ZOOM_GAME) / 2;
@@ -1237,7 +1370,7 @@ function endJoystick(){
 joy?.addEventListener("pointerdown", (e) => {
   if (!joy) return;
   if (phase === "starting") return;
-  if (myDead && phase === "started") return;
+  if (myDead && phase === "started") return; // expulsé => pas de joystick
 
   active = true;
   pointerId = e.pointerId;
@@ -1447,11 +1580,14 @@ onAuthStateChanged(auth, async (u) => {
       setLobbyMode();
     }
 
+    // chat gating + icône
     if (status === "started"){
-      chatAllowedNow = !!roomChatEnabled;
+      chatAllowedNow = !!roomChatEnabled && !myDead;
+      setChatFabVisible(chatAllowedNow);
       if (!chatAllowedNow && chatOverlay?.classList.contains("open")) closeChat();
     } else {
       chatAllowedNow = true;
+      setChatFabVisible(true);
     }
 
     if (lastRoomStatus !== status){
@@ -1480,8 +1616,31 @@ onAuthStateChanged(auth, async (u) => {
 
     // ✅ récupère mon état "mort" + cooldown
     if (me){
+      const wasDead = myDead;
       myDead = !!me.isDead;
       myLastExpelAtMs = (typeof me.lastExpelAtMs === "number") ? me.lastExpelAtMs : (myLastExpelAtMs || 0);
+
+      // transition vivant -> expulsé
+      if (!wasDead && myDead){
+        showExpelledToast(3200);
+
+        // init spectate cam au moment de l’expulsion
+        specCamX = (typeof me.x === "number") ? me.x : player.x;
+        specCamY = (typeof me.y === "number") ? me.y : player.y;
+
+        // coupe chat + cache icône
+        chatAllowedNow = false;
+        setChatFabVisible(false);
+        if (chatOverlay?.classList.contains("open")) closeChat();
+
+        // cache joystick
+        joy?.classList.add("is-hidden");
+      }
+
+      // si redevient vivant (au cas où) => reset
+      if (wasDead && !myDead){
+        specCamX = null; specCamY = null;
+      }
 
       if (!localPosReady){
         if (typeof me.x === "number" && typeof me.y === "number"){
@@ -1494,6 +1653,12 @@ onAuthStateChanged(auth, async (u) => {
       }
 
       ensurePlayerState({ ...me, x: player.x, y: player.y });
+
+      // en game: icône chat seulement si roomChatEnabled ET pas expulsé
+      if (phase === "started"){
+        chatAllowedNow = !!roomChatEnabled && !myDead;
+        setChatFabVisible(chatAllowedNow);
+      }
     }
 
     startLoopOnce();
@@ -1511,7 +1676,8 @@ onAuthStateChanged(auth, async (u) => {
       const msgs = snap.docs.map(d => d.data());
       renderChat(msgs);
 
-      const canBadge = (phase !== "started") ? true : chatAllowedNow;
+      // badge uniquement si chat visible/autorisé
+      const canBadge = (phase !== "started") ? true : (chatAllowedNow && !myDead);
 
       if (msgs.length && canBadge && !chatOverlay?.classList.contains("open")){
         const last = msgs[msgs.length - 1];
@@ -1526,8 +1692,8 @@ onAuthStateChanged(auth, async (u) => {
       e.preventDefault();
       e.stopPropagation();
 
+      if (myDead) return;
       if (phase === "started" && !chatAllowedNow){
-        setStartInfo("Chat dispo sur la map seulement pendant expulsion / dénonciation.");
         return;
       }
 
