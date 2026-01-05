@@ -18,7 +18,7 @@ import * as AuthMod from "./auth.js";
 import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.4/firebase-auth.js";
 import {
   doc, getDoc, updateDoc, onSnapshot, collection, deleteDoc, serverTimestamp,
-  addDoc, query, orderBy, limit, getDocs, setDoc
+  addDoc, query, orderBy, limit, getDocs, setDoc, increment
 } from "https://www.gstatic.com/firebasejs/10.12.4/firebase-firestore.js";
 
 const auth = AuthMod.auth;
@@ -149,9 +149,21 @@ function renderPlayers(players){
 
 function sleep(ms){ return new Promise(r => setTimeout(r, ms)); }
 
-function shuffleInPlace(arr){
+function cryptoRandInt(maxExclusive){
+  // [0..maxExclusive-1], crypto-safe
+  const arr = new Uint32Array(1);
+  const limit = Math.floor(0xFFFFFFFF / maxExclusive) * maxExclusive;
+  let x;
+  do {
+    crypto.getRandomValues(arr);
+    x = arr[0];
+  } while (x >= limit);
+  return x % maxExclusive;
+}
+
+function shuffleCryptoInPlace(arr){
   for (let i = arr.length - 1; i > 0; i--){
-    const j = Math.floor(Math.random() * (i + 1));
+    const j = cryptoRandInt(i + 1);
     [arr[i], arr[j]] = [arr[j], arr[i]];
   }
   return arr;
