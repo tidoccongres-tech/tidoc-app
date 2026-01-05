@@ -7,9 +7,9 @@
 // + ✅ Expulser (Ti’Truant) + cooldown 60s
 // + ✅ Joueur expulsé = ne bouge plus + sprite pleur.png
 // + ✅ Message “Vous avez été expulsé” côté expulsé
-// + ✅ Joueur expulsé: perso fixe, MAIS peut “pan” la caméra pour observer (drag sur canvas)
-// + ✅ Joueur expulsé: pas de chat
-// + ✅ Icône chat: visible lobby / en game seulement si room.chatEnabled === true (et joueur non-expulsé)
+// + ✅ Joueur expulsé: perso fixe, MAIS peut “pan” la caméra pour observer (drag sur canvas + joystick)
+// + ✅ Joueur expulsé: chat = lecture seule (peut voir / ne peut pas écrire)
+// + ✅ Icône chat: visible lobby / en game seulement si room.chatEnabled === true (vivant ou mort)
 // + ✅ Rapporter (près d’un joueur expulsé)
 // + ✅ Bouton activité (Ti’Nocent) selon zones (rouge = dénoncer)
 // + ✅ Personnages visibles uniquement dans le champ de vision (map visible partout)
@@ -23,6 +23,7 @@
 // + ✅ HUD missions sous le rôle (pas au-dessus des persos)
 // + ✅ Micro-activités (mini overlays) pour chaque zone (style “crew tasks” sans copier)
 // + ✅ Toast: “X a quitté la partie”
+// + ✅ Badge sous pseudo: “EXPULSÉ” sur les morts
 
 import * as AuthMod from "./auth.js";
 import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.4/firebase-auth.js";
@@ -457,7 +458,7 @@ function closeActivityUI(){
 activityCloseBtn?.addEventListener("click", closeActivityUI);
 activityOverlay.addEventListener("click", (e) => { if (e.target === activityOverlay) closeActivityUI(); });
 
-// mini-jeu: “taper les pastilles dans l’ordre” (6 pastilles)
+// mini-jeu: “taper les pastilles dans l’ordre”
 function startTapOrderMiniGame({ steps = 6 } = {}){
   const order = Array.from({length: steps}, (_,i)=>i+1);
   shuffleCryptoInPlace(order);
@@ -490,7 +491,6 @@ function startTapOrderMiniGame({ steps = 6 } = {}){
       if (activityDone) return;
 
       if (n !== need){
-        // petite pénalité : reset
         need = 1;
         setProgress();
         return;
@@ -507,14 +507,13 @@ function startTapOrderMiniGame({ steps = 6 } = {}){
         activitySubEl.textContent = "Terminé ✅";
         await sleep(350);
         closeActivityUI();
-        await completeCurrentTask(); // valide la mission (et incrémente la jauge globale)
+        await completeCurrentTask();
       }
     });
 
     wrap.appendChild(btn);
   }
 
-  // mélange l’ordre visuel
   const children = Array.from(wrap.children);
   children.sort(() => (cryptoRandInt(2) ? 1 : -1));
   wrap.innerHTML = "";
@@ -526,7 +525,6 @@ function startTapOrderMiniGame({ steps = 6 } = {}){
 
 // micro-activité selon zone
 function startActivityForZone(zoneId){
-  // On reste “crew task vibe” mais simple, rapide, et pas copié.
   if (zoneId === "imagerie"){
     openActivityUI("Imagerie", "Scanne les repères dans l’ordre");
     startTapOrderMiniGame({ steps: 6 });
@@ -567,7 +565,7 @@ function startActivityForZone(zoneId){
   startTapOrderMiniGame({ steps: 5 });
 }
 
-// valider tâche (appelé après mini-jeu)
+// valider tâche
 async function completeCurrentTask(){
   if (!myUid || !roomId) return;
   if (phase !== "started") return;
@@ -583,7 +581,6 @@ async function completeCurrentTask(){
     return;
   }
 
-  // proche zone ?
   const d = dist(player.x, player.y, z.cx, z.cy);
   if (d > ZONE_RANGE){
     setStartInfo("Va sur la zone indiquée (flèche).");
@@ -593,9 +590,7 @@ async function completeCurrentTask(){
   try{
     const nextIndex = myTaskIndex + 1;
 
-    await updateDoc(doc(db, "rooms", roomId), {
-      tasksDone: increment(1)
-    });
+    await updateDoc(doc(db, "rooms", roomId), { tasksDone: increment(1) });
 
     await updateDoc(doc(db, "rooms", roomId, "tasks", myUid), {
       index: nextIndex,
@@ -620,8 +615,6 @@ async function completeCurrentTask(){
   }
 }
 
-// bouton “Valider” => ouvre l’activité (au lieu de valider direct)
-// (ça évite que tu puisses “spam” sans mini-jeu)
 btnTaskDone?.addEventListener("click", () => {
   if (myRole !== "tinocent" || myDead || phase !== "started") return;
   const t = currentTask();
@@ -689,19 +682,28 @@ let expelLockUntil = 0;
 const EXPEL_COOLDOWN_MS = 60_000;
 
 // ===================
-// CHAT OPEN/CLOSE + GATING
+// CHAT OPEN/CLOSE + GATING (VIEW vs WRITE)
 // ===================
-let chatAllowedNow = true; // lobby true, map dépend room.chatEnabled
+let chatCanViewNow  = true;  // peut ouvrir/voir le chat
+let chatCanWriteNow = true;  // peut envoyer
+
+function applyChatWriteLock(){
+  if (!chatInput || !chatForm) return;
+  chatInput.disabled = !chatCanWriteNow;
+  chatInput.placeholder = chatCanWriteNow ? "Écrire…" : "Lecture seule";
+}
 
 function openChat(){
   if (!chatOverlay) return;
-  if (myDead) return;
-  if (!chatAllowedNow) return;
+  if (!chatCanViewNow) return;
 
   chatOverlay.classList.add("open");
   chatOverlay.setAttribute("aria-hidden", "false");
   document.body.classList.add("chat-open");
-  setTimeout(() => chatInput?.focus?.(), 80);
+
+  if (chatCanWriteNow){
+    setTimeout(() => chatInput?.focus?.(), 80);
+  }
 }
 function closeChat(){
   if (!chatOverlay) return;
@@ -712,9 +714,8 @@ function closeChat(){
 
 chatFab?.addEventListener("click", () => {
   if (!chatOverlay) return;
-  if (myDead) return;
 
-  if (!chatAllowedNow){
+  if (!chatCanViewNow){
     chatFab.classList.remove("has-unread");
     if (chatBadge) chatBadge.hidden = true;
     return;
@@ -764,8 +765,12 @@ function setLobbyMode(){
   gameStarted = false;
   phase = "lobby";
   joy?.classList.remove("is-hidden");
-  chatAllowedNow = true;
+
+  chatCanViewNow = true;
+  chatCanWriteNow = true;
   setChatFabVisible(true);
+  applyChatWriteLock();
+
   setActionUI({ show:false });
   showTasksHud(false);
   closeActivityUI();
@@ -774,8 +779,12 @@ function setStartingMode(){
   gameStarted = false;
   phase = "starting";
   joy?.classList.add("is-hidden");
-  chatAllowedNow = true;
+
+  chatCanViewNow = true;
+  chatCanWriteNow = true;
   setChatFabVisible(true);
+  applyChatWriteLock();
+
   setActionUI({ show:false });
   showTasksHud(false);
   closeActivityUI();
@@ -784,12 +793,17 @@ function setGameMode(){
   gameStarted = true;
   phase = "started";
 
-  if (myDead) joy?.classList.add("is-hidden");
-  else joy?.classList.remove("is-hidden");
+  // ✅ joystick toujours visible en game (vivant = move / mort = pan caméra)
+  joy?.classList.remove("is-hidden");
 
-  chatAllowedNow = !!roomChatEnabled && !myDead;
-  setChatFabVisible(chatAllowedNow);
-  if (!chatAllowedNow && chatOverlay?.classList.contains("open")) closeChat();
+  // ✅ chat: visible si room.chatEnabled
+  // vivant: write ok, mort: lecture seule
+  chatCanViewNow  = !!roomChatEnabled;
+  chatCanWriteNow = !!roomChatEnabled && !myDead;
+
+  setChatFabVisible(chatCanViewNow);
+  if (!chatCanViewNow && chatOverlay?.classList.contains("open")) closeChat();
+  applyChatWriteLock();
 
   showTasksHud(true);
   updateMyTaskHud();
@@ -883,7 +897,6 @@ let camX = 0, camY = 0;
 // ✅ FOV plus grand (téléphone)
 const VISION_SCREEN_FACTOR = 0.58;
 
-// rayon FOV monde
 function getVisionRadiusWorld(){
   const rScreen = Math.min(window.innerWidth, window.innerHeight) * VISION_SCREEN_FACTOR;
   return rScreen / ZOOM_GAME;
@@ -1337,7 +1350,7 @@ async function hostAssignRoles(players){
     truantsCount: truantsCount,
     tasksTotal: TASKS_TOTAL,
     tasksDone: 0,
-    deadUids: [] // reset au démarrage
+    deadUids: []
   }).catch(()=>{});
 }
 
@@ -1347,7 +1360,6 @@ async function hostAssignRoles(players){
 function getClosestAliveTargetForExpel(){
   const now = performance.now();
 
-  // 1) lock courte durée + marge de sortie
   if (expelLockedUid && now < expelLockUntil){
     const p = playersMap.get(expelLockedUid);
     if (p && !p.isDead && typeof p.x === "number" && typeof p.y === "number"){
@@ -1359,7 +1371,6 @@ function getClosestAliveTargetForExpel(){
     expelLockedUid = null;
   }
 
-  // 2) find best in range d'entrée
   let best = null;
   let bestD = Infinity;
 
@@ -1433,12 +1444,10 @@ async function doExpulse(targetUid){
   }
 
   try{
-    // ✅ persiste dans room.deadUids (anti “revient debout”)
     await updateDoc(doc(db, "rooms", roomId), {
       deadUids: arrayUnion(targetUid)
     }).catch(()=>{});
 
-    // flag sur player doc (compat)
     await updateDoc(doc(db, "rooms", roomId, "players", targetUid), {
       isDead: true,
       deadAtMs: now,
@@ -1492,24 +1501,20 @@ async function doZoneAction(zone){
     return;
   }
 
-  // ✅ ouvrir l’activité uniquement pour Ti’Nocent
   if (myRole !== "tinocent" || myDead) return;
 
-  // si ce n’est pas ta mission courante, on empêche (sinon ça fait “tout le monde spam”)
   const t = currentTask();
   if (!t || t.zoneId !== zone.id){
     setStartInfo("Ce n’est pas ta mission actuelle.");
     return;
   }
 
-  // proche zone (par sécurité)
   const d = dist(player.x, player.y, zone.cx, zone.cy);
   if (d > ZONE_RANGE){
     setStartInfo("Approche-toi encore un peu.");
     return;
   }
 
-  // lance mini-jeu
   startActivityForZone(zone.id);
 }
 
@@ -1549,22 +1554,28 @@ function roundRectPath(ctx, x, y, w, h, r){
   ctx.quadraticCurveTo(x, y, x+r, y);
 }
 
-function drawNameTag(px, py, name, isHost){
+// ✅ badge “EXPULSÉ”
+function drawNameTag(px, py, name, isHost, isDead){
   if (!name) return;
-  const text = isHost ? `${name} 👑` : name;
+
+  const main = isHost ? `${name} 👑` : name;
+  const sub  = isDead ? "EXPULSÉ" : "";
 
   const size = gameStarted ? SPRITE_SIZE_GAME : SPRITE_SIZE_LOBBY;
-  const y = Math.round(py - size - 16);
+  const y = Math.round(py - size - 18);
 
   ctx.save();
   ctx.font = "1000 14px system-ui, -apple-system, Segoe UI, Roboto, sans-serif";
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
 
-  const metrics = ctx.measureText(text);
+  const metricsMain = ctx.measureText(main);
+  const metricsSub  = sub ? ctx.measureText(sub) : { width: 0 };
+
   const padX = 10;
-  const w = Math.ceil(metrics.width + padX * 2);
-  const h = 24;
+  const w = Math.ceil(Math.max(metricsMain.width, metricsSub.width) + padX * 2);
+  const lines = sub ? 2 : 1;
+  const h = lines === 2 ? 40 : 24;
 
   ctx.fillStyle = "rgba(0,0,0,0.55)";
   ctx.beginPath();
@@ -1576,7 +1587,17 @@ function drawNameTag(px, py, name, isHost){
   ctx.stroke();
 
   ctx.fillStyle = "#fff";
-  ctx.fillText(text, px, y);
+  if (!sub){
+    ctx.fillText(main, px, y);
+  } else {
+    ctx.fillText(main, px, y - 9);
+
+    ctx.font = "1000 11px system-ui, -apple-system, Segoe UI, Roboto, sans-serif";
+    ctx.globalAlpha = 0.92;
+    ctx.fillText(sub, px, y + 10);
+    ctx.globalAlpha = 1;
+  }
+
   ctx.restore();
 }
 
@@ -1586,7 +1607,6 @@ function drawVignette(){
   const cx = w / 2;
   const cy = h / 2;
 
-  // ✅ vignette plus large (FOV plus grand)
   const rInner = Math.min(w, h) * 0.50;
   const rOuter = Math.min(w, h) * 0.94;
 
@@ -1615,7 +1635,6 @@ function drawTaskArrow(){
   const z = zones.find(z => z.id === t.zoneId);
   if (!z) return;
 
-  // angle vers la zone depuis le player (plus logique que cam)
   const dx = z.cx - player.x;
   const dy = z.cy - player.y;
   const ang = Math.atan2(dy, dx);
@@ -1657,11 +1676,22 @@ function update(dt){
   if (phase === "starting") {
     move.x = 0; move.y = 0;
   }
-  if (myDead && phase === "started"){
-    move.x = 0; move.y = 0;
-  }
 
   const dtNorm = Math.min(2, dt / 16.6667);
+
+  // ✅ mort = joystick pan caméra (et drag déjà géré)
+  if (myDead && phase === "started"){
+    ensureSpectateCamInit();
+
+    const CAM_PAN_SPEED = 7.2; // ajuste à ton feeling
+    specCamX += move.x * CAM_PAN_SPEED * dtNorm;
+    specCamY += move.y * CAM_PAN_SPEED * dtNorm;
+
+    const halfW = (window.innerWidth  / ZOOM_GAME) / 2;
+    const halfH = (window.innerHeight / ZOOM_GAME) / 2;
+    specCamX = clamp(specCamX, halfW, MAP_W - halfW);
+    specCamY = clamp(specCamY, halfH, MAP_H - halfH);
+  }
 
   const nx = player.x + move.x * player.speed * dtNorm;
   const ny = player.y + move.y * player.speed * dtNorm;
@@ -1810,7 +1840,7 @@ function draw(){
         : ((p.uid === myUid) ? getLocalSprite() : getRemoteSprite(p));
 
       drawPlayerSprite(ix, iy, sprite);
-      drawNameTag(ix, iy, p.name, !!p.isHost);
+      drawNameTag(ix, iy, p.name, !!p.isHost, !!p.isDead);
     }
 
     ctx.restore();
@@ -1839,10 +1869,9 @@ function draw(){
     ctx.drawImage(mapImg, 0, 0, MAP_W, MAP_H);
   }
 
-  // ✅ IMPORTANT: clip FOV centré sur le PLAYER (pas camX/camY)
-  // -> le perso ne disparaît plus quand la caméra est clamp en bas/coins
+  // clip FOV
   const visR = getVisionRadiusWorld();
-  const clipCX = myDead ? camX : player.x; // expulsé: on clip autour cam, vivant: autour player
+  const clipCX = myDead ? camX : player.x;
   const clipCY = myDead ? camY : player.y;
 
   ctx.save();
@@ -1864,7 +1893,7 @@ function draw(){
       : ((p.uid === myUid) ? getLocalSprite() : getRemoteSprite(p));
 
     drawPlayerSprite(p.drawX, p.drawY, sprite);
-    drawNameTag(p.drawX, p.drawY, p.name, !!p.isHost);
+    drawNameTag(p.drawX, p.drawY, p.name, !!p.isHost, !!p.isDead);
   }
 
   ctx.restore(); // end clip
@@ -1913,7 +1942,6 @@ function endJoystick(){
 joy?.addEventListener("pointerdown", (e) => {
   if (!joy) return;
   if (phase === "starting") return;
-  if (myDead && phase === "started") return;
   if (activityOpen) return;
 
   active = true;
@@ -2145,14 +2173,18 @@ onAuthStateChanged(auth, async (u) => {
       setLobbyMode();
     }
 
-    // chat gating + icône
+    // chat gating
     if (status === "started"){
-      chatAllowedNow = !!roomChatEnabled && !myDead;
-      setChatFabVisible(chatAllowedNow);
-      if (!chatAllowedNow && chatOverlay?.classList.contains("open")) closeChat();
+      chatCanViewNow  = !!roomChatEnabled;
+      chatCanWriteNow = !!roomChatEnabled && !myDead;
+      setChatFabVisible(chatCanViewNow);
+      if (!chatCanViewNow && chatOverlay?.classList.contains("open")) closeChat();
+      applyChatWriteLock();
     } else {
-      chatAllowedNow = true;
+      chatCanViewNow = true;
+      chatCanWriteNow = true;
       setChatFabVisible(true);
+      applyChatWriteLock();
     }
 
     if (lastRoomStatus !== status){
@@ -2166,12 +2198,11 @@ onAuthStateChanged(auth, async (u) => {
   onSnapshot(collection(db,"rooms",roomId,"players"), async (snap)=>{
     const players = snap.docs.map(d=>d.data());
 
-    // ✅ toast “X a quitté”
+    // toast “X a quitté”
     const nowMap = new Map(players.map(p => [p.uid, p.name || "Joueur"]));
     if (prevPlayersSnapshot.size){
       for (const [uid, name] of prevPlayersSnapshot.entries()){
         if (!nowMap.has(uid)){
-          // évite de spam si c’est toi
           if (uid !== myUid){
             showLeaveToast(`${name} a quitté la partie`);
           }
@@ -2205,11 +2236,13 @@ onAuthStateChanged(auth, async (u) => {
         specCamX = (typeof me.x === "number") ? me.x : player.x;
         specCamY = (typeof me.y === "number") ? me.y : player.y;
 
-        chatAllowedNow = false;
-        setChatFabVisible(false);
-        if (chatOverlay?.classList.contains("open")) closeChat();
+        // ✅ mort: chat lecture seule si room.chatEnabled
+        chatCanViewNow  = !!roomChatEnabled;
+        chatCanWriteNow = false;
+        setChatFabVisible(chatCanViewNow);
+        applyChatWriteLock();
+        if (!chatCanViewNow && chatOverlay?.classList.contains("open")) closeChat();
 
-        joy?.classList.add("is-hidden");
         updateMyTaskHud();
         closeActivityUI();
       }
@@ -2231,8 +2264,10 @@ onAuthStateChanged(auth, async (u) => {
       ensurePlayerState({ ...me, x: player.x, y: player.y });
 
       if (phase === "started"){
-        chatAllowedNow = !!roomChatEnabled && !myDead;
-        setChatFabVisible(chatAllowedNow);
+        chatCanViewNow  = !!roomChatEnabled;
+        chatCanWriteNow = !!roomChatEnabled && !myDead;
+        setChatFabVisible(chatCanViewNow);
+        applyChatWriteLock();
 
         if (myRole === "tinocent" && !myDead){
           await ensureMyTasksAssigned();
@@ -2256,7 +2291,7 @@ onAuthStateChanged(auth, async (u) => {
       const msgs = snap.docs.map(d => d.data());
       renderChat(msgs);
 
-      const canBadge = (phase !== "started") ? true : (chatAllowedNow && !myDead);
+      const canBadge = (phase !== "started") ? true : chatCanViewNow;
 
       if (msgs.length && canBadge && !chatOverlay?.classList.contains("open")){
         const last = msgs[msgs.length - 1];
@@ -2271,8 +2306,7 @@ onAuthStateChanged(auth, async (u) => {
       e.preventDefault();
       e.stopPropagation();
 
-      if (myDead) return;
-      if (phase === "started" && !chatAllowedNow) return;
+      if (!chatCanWriteNow) return;
 
       const val = chatInput.value;
       chatInput.value = "";
