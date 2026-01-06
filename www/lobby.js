@@ -24,6 +24,7 @@
 // + ✅ Micro-activités (mini overlays) pour chaque zone (style “crew tasks” sans copier)
 // + ✅ Toast: “X a quitté la partie”
 // + ✅ Badge sous pseudo: “EXPULSÉ” sur les morts
+// + ✅ NEW: Splash report "expulsion.png" (30s) -> chat forcé + débat 60s (lock map)
 
 import * as AuthMod from "./auth.js";
 import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.4/firebase-auth.js";
@@ -322,11 +323,9 @@ function currentTask(){
 }
 function updateMyTaskHud(){
   const t = currentTask();
-
   const showPersonal = (myRole === "tinocent" && !myDead && phase === "started");
   myTaskLineEl.style.display = showPersonal ? "" : "none";
   myTaskListEl.style.display = showPersonal ? "" : "none";
-
   if (!showPersonal) return;
 
   if (!t){
@@ -337,7 +336,6 @@ function updateMyTaskHud(){
 
   myTaskTextEl.textContent = `Ta mission: ${t.label}`;
 
-  // petite liste “à faire”
   const list = myTasks.map((x, i) => {
     const done = i < myTaskIndex;
     const cur  = i === myTaskIndex;
@@ -523,44 +521,14 @@ function startTapOrderMiniGame({ steps = 6 } = {}){
   setProgress();
 }
 
-// micro-activité selon zone
 function startActivityForZone(zoneId){
-  if (zoneId === "imagerie"){
-    openActivityUI("Imagerie", "Scanne les repères dans l’ordre");
-    startTapOrderMiniGame({ steps: 6 });
-    return;
-  }
-  if (zoneId === "labo"){
-    openActivityUI("Labo", "Valide la série d’échantillons");
-    startTapOrderMiniGame({ steps: 5 });
-    return;
-  }
-  if (zoneId === "pharma"){
-    openActivityUI("Pharma", "Prépare la séquence de doses");
-    startTapOrderMiniGame({ steps: 6 });
-    return;
-  }
-  if (zoneId === "exam"){
-    openActivityUI("Anamnèse", "Classe les infos dans l’ordre");
-    startTapOrderMiniGame({ steps: 5 });
-    return;
-  }
-  if (zoneId === "soins"){
-    openActivityUI("Soins", "Stabilise le patient (séquence)");
-    startTapOrderMiniGame({ steps: 6 });
-    return;
-  }
-  if (zoneId === "admin"){
-    openActivityUI("Dossiers", "Valide les documents");
-    startTapOrderMiniGame({ steps: 5 });
-    return;
-  }
-  if (zoneId === "rcp"){
-    openActivityUI("RCP", "Confirme les étapes");
-    startTapOrderMiniGame({ steps: 5 });
-    return;
-  }
-
+  if (zoneId === "imagerie"){ openActivityUI("Imagerie", "Scanne les repères dans l’ordre"); startTapOrderMiniGame({ steps: 6 }); return; }
+  if (zoneId === "labo"){ openActivityUI("Labo", "Valide la série d’échantillons"); startTapOrderMiniGame({ steps: 5 }); return; }
+  if (zoneId === "pharma"){ openActivityUI("Pharma", "Prépare la séquence de doses"); startTapOrderMiniGame({ steps: 6 }); return; }
+  if (zoneId === "exam"){ openActivityUI("Anamnèse", "Classe les infos dans l’ordre"); startTapOrderMiniGame({ steps: 5 }); return; }
+  if (zoneId === "soins"){ openActivityUI("Soins", "Stabilise le patient (séquence)"); startTapOrderMiniGame({ steps: 6 }); return; }
+  if (zoneId === "admin"){ openActivityUI("Dossiers", "Valide les documents"); startTapOrderMiniGame({ steps: 5 }); return; }
+  if (zoneId === "rcp"){ openActivityUI("RCP", "Confirme les étapes"); startTapOrderMiniGame({ steps: 5 }); return; }
   openActivityUI("Activité", "Mini-jeu à brancher");
   startTapOrderMiniGame({ steps: 5 });
 }
@@ -576,16 +544,10 @@ async function completeCurrentTask(){
   if (!t) return;
 
   const z = zones.find(z => z.id === t.zoneId);
-  if (!z){
-    setStartInfo("Zone de mission introuvable.");
-    return;
-  }
+  if (!z){ setStartInfo("Zone de mission introuvable."); return; }
 
   const d = dist(player.x, player.y, z.cx, z.cy);
-  if (d > ZONE_RANGE){
-    setStartInfo("Va sur la zone indiquée (flèche).");
-    return;
-  }
+  if (d > ZONE_RANGE){ setStartInfo("Va sur la zone indiquée (flèche)."); return; }
 
   try{
     const nextIndex = myTaskIndex + 1;
@@ -706,6 +668,7 @@ function openChat(){
   }
 }
 function closeChat(){
+  if (meetingLockActive) return; // ✅ pendant débat: impossible de fermer
   if (!chatOverlay) return;
   chatOverlay.classList.remove("open");
   chatOverlay.setAttribute("aria-hidden", "true");
@@ -761,10 +724,256 @@ let roomChatEnabled = false;
 // deadUids persistant (anti “revient debout”)
 let deadUidsSet = new Set();
 
+// ===================
+// MEETING / REPORT SPLASH (expulsion.png) + LOCK CHAT
+// ===================
+const REPORT_SPLASH_MS = 30_000; // écran expulsion visible
+const DEBATE_MS        = 60_000; // débat chat forcé
+
+let meetingLockActive = false;     // empêche retour map / close chat
+let meetingAtMsLocal = 0;          // dernière réunion (timestamp)
+let meetingTimers = { splash:null, debate:null, tick:null };
+
+function clearMeetingTimers(){
+  clearTimeout(meetingTimers.splash);
+  clearTimeout(meetingTimers.debate);
+  clearInterval(meetingTimers.tick);
+  meetingTimers.splash = meetingTimers.debate = meetingTimers.tick = null;
+}
+
+function tsToMs(v){
+  if (!v) return 0;
+  if (typeof v === "number") return v;
+  if (typeof v?.toMillis === "function") return v.toMillis();
+  return 0;
+}
+
+function getPlayerNameByUid(uid){
+  if (!uid) return "";
+  const p = playersMap.get(uid);
+  if (p?.name) return p.name;
+  const n = prevPlayersSnapshot?.get?.(uid);
+  return n || "";
+}
+
+const reportOverlay = document.createElement("div");
+reportOverlay.id = "reportOverlay";
+reportOverlay.style.cssText = `
+  position: fixed;
+  inset: 0;
+  z-index: 250;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0,0,0,.55);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+`;
+
+reportOverlay.innerHTML = `
+  <div id="reportCard" style="
+    width: min(520px, calc(100vw - 28px));
+    border-radius: 22px;
+    padding: 14px;
+    background: rgba(0,0,0,.70);
+    border: 1px solid rgba(255,255,255,.14);
+    box-shadow: 0 18px 50px rgba(0,0,0,.38);
+    transform: translateY(18px) scale(.96);
+    opacity: 0;
+  ">
+    <div style="
+      border-radius: 18px;
+      overflow: hidden;
+      border: 1px solid rgba(255,255,255,.12);
+      background: rgba(255,255,255,.06);
+    ">
+      <img id="reportImg" src="./assets/expulsion.png" alt="Expulsion" style="
+        display:block;
+        width: 100%;
+        height: auto;
+      "/>
+    </div>
+
+    <div style="
+      margin-top: 12px;
+      text-align: center;
+      color: #fff;
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+    ">
+      <div id="reportLine1" style="font: 1000 15px system-ui; letter-spacing:.2px;">
+        Un Ti’Doc a été expulsé…
+      </div>
+      <div id="reportLine2" style="margin-top:6px; font: 1000 18px system-ui;">
+        —
+      </div>
+      <div id="reportCountdown" style="margin-top:10px; font: 900 12px system-ui; opacity:.85;">
+        Discussion dans 30s…
+      </div>
+    </div>
+  </div>
+`;
+document.body.appendChild(reportOverlay);
+
+const reportCard = reportOverlay.querySelector("#reportCard");
+const reportLine2 = reportOverlay.querySelector("#reportLine2");
+const reportCountdown = reportOverlay.querySelector("#reportCountdown");
+
+const debatePill = document.createElement("div");
+debatePill.id = "debatePill";
+debatePill.style.cssText = `
+  position: fixed;
+  left: 50%;
+  top: calc(12px + env(safe-area-inset-top));
+  transform: translateX(-50%);
+  z-index: 260;
+  padding: 10px 12px;
+  border-radius: 999px;
+  font: 900 12px system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+  color: #fff;
+  background: rgba(0,0,0,.58);
+  border: 1px solid rgba(255,255,255,.14);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  display: none;
+`;
+debatePill.textContent = "Débat : 60s";
+document.body.appendChild(debatePill);
+
+function setMeetingLock(on){
+  meetingLockActive = !!on;
+
+  if (meetingLockActive){
+    setActionUI({ show:false });
+    closeActivityUI();
+    joy?.classList.add("is-hidden");
+  } else {
+    if (phase === "started") joy?.classList.remove("is-hidden");
+  }
+}
+
+function showReportSplash(bodyName, meetingAtMs){
+  reportLine2.textContent = bodyName ? `${bodyName} a été expulsé` : "Un Ti’Doc a été expulsé";
+  reportOverlay.style.display = "flex";
+
+  requestAnimationFrame(() => {
+    reportCard.style.transition = "transform 260ms cubic-bezier(.2,.9,.2,1), opacity 260ms ease";
+    reportCard.style.transform = "translateY(0px) scale(1)";
+    reportCard.style.opacity = "1";
+  });
+
+  const endSplash = meetingAtMs + REPORT_SPLASH_MS;
+  const endDebate = endSplash + DEBATE_MS;
+
+  clearMeetingTimers();
+
+  meetingTimers.tick = setInterval(() => {
+    const now = Date.now();
+    if (now < endSplash){
+      const s = Math.max(0, Math.ceil((endSplash - now)/1000));
+      if (reportCountdown) reportCountdown.textContent = `Discussion dans ${s}s…`;
+    } else if (now < endDebate){
+      const s = Math.max(0, Math.ceil((endDebate - now)/1000));
+      debatePill.style.display = "";
+      debatePill.textContent = `Débat : ${s}s`;
+      if (reportCountdown) reportCountdown.textContent = "Discussion en cours…";
+    } else {
+      debatePill.style.display = "none";
+      clearMeetingTimers();
+    }
+  }, 250);
+
+  meetingTimers.splash = setTimeout(() => {
+    reportOverlay.style.display = "none";
+    openChat(); // force ouverture chat
+  }, REPORT_SPLASH_MS);
+
+  meetingTimers.debate = setTimeout(() => {
+    debatePill.style.display = "none";
+    setMeetingLock(false);
+  }, REPORT_SPLASH_MS + DEBATE_MS);
+}
+
+function hideReportSplash(){
+  reportOverlay.style.display = "none";
+}
+
+function handleMeetingState(room, status){
+  if (status !== "started"){
+    setMeetingLock(false);
+    hideReportSplash();
+    debatePill.style.display = "none";
+    clearMeetingTimers();
+    meetingAtMsLocal = 0;
+    return;
+  }
+
+  const meetingType = room?.meetingType || "";
+  const meetingAtMs = tsToMs(room?.meetingAt);
+  const bodyUid = room?.reportedBodyUid || "";
+  const hasMeeting = !!meetingAtMs && (meetingType === "report" || meetingType === "meeting");
+
+  if (!hasMeeting){
+    setMeetingLock(false);
+    hideReportSplash();
+    debatePill.style.display = "none";
+    clearMeetingTimers();
+    meetingAtMsLocal = 0;
+    return;
+  }
+
+  // meeting actif => lock
+  setMeetingLock(true);
+
+  if (meetingAtMs && meetingAtMs !== meetingAtMsLocal){
+    meetingAtMsLocal = meetingAtMs;
+
+    if (meetingType === "report"){
+      const bodyName = getPlayerNameByUid(bodyUid) || "Un Ti’Doc";
+      showReportSplash(bodyName, meetingAtMs);
+    } else {
+      // meeting “dénoncer” simple => chat direct, débat 60s
+      clearMeetingTimers();
+      debatePill.style.display = "";
+      const endDebate = meetingAtMs + DEBATE_MS;
+
+      meetingTimers.tick = setInterval(() => {
+        const now = Date.now();
+        const s = Math.max(0, Math.ceil((endDebate - now)/1000));
+        debatePill.textContent = `Débat : ${s}s`;
+        if (s <= 0){
+          debatePill.style.display = "none";
+          clearMeetingTimers();
+        }
+      }, 250);
+
+      openChat();
+      meetingTimers.debate = setTimeout(() => {
+        debatePill.style.display = "none";
+        setMeetingLock(false);
+      }, DEBATE_MS);
+    }
+  }
+
+  // force chat visible si chatEnabled
+  if (room?.chatEnabled){
+    chatCanViewNow = true;
+    setChatFabVisible(true);
+  }
+}
+
+// ===================
+// MODES
+// ===================
 function setLobbyMode(){
   gameStarted = false;
   phase = "lobby";
   joy?.classList.remove("is-hidden");
+
+  setMeetingLock(false);
+  hideReportSplash();
+  debatePill.style.display = "none";
+  clearMeetingTimers();
+  meetingAtMsLocal = 0;
 
   chatCanViewNow = true;
   chatCanWriteNow = true;
@@ -780,6 +989,12 @@ function setStartingMode(){
   phase = "starting";
   joy?.classList.add("is-hidden");
 
+  setMeetingLock(false);
+  hideReportSplash();
+  debatePill.style.display = "none";
+  clearMeetingTimers();
+  meetingAtMsLocal = 0;
+
   chatCanViewNow = true;
   chatCanWriteNow = true;
   setChatFabVisible(true);
@@ -793,11 +1008,10 @@ function setGameMode(){
   gameStarted = true;
   phase = "started";
 
-  // ✅ joystick toujours visible en game (vivant = move / mort = pan caméra)
-  joy?.classList.remove("is-hidden");
+  // joystick visible en game (vivant = move / mort = pan caméra)
+  if (!meetingLockActive) joy?.classList.remove("is-hidden");
 
-  // ✅ chat: visible si room.chatEnabled
-  // vivant: write ok, mort: lecture seule
+  // chat: visible si room.chatEnabled
   chatCanViewNow  = !!roomChatEnabled;
   chatCanWriteNow = !!roomChatEnabled && !myDead;
 
@@ -894,7 +1108,7 @@ const CAM_LERP   = 0.12;
 
 let camX = 0, camY = 0;
 
-// ✅ FOV plus grand (téléphone)
+// FOV plus grand (téléphone)
 const VISION_SCREEN_FACTOR = 0.58;
 
 function getVisionRadiusWorld(){
@@ -919,6 +1133,7 @@ function ensureSpectateCamInit(){
 canvas?.addEventListener("pointerdown", (e) => {
   if (phase !== "started") return;
   if (!myDead) return;
+  if (meetingLockActive) return;
 
   ensureSpectateCamInit();
   specDragActive = true;
@@ -932,6 +1147,7 @@ canvas?.addEventListener("pointerdown", (e) => {
 canvas?.addEventListener("pointermove", (e) => {
   if (!specDragActive) return;
   if (specPointerId !== null && e.pointerId !== specPointerId) return;
+  if (meetingLockActive) return;
 
   const dx = e.clientX - specLast.x;
   const dy = e.clientY - specLast.y;
@@ -1163,7 +1379,7 @@ function ensurePlayerState(p){
   const x = (typeof p.x === "number") ? p.x : undefined;
   const y = (typeof p.y === "number") ? p.y : undefined;
 
-  // ✅ “dead” = player doc OU deadUids persistant room
+  // “dead” = player doc OU deadUids persistant room
   const isDead = !!p.isDead || deadUidsSet.has(p.uid);
   const deadAtMs = (typeof p.deadAtMs === "number") ? p.deadAtMs : 0;
 
@@ -1228,6 +1444,7 @@ let lastSend = 0;
 async function sendMyPosition(){
   if (!myUid || !roomId) return;
   if (myDead) return;
+  if (meetingLockActive) return;
 
   const now = performance.now();
   if (now - lastSend < SEND_EVERY_MS) return;
@@ -1435,6 +1652,7 @@ async function doExpulse(targetUid){
   if (!myUid || !roomId) return;
   if (phase !== "started") return;
   if (myDead) return;
+  if (meetingLockActive) return;
 
   const now = Date.now();
   const remain = EXPEL_COOLDOWN_MS - (now - (myLastExpelAtMs || 0));
@@ -1467,6 +1685,7 @@ async function doExpulse(targetUid){
 }
 
 async function doReport(bodyUid){
+  if (meetingLockActive) return;
   try{
     await updateDoc(doc(db, "rooms", roomId), {
       chatEnabled: true,
@@ -1484,6 +1703,7 @@ async function doReport(bodyUid){
 
 async function doZoneAction(zone){
   if (!zone) return;
+  if (meetingLockActive) return;
 
   if (zone.id === "meeting"){
     try{
@@ -1554,7 +1774,7 @@ function roundRectPath(ctx, x, y, w, h, r){
   ctx.quadraticCurveTo(x, y, x+r, y);
 }
 
-// ✅ badge “EXPULSÉ”
+// badge “EXPULSÉ”
 function drawNameTag(px, py, name, isHost, isDead){
   if (!name) return;
 
@@ -1591,7 +1811,6 @@ function drawNameTag(px, py, name, isHost, isDead){
     ctx.fillText(main, px, y);
   } else {
     ctx.fillText(main, px, y - 9);
-
     ctx.font = "1000 11px system-ui, -apple-system, Segoe UI, Roboto, sans-serif";
     ctx.globalAlpha = 0.92;
     ctx.fillText(sub, px, y + 10);
@@ -1628,6 +1847,7 @@ function drawTaskArrow(){
   if (phase !== "started") return;
   if (myDead) return;
   if (myRole !== "tinocent") return;
+  if (meetingLockActive) return;
 
   const t = currentTask();
   if (!t) return;
@@ -1673,17 +1893,23 @@ function drawTaskArrow(){
 // UPDATE / DRAW / LOOP
 // ===================
 function update(dt){
+  // meeting lock => pas de move / pas d’actions
+  if (meetingLockActive){
+    move.x = 0; move.y = 0;
+    setActionUI({ show:false });
+  }
+
   if (phase === "starting") {
     move.x = 0; move.y = 0;
   }
 
   const dtNorm = Math.min(2, dt / 16.6667);
 
-  // ✅ mort = joystick pan caméra (et drag déjà géré)
-  if (myDead && phase === "started"){
+  // mort = joystick pan caméra (et drag déjà géré)
+  if (myDead && phase === "started" && !meetingLockActive){
     ensureSpectateCamInit();
 
-    const CAM_PAN_SPEED = 7.2; // ajuste à ton feeling
+    const CAM_PAN_SPEED = 7.2;
     specCamX += move.x * CAM_PAN_SPEED * dtNorm;
     specCamY += move.y * CAM_PAN_SPEED * dtNorm;
 
@@ -1697,7 +1923,7 @@ function update(dt){
   const ny = player.y + move.y * player.speed * dtNorm;
 
   const wasWalking = walking;
-  walking = !myDead && (Math.abs(move.x) + Math.abs(move.y)) > 0.15;
+  walking = !myDead && (Math.abs(move.x) + Math.abs(move.y)) > 0.15 && !meetingLockActive;
 
   const speed01 = Math.min(1, (Math.abs(move.x) + Math.abs(move.y)) / 1.4);
   const swapMs  = 140 - speed01 * 70;
@@ -1715,7 +1941,7 @@ function update(dt){
 
   let moved = false;
 
-  if (!myDead){
+  if (!myDead && !meetingLockActive){
     if (canMoveWorld(nx, player.y)){
       player.x = nx; moved = true;
     }
@@ -1741,9 +1967,9 @@ function update(dt){
 
   settleRemoteIdle();
 
-  // ===== ACTION UI refresh (map uniquement)
+  // ACTION UI refresh (map uniquement)
   if (phase === "started"){
-    if (myDead || activityOpen){
+    if (myDead || activityOpen || meetingLockActive){
       setActionUI({ show:false });
       return;
     }
@@ -1859,7 +2085,7 @@ function draw(){
   camX = clamp(camX, halfW, MAP_W - halfW);
   camY = clamp(camY, halfH, MAP_H - halfH);
 
-  // 1) draw map
+  // draw map
   ctx.save();
   ctx.translate(window.innerWidth/2, window.innerHeight/2);
   ctx.scale(ZOOM_GAME, ZOOM_GAME);
@@ -1896,13 +2122,10 @@ function draw(){
     drawNameTag(p.drawX, p.drawY, p.name, !!p.isHost, !!p.isDead);
   }
 
-  ctx.restore(); // end clip
-  ctx.restore(); // end world
+  ctx.restore(); // clip
+  ctx.restore(); // world
 
-  // 2) vignette écran
   drawVignette();
-
-  // 3) flèche mission
   drawTaskArrow();
 }
 
@@ -1943,6 +2166,7 @@ joy?.addEventListener("pointerdown", (e) => {
   if (!joy) return;
   if (phase === "starting") return;
   if (activityOpen) return;
+  if (meetingLockActive) return;
 
   active = true;
   pointerId = e.pointerId;
@@ -1958,6 +2182,7 @@ joy?.addEventListener("pointerdown", (e) => {
 joy?.addEventListener("pointermove", (e) => {
   if (!active) return;
   if (pointerId !== null && e.pointerId !== pointerId) return;
+  if (meetingLockActive) return;
 
   let dx = e.clientX - center.x;
   let dy = e.clientY - center.y;
@@ -2080,7 +2305,11 @@ onAuthStateChanged(auth, async (u) => {
         chatEnabled: false,
         tasksTotal: TASKS_TOTAL,
         tasksDone: 0,
-        deadUids: []
+        deadUids: [],
+        meetingType: null,
+        meetingAt: null,
+        meetingBy: null,
+        reportedBodyUid: null
       });
 
       const snapPlayers = await getDocs(collection(db, "rooms", roomId, "players"));
@@ -2100,7 +2329,7 @@ onAuthStateChanged(auth, async (u) => {
     }
   });
 
-  // room status + flags + tasks + deadUids
+  // room status + flags + tasks + deadUids + meeting/report
   onSnapshot(doc(db,"rooms",roomId), async (snap)=>{
     if (!snap.exists()){
       alert("Partie supprimée");
@@ -2128,6 +2357,9 @@ onAuthStateChanged(auth, async (u) => {
 
     myIsHost = (room.hostUid === myUid);
     if (btnStart) btnStart.style.display = myIsHost ? "" : "none";
+
+    // ✅ meeting/report (splash + lock)
+    handleMeetingState(room, status);
 
     if (status === "starting"){
       if (lastRoomStatus !== "starting"){
@@ -2173,13 +2405,19 @@ onAuthStateChanged(auth, async (u) => {
       setLobbyMode();
     }
 
-    // chat gating
+    // chat gating (si meeting actif, on force view true)
     if (status === "started"){
-      chatCanViewNow  = !!roomChatEnabled;
-      chatCanWriteNow = !!roomChatEnabled && !myDead;
+      chatCanViewNow  = meetingLockActive ? true : !!roomChatEnabled;
+      chatCanWriteNow = (meetingLockActive ? true : !!roomChatEnabled) && !myDead; // vivant écrit, mort lecture seule
       setChatFabVisible(chatCanViewNow);
       if (!chatCanViewNow && chatOverlay?.classList.contains("open")) closeChat();
       applyChatWriteLock();
+
+      // pendant meeting: on force chat ouvert (après le splash, openChat() est appelé)
+      if (meetingLockActive && roomChatEnabled){
+        // on ne force pas ici pour éviter de couper le splash,
+        // l'ouverture est gérée par showReportSplash() / meetingType === "meeting"
+      }
     } else {
       chatCanViewNow = true;
       chatCanWriteNow = true;
@@ -2236,8 +2474,8 @@ onAuthStateChanged(auth, async (u) => {
         specCamX = (typeof me.x === "number") ? me.x : player.x;
         specCamY = (typeof me.y === "number") ? me.y : player.y;
 
-        // ✅ mort: chat lecture seule si room.chatEnabled
-        chatCanViewNow  = !!roomChatEnabled;
+        // mort: chat lecture seule si room.chatEnabled
+        chatCanViewNow  = meetingLockActive ? true : !!roomChatEnabled;
         chatCanWriteNow = false;
         setChatFabVisible(chatCanViewNow);
         applyChatWriteLock();
@@ -2264,8 +2502,8 @@ onAuthStateChanged(auth, async (u) => {
       ensurePlayerState({ ...me, x: player.x, y: player.y });
 
       if (phase === "started"){
-        chatCanViewNow  = !!roomChatEnabled;
-        chatCanWriteNow = !!roomChatEnabled && !myDead;
+        chatCanViewNow  = meetingLockActive ? true : !!roomChatEnabled;
+        chatCanWriteNow = (meetingLockActive ? true : !!roomChatEnabled) && !myDead;
         setChatFabVisible(chatCanViewNow);
         applyChatWriteLock();
 
