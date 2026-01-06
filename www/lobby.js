@@ -837,7 +837,7 @@ function setMeetingLock(on){
 }
 
 function showReportSplash(bodyName, meetingAtMs){
-  reportLine2.textContent = bodyName ? `${bodyName} a été expulsé` : "Un Ti’Doc a été expulsé";
+  reportLine1.textContent = bodyName ? `${bodyName} a été expulsé` : "Un Ti’Doc a été expulsé…";
   reportOverlay.style.display = "flex";
 
   requestAnimationFrame(() => {
@@ -855,21 +855,23 @@ function showReportSplash(bodyName, meetingAtMs){
     const now = Date.now();
     if (now < endSplash){
       const s = Math.max(0, Math.ceil((endSplash - now)/1000));
-      if (reportCountdown) reportCountdown.textContent = `Discussion dans ${s}s…`;
-    } else if (now < endDebate){
+      reportCountdown.textContent = `Discussion dans ${s}s…`;
+      return;
+    }
+    if (now < endDebate){
       const s = Math.max(0, Math.ceil((endDebate - now)/1000));
       debatePill.style.display = "";
       debatePill.textContent = `Débat : ${s}s`;
-      if (reportCountdown) reportCountdown.textContent = "Discussion en cours…";
-    } else {
-      debatePill.style.display = "none";
-      clearMeetingTimers();
+      reportCountdown.textContent = "Discussion en cours…";
+      return;
     }
+    debatePill.style.display = "none";
+    clearMeetingTimers();
   }, 250);
 
   meetingTimers.splash = setTimeout(() => {
     reportOverlay.style.display = "none";
-    openChat(); // force ouverture chat
+    forceOpenChat();               // ✅ OUVERTURE FORCÉE
   }, REPORT_SPLASH_MS);
 
   meetingTimers.debate = setTimeout(() => {
@@ -939,6 +941,95 @@ function handleMeetingState(room, status){
     }
   }
 
+// ===================
+// SELF EXPULSED CARD (victime) : 30s puis spectateur
+// ===================
+const SELF_EXPEL_MS = 30_000;
+
+let selfExpelActive = false;
+let selfExpelUntil = 0;
+let selfExpelTimer = null;
+
+const selfExpelOverlay = document.createElement("div");
+selfExpelOverlay.id = "selfExpelOverlay";
+selfExpelOverlay.style.cssText = `
+  position: fixed;
+  inset: 0;
+  z-index: 300;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0,0,0,.65);
+  backdrop-filter: blur(7px);
+  -webkit-backdrop-filter: blur(7px);
+`;
+
+selfExpelOverlay.innerHTML = `
+  <div id="selfExpelCard" style="
+    width: min(520px, calc(100vw - 28px));
+    border-radius: 22px;
+    padding: 14px;
+    background: rgba(0,0,0,.72);
+    border: 1px solid rgba(255,255,255,.14);
+    box-shadow: 0 18px 50px rgba(0,0,0,.40);
+    transform: translateY(18px) scale(.96);
+    opacity: 0;
+  ">
+    <div style="
+      border-radius: 18px;
+      overflow: hidden;
+      border: 1px solid rgba(255,255,255,.12);
+      background: rgba(255,255,255,.06);
+    ">
+      <img src="./assets/expulsion.png" alt="Expulsion" style="display:block;width:100%;height:auto;"/>
+    </div>
+
+    <div style="margin-top: 12px; text-align:center; color:#fff; font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;">
+      <div style="font:1000 18px system-ui;">Vous avez été expulsé</div>
+      <div id="selfExpelCountdown" style="margin-top:10px; font:900 12px system-ui; opacity:.85;">
+        Observation dans 30s…
+      </div>
+    </div>
+  </div>
+`;
+document.body.appendChild(selfExpelOverlay);
+
+const selfExpelCard = selfExpelOverlay.querySelector("#selfExpelCard");
+const selfExpelCountdown = selfExpelOverlay.querySelector("#selfExpelCountdown");
+
+function showSelfExpelledCard(ms = SELF_EXPEL_MS){
+  clearTimeout(selfExpelTimer);
+
+  selfExpelActive = true;
+  selfExpelUntil = Date.now() + ms;
+
+  selfExpelOverlay.style.display = "flex";
+  requestAnimationFrame(() => {
+    selfExpelCard.style.transition = "transform 260ms cubic-bezier(.2,.9,.2,1), opacity 260ms ease";
+    selfExpelCard.style.transform = "translateY(0px) scale(1)";
+    selfExpelCard.style.opacity = "1";
+  });
+
+  // pendant la carte : pas de map, pas de joystick
+  joy?.classList.add("is-hidden");
+  closeChat(); // optionnel, si tu veux forcer plein écran
+
+  const tick = setInterval(() => {
+    const s = Math.max(0, Math.ceil((selfExpelUntil - Date.now())/1000));
+    selfExpelCountdown.textContent = `Observation dans ${s}s…`;
+    if (s <= 0) clearInterval(tick);
+  }, 250);
+
+  selfExpelTimer = setTimeout(() => {
+    selfExpelActive = false;
+    selfExpelOverlay.style.display = "none";
+    // ✅ après 30s : spectateur => joystick revient (pan caméra déjà géré)
+    if (phase === "started") joy?.classList.remove("is-hidden");
+    // chat selon règles (vivant/expulsé)
+    applyChatWriteLock();
+  }, ms);
+}
+  
   // force chat visible si chatEnabled
   if (room?.chatEnabled){
     chatCanViewNow = true;
