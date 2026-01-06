@@ -787,35 +787,20 @@ reportOverlay.innerHTML = `
       border: 1px solid rgba(255,255,255,.12);
       background: rgba(255,255,255,.06);
     ">
-      <img id="reportImg" src="./assets/expulsion.png" alt="Expulsion" style="
-        display:block;
-        width: 100%;
-        height: auto;
-      "/>
+      <img src="./assets/expulsion.png" alt="Expulsion" style="display:block;width:100%;height:auto;"/>
     </div>
 
-    <div style="
-      margin-top: 12px;
-      text-align: center;
-      color: #fff;
-      font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
-    ">
-      <div id="reportLine1" style="font: 1000 15px system-ui; letter-spacing:.2px;">
-        Un Ti’Doc a été expulsé…
-      </div>
-      <div id="reportLine2" style="margin-top:6px; font: 1000 18px system-ui;">
-        —
-      </div>
-      <div id="reportCountdown" style="margin-top:10px; font: 900 12px system-ui; opacity:.85;">
-        Discussion dans 30s…
-      </div>
+    <div style="margin-top: 12px;text-align:center;color:#fff;font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;">
+      <div id="reportLine1" style="font:1000 16px system-ui; letter-spacing:.2px;">—</div>
+      <div id="reportCountdown" style="margin-top:10px; font:900 12px system-ui; opacity:.85;">Discussion dans 30s…</div>
     </div>
   </div>
 `;
+
 document.body.appendChild(reportOverlay);
 
 const reportCard = reportOverlay.querySelector("#reportCard");
-const reportLine2 = reportOverlay.querySelector("#reportLine2");
+const reportLine1 = reportOverlay.querySelector("#reportLine1");
 const reportCountdown = reportOverlay.querySelector("#reportCountdown");
 
 const debatePill = document.createElement("div");
@@ -958,6 +943,22 @@ function handleMeetingState(room, status){
   if (room?.chatEnabled){
     chatCanViewNow = true;
     setChatFabVisible(true);
+  }
+}
+
+function forceOpenChat(){
+  if (!chatOverlay) return;
+
+  // force le droit de voir
+  chatCanViewNow = true;
+  setChatFabVisible(true);
+
+  chatOverlay.classList.add("open");
+  chatOverlay.setAttribute("aria-hidden","false");
+  document.body.classList.add("chat-open");
+
+  if (chatCanWriteNow){
+    setTimeout(() => chatInput?.focus?.(), 80);
   }
 }
 
