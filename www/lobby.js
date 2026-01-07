@@ -1014,7 +1014,7 @@ function setLobbyMode(){
 
   setMeetingLock(false);
   hideReportSplash();
-  debatePill.style.display = "none";
+  safeStyle(debatePill, "display", "none"); // ✅ au lieu de debatePill.style...
   clearMeetingTimers();
   meetingAtMsLocal = 0;
 
@@ -1027,6 +1027,7 @@ function setLobbyMode(){
   showTasksHud(false);
   closeActivityUI();
 }
+
 function setStartingMode(){
   gameStarted = false;
   phase = "starting";
@@ -1034,7 +1035,7 @@ function setStartingMode(){
 
   setMeetingLock(false);
   hideReportSplash();
-  debatePill.style.display = "none";
+  safeStyle(debatePill, "display", "none"); // ✅
   clearMeetingTimers();
   meetingAtMsLocal = 0;
 
