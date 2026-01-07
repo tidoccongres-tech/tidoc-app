@@ -1152,6 +1152,7 @@ let specPointerId = null;
 let specLast = { x: 0, y: 0 };
 
 function ensureSpectateCamInit(){
+  if (!player) return;
   if (specCamX == null || specCamY == null){
     specCamX = player.x;
     specCamY = player.y;
@@ -1396,12 +1397,9 @@ function getRemoteSprite(p){
 // ===================
 // PLAYERS STATE
 // ===================
-let myUid = null;
 let myName = "";
 let myIsHost = false;
 
-let myRole = null;        // "tinocent" | "titruant"
-let myDead = false;       // expulsé ?
 let myLastExpelAtMs = 0;  // cooldown
 
 const playersMap = new Map();
