@@ -776,9 +776,6 @@ function getPlayerNameByUid(uid){
   return n || "";
 }
 
-// (reportOverlay / reportCard / reportLine1 / debatePill : inchangés)
-
-// lock
 function setMeetingLock(on){
   meetingLockActive = !!on;
 
@@ -791,7 +788,7 @@ function setMeetingLock(on){
   }
 }
 
-// SAFE: évite crash si les éléments report UI n’existent pas dans le DOM
+// ✅ SAFE: si ces éléments n’existent pas dans le HTML, on n’explose pas
 const reportOverlay = document.getElementById("reportOverlay");
 const reportCard    = document.getElementById("reportCard");
 const reportLine1   = document.getElementById("reportLine1");
@@ -808,13 +805,13 @@ function showReportSplash(bodyName, meetingAtMs){
   safeSet(reportLine1, "textContent", bodyName ? `${bodyName} a été expulsé` : "Un Ti’Doc a été expulsé…");
   safeStyle(reportOverlay, "display", "flex");
 
-requestAnimationFrame(() => {
-  if (reportCard){
-    reportCard.style.transition = "transform 260ms cubic-bezier(.2,.9,.2,1), opacity 260ms ease";
-    reportCard.style.transform = "translateY(0px) scale(1)";
-    reportCard.style.opacity = "1";
-  }
-});
+  requestAnimationFrame(() => {
+    if (reportCard){
+      reportCard.style.transition = "transform 260ms cubic-bezier(.2,.9,.2,1), opacity 260ms ease";
+      reportCard.style.transform = "translateY(0px) scale(1)";
+      reportCard.style.opacity = "1";
+    }
+  });
 
   const endSplash = meetingAtMs + REPORT_SPLASH_MS;
   const endDebate = endSplash + DEBATE_MS;
@@ -828,35 +825,35 @@ requestAnimationFrame(() => {
 
     if (now < endDebate){
       const s = Math.max(0, Math.ceil((endDebate - now)/1000));
-      debatePill.style.display = "";
-      debatePill.textContent = `Débat : ${s}s`;
+      safeStyle(debatePill, "display", "");
+      safeSet(debatePill, "textContent", `Débat : ${s}s`);
       return;
     }
 
-    debatePill.style.display = "none";
+    safeStyle(debatePill, "display", "none");
     clearMeetingTimers();
   }, 250);
 
   meetingTimers.splash = setTimeout(() => {
-    reportOverlay.style.display = "none";
-    forceOpenChat(); // ✅ ouverture forcée après le splash
+    safeStyle(reportOverlay, "display", "none");
+    forceOpenChat(); // ouverture forcée après le splash
   }, REPORT_SPLASH_MS);
 
   meetingTimers.debate = setTimeout(() => {
-    debatePill.style.display = "none";
+    safeStyle(debatePill, "display", "none");
     setMeetingLock(false);
   }, REPORT_SPLASH_MS + DEBATE_MS);
 }
 
 function hideReportSplash(){
-  reportOverlay.style.display = "none";
+  safeStyle(reportOverlay, "display", "none");
 }
 
 function handleMeetingState(room, status){
   if (status !== "started"){
     setMeetingLock(false);
     hideReportSplash();
-    debatePill.style.display = "none";
+    safeStyle(debatePill, "display", "none");
     clearMeetingTimers();
     meetingAtMsLocal = 0;
     return;
@@ -864,13 +861,13 @@ function handleMeetingState(room, status){
 
   const meetingType = room?.meetingType || "";
   const meetingAtMs = tsToMs(room?.meetingAt);
-  const bodyUid = room?.reportedBodyUid || "";
-  const hasMeeting = !!meetingAtMs && (meetingType === "report" || meetingType === "meeting");
+  const bodyUid     = room?.reportedBodyUid || "";
+  const hasMeeting  = !!meetingAtMs && (meetingType === "report" || meetingType === "meeting");
 
   if (!hasMeeting){
     setMeetingLock(false);
     hideReportSplash();
-    debatePill.style.display = "none";
+    safeStyle(debatePill, "display", "none");
     clearMeetingTimers();
     meetingAtMsLocal = 0;
     return;
@@ -887,27 +884,29 @@ function handleMeetingState(room, status){
     } else {
       // meeting “dénoncer” => chat direct + débat 60s
       clearMeetingTimers();
-      debatePill.style.display = "";
+
+      safeStyle(debatePill, "display", "");
       const endDebate = meetingAtMs + DEBATE_MS;
 
       meetingTimers.tick = setInterval(() => {
         const now = Date.now();
         const s = Math.max(0, Math.ceil((endDebate - now)/1000));
-        debatePill.textContent = `Débat : ${s}s`;
+        safeSet(debatePill, "textContent", `Débat : ${s}s`);
         if (s <= 0){
-          debatePill.style.display = "none";
+          safeStyle(debatePill, "display", "none");
           clearMeetingTimers();
         }
       }, 250);
 
       openChat();
+
       meetingTimers.debate = setTimeout(() => {
-        debatePill.style.display = "none";
+        safeStyle(debatePill, "display", "none");
         setMeetingLock(false);
       }, DEBATE_MS);
     }
   }
-} // ✅ fin handleMeetingState
+}
 
 // ===================
 // SELF EXPULSED CARD (victime) : 10s puis spectateur
