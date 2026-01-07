@@ -957,18 +957,10 @@ function showSelfExpelledCard(ms = SELF_EXPEL_MS){
     applyChatWriteLock();
   }, ms);
 }
-  
-  // force chat visible si chatEnabled
-  if (room?.chatEnabled){
-    chatCanViewNow = true;
-    setChatFabVisible(true);
-  }
-}
 
 function forceOpenChat(){
   if (!chatOverlay) return;
 
-  // force le droit de voir
   chatCanViewNow = true;
   setChatFabVisible(true);
 
