@@ -2561,7 +2561,7 @@ onAuthStateChanged(auth, async (u) => {
       myLastExpelAtMs = (typeof me.lastExpelAtMs === "number") ? me.lastExpelAtMs : (myLastExpelAtMs || 0);
 
       if (!wasDead && myDead){
-        showExpelledToast(3200);
+        showSelfExpelledCard(30_000);  // ✅ carte expulsion victime 30s
 
         specCamX = (typeof me.x === "number") ? me.x : player.x;
         specCamY = (typeof me.y === "number") ? me.y : player.y;
@@ -2593,11 +2593,14 @@ onAuthStateChanged(auth, async (u) => {
 
       ensurePlayerState({ ...me, x: player.x, y: player.y });
 
-      if (phase === "started"){
-        chatCanViewNow  = meetingLockActive ? true : !!roomChatEnabled;
-        chatCanWriteNow = (meetingLockActive ? true : !!roomChatEnabled) && !myDead;
-        setChatFabVisible(chatCanViewNow);
-        applyChatWriteLock();
+      if (status === "started"){
+  chatCanViewNow  = meetingLockActive ? true : !!roomChatEnabled;
+  chatCanWriteNow = (!myDead) && (meetingLockActive ? true : !!roomChatEnabled);
+
+  setChatFabVisible(chatCanViewNow);
+  if (!chatCanViewNow && chatOverlay?.classList.contains("open")) closeChat();
+  applyChatWriteLock();
+}
 
         if (myRole === "tinocent" && !myDead){
           await ensureMyTasksAssigned();
