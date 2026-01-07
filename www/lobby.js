@@ -1931,29 +1931,22 @@ function drawTaskArrow(){
 }
 
 // ===================
-// UPDATE / DRAW / LOOP
+// UPDATE / DRAW / LOOP (IMPECCABLE)
 // ===================
+
 function update(dt){
   // meeting lock => pas de move / pas d’actions
   if (meetingLockActive){
     move.x = 0; move.y = 0;
   }
-  
-  function setActionUI({ show=false, label="", disabled=false }){
-  actionWrap.style.display = show ? "flex" : "none";
-  actionBtn.textContent = label || "";
-  actionBtn.disabled = !!disabled;
-  actionBtn.style.opacity = disabled ? "0.65" : "1";
-  if (!show) actionBtn.onclick = null; // ✅ cleanup OK ici
-}
 
-  if (phase === "starting") {
+  if (phase === "starting"){
     move.x = 0; move.y = 0;
   }
 
   const dtNorm = Math.min(2, dt / 16.6667);
 
-  // mort = joystick pan caméra (et drag déjà géré)
+  // mort = joystick pan caméra
   if (myDead && phase === "started" && !meetingLockActive){
     ensureSpectateCamInit();
 
@@ -1989,6 +1982,7 @@ function update(dt){
 
   let moved = false;
 
+  // déplacement vivant
   if (!myDead && !meetingLockActive){
     if (canMoveWorld(nx, player.y)){
       player.x = nx; moved = true;
@@ -2016,68 +2010,68 @@ function update(dt){
   settleRemoteIdle();
 
   // ACTION UI refresh (map uniquement)
-  if (phase === "started"){
-    if (myDead || activityOpen || meetingLockActive){
-      setActionUI({ show:false });
-      return;
-    }
+  if (phase !== "started") return;
 
-    const now = Date.now();
+  if (myDead || activityOpen || meetingLockActive){
+    setActionUI({ show:false });
+    return;
+  }
 
-    // priorité 1: Rapporter
-    const bodyHit = getClosestDeadBody();
-    if (bodyHit){
-      setActionUI({ show:true, label:"Rapporter", disabled:false });
-      actionBtn.onclick = () => doReport(bodyHit.body.uid);
-      return;
-    }
+  const now = Date.now();
 
-    // priorité 2: Expulser
-    const isTruant = (myRole === "titruant");
-    if (isTruant){
-      const hit = getClosestAliveTargetForExpel();
-      if (hit){
-        const remain = EXPEL_COOLDOWN_MS - (now - (myLastExpelAtMs || 0));
-        if (remain > 0){
-          setActionUI({
-            show:true,
-            label:`Expulser (${Math.ceil(remain/1000)}s)`,
-            disabled:true
-          });
-          actionBtn.onclick = null;
-        } else {
-          setActionUI({ show:true, label:"Expulser", disabled:false });
-          actionBtn.onclick = () => doExpulse(hit.target.uid);
-        }
-        return;
+  // priorité 1: Rapporter
+  const bodyHit = getClosestDeadBody();
+  if (bodyHit){
+    setActionUI({ show:true, label:"Rapporter", disabled:false });
+    actionBtn.onclick = () => doReport(bodyHit.body.uid);
+    return;
+  }
+
+  // priorité 2: Expulser
+  if (myRole === "titruant"){
+    const hit = getClosestAliveTargetForExpel();
+    if (hit){
+      const remain = EXPEL_COOLDOWN_MS - (now - (myLastExpelAtMs || 0));
+      if (remain > 0){
+        setActionUI({
+          show:true,
+          label:`Expulser (${Math.ceil(remain/1000)}s)`,
+          disabled:true
+        });
+        actionBtn.onclick = null;
+      } else {
+        setActionUI({ show:true, label:"Expulser", disabled:false });
+        actionBtn.onclick = () => doExpulse(hit.target.uid);
       }
+      return;
+    }
+  }
+
+  // priorité 3: Zones
+  const nearZone = getClosestZoneNearMe();
+  if (nearZone){
+    const z = nearZone.zone;
+
+    if (z.id === "meeting"){
+      setActionUI({ show:true, label:"Dénoncer", disabled:false });
+      actionBtn.onclick = () => doZoneAction(z);
+      return;
     }
 
-    // priorité 3: Activité (Ti’Nocent)
-    const isNocent = (myRole === "tinocent");
-    if (isNocent){
-      // priorité 3: Zone (tout le monde pour meeting, nocent pour tasks)
-// priorité 3: Zones
-const nearZone = getClosestZoneNearMe();
-if (nearZone){
-  const z = nearZone.zone;
-
-  if (z.id === "meeting"){
-    setActionUI({ show:true, label:"Dénoncer", disabled:false });
-    actionBtn.onclick = () => doZoneAction(z);
-    return;
+    if (myRole === "tinocent"){
+      setActionUI({ show:true, label:`Faire: ${z.label}`, disabled:false });
+      actionBtn.onclick = () => doZoneAction(z);
+      return;
+    }
   }
 
-  // tâches uniquement Ti’Nocent
-  if (myRole === "tinocent"){
-    setActionUI({ show:true, label:`Faire: ${z.label}`, disabled:false });
-    actionBtn.onclick = () => doZoneAction(z);
-    return;
-  }
+  // rien à faire
+  setActionUI({ show:false });
 }
 
 function draw(){
-  if (!ctx) return; // évite crash si canvas absent
+  if (!ctx) return;
+
   ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
   ctx.clearRect(0,0,window.innerWidth, window.innerHeight);
 
