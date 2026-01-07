@@ -252,6 +252,10 @@ function setRoleHud(role){
 
 if (roomCodeEl) roomCodeEl.textContent = roomId || "----";
 
+if (!roomId){
+  setStartInfo("⚠️ Aucun code room dans l’URL (ex: lobby.html?room=ABCD).");
+}
+
 // ===================
 // TI’NOCENT TASKS (TÂCHES + FLÈCHE + JAUGE)
 // ===================
