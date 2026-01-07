@@ -1,30 +1,4 @@
 // lobby.js (MODULE) — Lobby (lobby.png + lobby-NB.png) -> Game (map.png + collisions.png)
-// + Tirage au sort animé (rapide -> ralenti -> rôle final) + auto start
-// + Zones activité = obstacles
-// + Vignette (noir autour) sur MAP uniquement
-// + HUD rôle en haut à droite
-// + Chat: lobby = toujours / map = seulement si room.chatEnabled === true
-// + ✅ Expulser (Ti’Truant) + cooldown 60s
-// + ✅ Joueur expulsé = ne bouge plus + sprite pleur.png
-// + ✅ Message “Vous avez été expulsé” côté expulsé
-// + ✅ Joueur expulsé: perso fixe, MAIS peut “pan” la caméra pour observer (drag sur canvas + joystick)
-// + ✅ Joueur expulsé: chat = lecture seule (peut voir / ne peut pas écrire)
-// + ✅ Icône chat: visible lobby / en game seulement si room.chatEnabled === true (vivant ou mort)
-// + ✅ Rapporter (près d’un joueur expulsé)
-// + ✅ Bouton activité (Ti’Nocent) selon zones (rouge = dénoncer)
-// + ✅ Personnages visibles uniquement dans le champ de vision (map visible partout)
-// + ✅ Tirage équitable (host = même proba)
-// + ✅ Hint “Zone activité” supprimé
-// + ✅ Système de tâches Ti’Nocent: liste aléatoire + flèche + jauge globale (progression commune)
-// + ✅ FIX: expulsion “revient debout” -> deadUids persistant côté room
-// + ✅ FIX: bouton Expulser qui clignote -> hystérésis + lock cible
-// + ✅ FIX: FOV téléphone trop petit -> FOV augmenté
-// + ✅ FIX: player caché en bas de map -> FOV centré sur le player (pas sur caméra clamp)
-// + ✅ HUD missions sous le rôle (pas au-dessus des persos)
-// + ✅ Micro-activités (mini overlays) pour chaque zone (style “crew tasks” sans copier)
-// + ✅ Toast: “X a quitté la partie”
-// + ✅ Badge sous pseudo: “EXPULSÉ” sur les morts
-// + ✅ NEW: Splash report "expulsion.png" (30s) -> chat forcé + débat 60s (lock map)
 
 import * as AuthMod from "./auth.js";
 import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.4/firebase-auth.js";
@@ -220,7 +194,7 @@ function setChatFabVisible(show){
   if (!show){
     chatFab.classList.remove("has-unread");
     if (chatBadge) chatBadge.hidden = true;
-    if (chatOverlay?.classList.contains("open") && typeof closeChat === "function") closeChat();
+    if (chatOverlay?.classList.contains("open") && typeof closeChat === "function") closeChat(true);
   }
 }
 
@@ -694,8 +668,8 @@ function openChat(){
     setTimeout(() => chatInput?.focus?.(), 80);
   }
 }
-function closeChat(){
-  if (meetingLockActive) return; // ✅ pendant débat: impossible de fermer
+function closeChat(force=false){
+  if (!force && meetingLockActive) return;
   if (!chatOverlay) return;
   chatOverlay.classList.remove("open");
   chatOverlay.setAttribute("aria-hidden", "true");
@@ -717,10 +691,9 @@ chatFab?.addEventListener("click", () => {
   if (chatOverlay.classList.contains("open")) closeChat();
   else openChat();
 });
-btnChatClose?.addEventListener("click", closeChat);
-chatOverlay?.addEventListener("click", (e) => { if (e.target === chatOverlay) closeChat(); });
-window.addEventListener("keydown", (e) => { if (e.key === "Escape") closeChat(); });
-
+btnChatClose?.addEventListener("click", () => closeChat(false));
+chatOverlay?.addEventListener("click", (e) => { if (e.target === chatOverlay) closeChat(false); });
+window.addEventListener("keydown", (e) => { if (e.key === "Escape") closeChat(false); });
 // ===================
 // CANVAS SETUP (DPR SAFE iPhone)
 // ===================
@@ -745,7 +718,6 @@ window.addEventListener("resize", resize);
 // ===================
 let gameStarted = false;
 let loopRunning = false;
-let phase = "lobby";
 let lastRoomStatus = null;
 
 // room flags
@@ -791,7 +763,7 @@ function setMeetingLock(on){
 
   if (meetingLockActive){
     setActionUI({ show:false });
-    closeActivityUI();
+    if (typeof closeActivityUI === "function") closeActivityUI();
     joy?.classList.add("is-hidden");
   } else {
     if (phase === "started") joy?.classList.remove("is-hidden");
@@ -972,6 +944,7 @@ const selfExpelCard = selfExpelOverlay.querySelector("#selfExpelCard");
 
 function showSelfExpelledCard(ms = SELF_EXPEL_MS){
   clearTimeout(selfExpelTimer);
+  
 
   selfExpelActive = true;
   selfExpelUntil = Date.now() + ms;
@@ -985,7 +958,7 @@ function showSelfExpelledCard(ms = SELF_EXPEL_MS){
 
   // pendant la carte : pas de map, pas de joystick
   joy?.classList.add("is-hidden");
-  closeChat();
+  closeChat(true);
 
   selfExpelTimer = setTimeout(() => {
     selfExpelActive = false;
@@ -1008,6 +981,8 @@ function forceOpenChat(){
   chatOverlay.classList.add("open");
   chatOverlay.setAttribute("aria-hidden","false");
   document.body.classList.add("chat-open");
+
+  applyChatWriteLock(); // ✅ ici
 
   if (chatCanWriteNow){
     setTimeout(() => chatInput?.focus?.(), 80);
@@ -1035,7 +1010,7 @@ function setLobbyMode(){
 
   setActionUI({ show:false });
   showTasksHud(false);
-  closeActivityUI();
+  if (typeof closeActivityUI === "function") closeActivityUI();
 }
 
 function setStartingMode(){
@@ -1070,7 +1045,7 @@ function setGameMode(){
   chatCanWriteNow = !!roomChatEnabled && !myDead;
 
   setChatFabVisible(chatCanViewNow);
-  if (!chatCanViewNow && chatOverlay?.classList.contains("open")) closeChat();
+  if (!chatCanViewNow && chatOverlay?.classList.contains("open")) closeChat(true);
   applyChatWriteLock();
 
   showTasksHud(true);
