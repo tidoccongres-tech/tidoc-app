@@ -727,8 +727,8 @@ let deadUidsSet = new Set();
 // ===================
 // MEETING / REPORT SPLASH (expulsion.png) + LOCK CHAT
 // ===================
-const REPORT_SPLASH_MS = 10_000; // écran expulsion visible
-const DEBATE_MS        = 60_000; // débat chat forcé
+const REPORT_SPLASH_MS = 10_000; // écran expulsion visible (10s)
+const DEBATE_MS        = 60_000; // débat chat forcé (60s)
 
 let meetingLockActive = false;
 let meetingAtMsLocal = 0;
@@ -786,13 +786,10 @@ function showReportSplash(bodyName, meetingAtMs){
 
   clearMeetingTimers();
 
-  // ✅ plus de texte “Discussion dans …”
   meetingTimers.tick = setInterval(() => {
     const now = Date.now();
 
-    if (now < endSplash){
-      return;
-    }
+    if (now < endSplash) return;
 
     if (now < endDebate){
       const s = Math.max(0, Math.ceil((endDebate - now)/1000));
@@ -807,7 +804,7 @@ function showReportSplash(bodyName, meetingAtMs){
 
   meetingTimers.splash = setTimeout(() => {
     reportOverlay.style.display = "none";
-    forceOpenChat(); // ✅ OUVERTURE FORCÉE
+    forceOpenChat(); // ✅ ouverture forcée après le splash
   }, REPORT_SPLASH_MS);
 
   meetingTimers.debate = setTimeout(() => {
@@ -853,7 +850,7 @@ function handleMeetingState(room, status){
       const bodyName = getPlayerNameByUid(bodyUid) || "Un Ti’Doc";
       showReportSplash(bodyName, meetingAtMs);
     } else {
-      // meeting “dénoncer” simple => chat direct, débat 60s
+      // meeting “dénoncer” => chat direct + débat 60s
       clearMeetingTimers();
       debatePill.style.display = "";
       const endDebate = meetingAtMs + DEBATE_MS;
@@ -875,12 +872,12 @@ function handleMeetingState(room, status){
       }, DEBATE_MS);
     }
   }
-} // ✅ IMPORTANT: fin handleMeetingState
+} // ✅ fin handleMeetingState
 
 // ===================
-// SELF EXPULSED CARD (victime) : 30s puis spectateur
+// SELF EXPULSED CARD (victime) : 10s puis spectateur
 // ===================
-const SELF_EXPEL_MS = 30_000;
+const SELF_EXPEL_MS = 10_000;
 
 let selfExpelActive = false;
 let selfExpelUntil = 0;
@@ -950,8 +947,8 @@ function showSelfExpelledCard(ms = SELF_EXPEL_MS){
     selfExpelActive = false;
     selfExpelOverlay.style.display = "none";
 
-    // ✅ après 30s : spectateur => joystick revient
-    if (phase === "started") joy?.classList.remove("is-hidden");
+    // après 10s : spectateur => joystick revient (si pas de meeting)
+    if (phase === "started" && !meetingLockActive) joy?.classList.remove("is-hidden");
 
     // chat selon règles (vivant/expulsé)
     applyChatWriteLock();
