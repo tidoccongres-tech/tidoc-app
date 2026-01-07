@@ -2041,6 +2041,7 @@ function update(dt){
 }
 
 function draw(){
+  if (!ctx) return; // évite crash si canvas absent
   ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
   ctx.clearRect(0,0,window.innerWidth, window.innerHeight);
 
