@@ -792,7 +792,6 @@ reportOverlay.innerHTML = `
 
     <div style="margin-top: 12px;text-align:center;color:#fff;font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;">
       <div id="reportLine1" style="font:1000 16px system-ui; letter-spacing:.2px;">—</div>
-      <div id="reportCountdown" style="margin-top:10px; font:900 12px system-ui; opacity:.85;">Discussion dans 30s…</div>
     </div>
   </div>
 `;
@@ -801,7 +800,6 @@ document.body.appendChild(reportOverlay);
 
 const reportCard = reportOverlay.querySelector("#reportCard");
 const reportLine1 = reportOverlay.querySelector("#reportLine1");
-const reportCountdown = reportOverlay.querySelector("#reportCountdown");
 
 const debatePill = document.createElement("div");
 debatePill.id = "debatePill";
