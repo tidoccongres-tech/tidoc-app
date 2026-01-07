@@ -727,7 +727,7 @@ let deadUidsSet = new Set();
 // ===================
 // MEETING / REPORT SPLASH (expulsion.png) + LOCK CHAT
 // ===================
-const REPORT_SPLASH_MS = 30_000; // écran expulsion visible
+const REPORT_SPLASH_MS = 10_000; // écran expulsion visible
 const DEBATE_MS        = 60_000; // débat chat forcé
 
 let meetingLockActive = false;     // empêche retour map / close chat
