@@ -37,8 +37,17 @@ const auth = AuthMod.auth;
 const db   = AuthMod.db;
 
 const params = new URLSearchParams(location.search);
-const roomId = (params.get("room") || params.get("code") || "").trim().toUpperCase();
 
+const roomId = (
+  params.get("room") ||
+  params.get("code") ||
+  params.get("id")   ||
+  params.get("r")    ||
+  ""
+).trim().toUpperCase();
+
+console.log("[LOBBY] href =", location.href);
+console.log("[LOBBY] roomId =", roomId);
 // ===================
 // DOM
 // ===================
