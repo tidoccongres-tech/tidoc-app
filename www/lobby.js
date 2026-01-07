@@ -791,15 +791,30 @@ function setMeetingLock(on){
   }
 }
 
-function showReportSplash(bodyName, meetingAtMs){
-  reportLine1.textContent = bodyName ? `${bodyName} a été expulsé` : "Un Ti’Doc a été expulsé…";
-  reportOverlay.style.display = "flex";
+// SAFE: évite crash si les éléments report UI n’existent pas dans le DOM
+const reportOverlay = document.getElementById("reportOverlay");
+const reportCard    = document.getElementById("reportCard");
+const reportLine1   = document.getElementById("reportLine1");
+const debatePill    = document.getElementById("debatePill");
 
-  requestAnimationFrame(() => {
+function safeSet(el, prop, value){
+  if (el) el[prop] = value;
+}
+function safeStyle(el, prop, value){
+  if (el) el.style[prop] = value;
+}
+
+function showReportSplash(bodyName, meetingAtMs){
+  safeSet(reportLine1, "textContent", bodyName ? `${bodyName} a été expulsé` : "Un Ti’Doc a été expulsé…");
+  safeStyle(reportOverlay, "display", "flex");
+
+requestAnimationFrame(() => {
+  if (reportCard){
     reportCard.style.transition = "transform 260ms cubic-bezier(.2,.9,.2,1), opacity 260ms ease";
     reportCard.style.transform = "translateY(0px) scale(1)";
     reportCard.style.opacity = "1";
-  });
+  }
+});
 
   const endSplash = meetingAtMs + REPORT_SPLASH_MS;
   const endDebate = endSplash + DEBATE_MS;
