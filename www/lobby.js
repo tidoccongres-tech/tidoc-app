@@ -2295,13 +2295,32 @@ async function sendChat(text){
 }
       
 // ===================
-// FIREBASE
+// FIREBASE (PROPRE)
 // ===================
 let localPosReady = false;
 let spawning = false;
 let unsubMyRole = null;
 let startTriggeredLocal = false;
 let startBtnBound = false;
+
+// petit cache de room.status pour l’avoir dans players snapshot
+let roomStatusCache = null;
+
+function refreshChatGating(status){
+  if (status === "started"){
+    chatCanViewNow  = meetingLockActive ? true : !!roomChatEnabled;
+    chatCanWriteNow = chatCanViewNow && !myDead;
+
+    setChatFabVisible(chatCanViewNow);
+    if (!chatCanViewNow && chatOverlay?.classList.contains("open")) closeChat(true);
+    applyChatWriteLock();
+  } else {
+    chatCanViewNow = true;
+    chatCanWriteNow = true;
+    setChatFabVisible(true);
+    applyChatWriteLock();
+  }
+}
 
 async function ensureSpawnCenter(){
   if (!myUid || !roomId) return;
@@ -2391,7 +2410,9 @@ onAuthStateChanged(auth, async (u) => {
     });
   }
 
-  // room status + flags + tasks + deadUids + meeting/report
+  // ===================
+  // ROOM SNAPSHOT (1 SEUL)
+  // ===================
   onSnapshot(doc(db,"rooms",roomId), async (snap)=>{
     if (!snap.exists()){
       alert("Partie supprimée");
@@ -2400,7 +2421,8 @@ onAuthStateChanged(auth, async (u) => {
     }
 
     const room = snap.data() || {};
-    const status = room.status;
+    const status = room.status || "lobby";
+    roomStatusCache = status;
 
     roomChatEnabled = !!room.chatEnabled;
 
@@ -2420,9 +2442,10 @@ onAuthStateChanged(auth, async (u) => {
     myIsHost = (room.hostUid === myUid);
     if (btnStart) btnStart.style.display = myIsHost ? "" : "none";
 
-    // ✅ meeting/report (splash + lock)
+    // meeting/report (lock + splash)
     handleMeetingState(room, status);
 
+    // modes
     if (status === "starting"){
       if (lastRoomStatus !== "starting"){
         setStartingMode();
@@ -2456,88 +2479,35 @@ onAuthStateChanged(auth, async (u) => {
       hideRoleOverlay();
       setGameMode();
 
-      if (myRole === "tinocent" && !myDead){
-        await ensureMyTasksAssigned();
-        updateMyTaskHud();
-      }
-
+      // (tasks perso seront gérées côté players snapshot quand myDead est connu)
     } else {
       spinRunning = false;
       hideRoleOverlay();
       setLobbyMode();
     }
 
-    // chat gating (si meeting actif, on force view true)
-    if (status === "started"){
-      chatCanViewNow  = meetingLockActive ? true : !!roomChatEnabled;
-      chatCanWriteNow = (meetingLockActive ? true : !!roomChatEnabled) && !myDead; // vivant écrit, mort lecture seule
-      setChatFabVisible(chatCanViewNow);
-      if (!chatCanViewNow && chatOverlay?.classList.contains("open")) closeChat();
-      applyChatWriteLock();
-
-      // pendant meeting: on force chat ouvert (après le splash, openChat() est appelé)
-      if (meetingLockActive && roomChatEnabled){
-        // on ne force pas ici pour éviter de couper le splash,
-        // l'ouverture est gérée par showReportSplash() / meetingType === "meeting"
-      }
-    } else {
-      chatCanViewNow = true;
-      chatCanWriteNow = true;
-      setChatFabVisible(true);
-      applyChatWriteLock();
-    }
+    // refresh chat gating (room side)
+    refreshChatGating(status);
 
     if (lastRoomStatus !== status){
       ensureSpawnCenter();
     }
-
     lastRoomStatus = status;
   });
 
-  // players snapshot
-  let roomState = null;
-
-onSnapshot(doc(db,"rooms",roomId), (snap)=>{
-  roomState = snap.exists() ? (snap.data() || {}) : null;
-  const roomSnap = await getDoc(doc(db,"rooms",roomId));
-  const room = roomSnap.data() || {};
-  const status = roomState?.status;
-  roomChatEnabled = !!roomState?.chatEnabled;
-
-  const players = snap.docs.map(d=>d.data());
-
-function refreshChatGating(status){
-  if (status === "started"){
-    // en game: icône visible seulement si room.chatEnabled, sauf meeting (forcé visible)
-    chatCanViewNow  = meetingLockActive ? true : !!roomChatEnabled;
-
-    // écrire: seulement si chat visible ET pas mort
-    // (pendant meeting on autorise l’écriture uniquement si vivant)
-    chatCanWriteNow = chatCanViewNow && !myDead;
-
-    setChatFabVisible(chatCanViewNow);
-
-    // si on n'a pas le droit de voir le chat => on le ferme en FORCE (meetingLock sinon bloque)
-    if (!chatCanViewNow && chatOverlay?.classList.contains("open")) closeChat(true);
-
-    applyChatWriteLock();
-  } else {
-    // lobby / starting => chat toujours visible + écriture autorisée
-    chatCanViewNow = true;
-    chatCanWriteNow = true;
-    setChatFabVisible(true);
-    applyChatWriteLock();
-  }
-}
+  // ===================
+  // PLAYERS SNAPSHOT (COLLECTION)
+  // ===================
+  onSnapshot(collection(db,"rooms",roomId,"players"), async (snap)=>{
+    const status = roomStatusCache || lastRoomStatus || "lobby";
+    const players = snap.docs.map(d=>d.data());
 
     // toast “X a quitté”
     const nowMap = new Map(players.map(p => [p.uid, p.name || "Joueur"]));
     if (prevPlayersSnapshot.size){
       for (const [uid, name] of prevPlayersSnapshot.entries()){
-        if (!nowMap.has(uid)){
-          if (uid !== myUid){
-            showLeaveToast(`${name} a quitté la partie`);
-          }
+        if (!nowMap.has(uid) && uid !== myUid){
+          showLeaveToast(`${name} a quitté la partie`);
         }
       }
     }
@@ -2549,6 +2519,7 @@ function refreshChatGating(status){
 
     for (const p of players) ensurePlayerState(p);
 
+    // cleanup disconnected
     const live = new Set(players.map(p => p.uid));
     for (const uid of Array.from(playersMap.keys())){
       if (!live.has(uid)) playersMap.delete(uid);
@@ -2559,21 +2530,17 @@ function refreshChatGating(status){
 
     if (me){
       const wasDead = myDead;
+
       myDead = !!me.isDead || deadUidsSet.has(myUid);
-      myLastExpelAtMs = (typeof me.lastExpelAtMs === "number") ? me.lastExpelAtMs : (myLastExpelAtMs || 0);
+      myLastExpelAtMs = (typeof me.lastExpelAtMs === "number")
+        ? me.lastExpelAtMs
+        : (myLastExpelAtMs || 0);
 
       if (!wasDead && myDead){
-        showSelfExpelledCard(10_000);  // ✅ carte expulsion victime 10s
+        showSelfExpelledCard(10_000);
 
         specCamX = (typeof me.x === "number") ? me.x : player.x;
         specCamY = (typeof me.y === "number") ? me.y : player.y;
-
-        // mort: chat lecture seule si room.chatEnabled
-        chatCanViewNow  = meetingLockActive ? true : !!roomChatEnabled;
-        chatCanWriteNow = false;
-        setChatFabVisible(chatCanViewNow);
-        applyChatWriteLock();
-        if (!chatCanViewNow && chatOverlay?.classList.contains("open")) closeChat();
 
         updateMyTaskHud();
         closeActivityUI();
@@ -2593,21 +2560,25 @@ function refreshChatGating(status){
         localPosReady = true;
       }
 
+      // ✅ me dans playersMap avec coords locales
       ensurePlayerState({ ...me, x: player.x, y: player.y });
 
-// IMPORTANT: status vient de room.status (tu l’as déjà au début du snapshot players)
-refreshChatGating(status);
+      // ✅ chat gating après myDead connu
+      refreshChatGating(status);
 
-// tasks uniquement en game + vivant + nocent
-if (status === "started" && myRole === "tinocent" && !myDead){
-  await ensureMyTasksAssigned();
-}
-updateMyTaskHud();
+      // ✅ tasks uniquement en started + nocent + vivant
+      if (status === "started" && myRole === "tinocent" && !myDead){
+        await ensureMyTasksAssigned();
+      }
+      updateMyTaskHud();
+    }
 
-// loop
-startLoopOnce()
+    startLoopOnce();
+  });
 
-  // chat snapshot + submit
+  // ===================
+  // CHAT SNAPSHOT + SUBMIT (1 SEUL bind)
+  // ===================
   if (chatForm && chatInput){
     const q = query(
       collection(db, "rooms", roomId, "messages"),
@@ -2620,7 +2591,6 @@ startLoopOnce()
       renderChat(msgs);
 
       const canBadge = (phase !== "started") ? true : chatCanViewNow;
-
       if (msgs.length && canBadge && !chatOverlay?.classList.contains("open")){
         const last = msgs[msgs.length - 1];
         if (last?.uid && last.uid !== myUid){
@@ -2633,7 +2603,6 @@ startLoopOnce()
     chatForm.addEventListener("submit", async (e) => {
       e.preventDefault();
       e.stopPropagation();
-
       if (!chatCanWriteNow) return;
 
       const val = chatInput.value;
@@ -2643,7 +2612,9 @@ startLoopOnce()
     });
   }
 
-  // leave
+  // ===================
+  // LEAVE
+  // ===================
   btnLeave?.addEventListener("click", async ()=>{
     try{
       await deleteDoc(doc(db,"rooms",roomId,"players",myUid));
