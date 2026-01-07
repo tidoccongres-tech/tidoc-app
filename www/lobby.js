@@ -704,6 +704,8 @@ window.addEventListener("keydown", (e) => { if (e.key === "Escape") closeChat();
 let DPR = window.devicePixelRatio || 1;
 
 function resize(){
+  if (!canvas || !ctx) return; // évite crash si canvas absent
+
   DPR = window.devicePixelRatio || 1;
   canvas.width  = Math.floor(window.innerWidth * DPR);
   canvas.height = Math.floor(window.innerHeight * DPR);
@@ -711,6 +713,7 @@ function resize(){
   canvas.style.height = window.innerHeight + "px";
   ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
 }
+
 resize();
 window.addEventListener("resize", resize);
 
