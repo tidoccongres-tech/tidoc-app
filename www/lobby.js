@@ -73,9 +73,13 @@ const chatMessagesEl = document.getElementById("chatMessages");
 const chatForm  = document.getElementById("chatForm");
 const chatInput = document.getElementById("chatInput");
 
-// CANVAS
+// CANVAS (SAFE)
 const canvas = document.getElementById("gameCanvas");
-const ctx = canvas.getContext("2d");
+const ctx = canvas?.getContext?.("2d") || null;
+
+if (!canvas || !ctx){
+  console.warn("[lobby.js] Canvas introuvable (#gameCanvas). Le lobby ne pourra pas se dessiner.");
+}
 
 // ===================
 // TOASTS
