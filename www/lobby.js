@@ -849,23 +849,24 @@ function showReportSplash(bodyName, meetingAtMs){
 
   clearMeetingTimers();
 
-  meetingTimers.tick = setInterval(() => {
-    const now = Date.now();
-    if (now < endSplash){
-      const s = Math.max(0, Math.ceil((endSplash - now)/1000));
-      reportCountdown.textContent = `Discussion dans ${s}s…`;
-      return;
-    }
-    if (now < endDebate){
-      const s = Math.max(0, Math.ceil((endDebate - now)/1000));
-      debatePill.style.display = "";
-      debatePill.textContent = `Débat : ${s}s`;
-      reportCountdown.textContent = "Discussion en cours…";
-      return;
-    }
-    debatePill.style.display = "none";
-    clearMeetingTimers();
-  }, 250);
+ meetingTimers.tick = setInterval(() => {
+  const now = Date.now();
+
+  if (now < endSplash){
+    // plus de texte
+    return;
+  }
+
+  if (now < endDebate){
+    const s = Math.max(0, Math.ceil((endDebate - now)/1000));
+    debatePill.style.display = "";
+    debatePill.textContent = `Débat : ${s}s`;
+    return;
+  }
+
+  debatePill.style.display = "none";
+  clearMeetingTimers();
+}, 250);
 
   meetingTimers.splash = setTimeout(() => {
     reportOverlay.style.display = "none";
@@ -984,17 +985,13 @@ selfExpelOverlay.innerHTML = `
 
     <div style="margin-top: 12px; text-align:center; color:#fff; font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;">
       <div style="font:1000 18px system-ui;">Vous avez été expulsé</div>
-      <div id="selfExpelCountdown" style="margin-top:10px; font:900 12px system-ui; opacity:.85;">
-        Observation dans 30s…
-      </div>
     </div>
   </div>
 `;
 document.body.appendChild(selfExpelOverlay);
 
 const selfExpelCard = selfExpelOverlay.querySelector("#selfExpelCard");
-const selfExpelCountdown = selfExpelOverlay.querySelector("#selfExpelCountdown");
-
+  
 function showSelfExpelledCard(ms = SELF_EXPEL_MS){
   clearTimeout(selfExpelTimer);
 
@@ -1011,12 +1008,6 @@ function showSelfExpelledCard(ms = SELF_EXPEL_MS){
   // pendant la carte : pas de map, pas de joystick
   joy?.classList.add("is-hidden");
   closeChat(); // optionnel, si tu veux forcer plein écran
-
-  const tick = setInterval(() => {
-    const s = Math.max(0, Math.ceil((selfExpelUntil - Date.now())/1000));
-    selfExpelCountdown.textContent = `Observation dans ${s}s…`;
-    if (s <= 0) clearInterval(tick);
-  }, 250);
 
   selfExpelTimer = setTimeout(() => {
     selfExpelActive = false;
