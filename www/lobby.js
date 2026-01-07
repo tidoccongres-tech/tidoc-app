@@ -33,6 +33,11 @@ import {
   addDoc, query, orderBy, limit, getDocs, setDoc, increment, arrayUnion
 } from "https://www.gstatic.com/firebasejs/10.12.4/firebase-firestore.js";
 
+let phase = "lobby";
+let myRole = null;
+let myDead = false;
+let myUid = null;
+
 const auth = AuthMod.auth;
 const db   = AuthMod.db;
 
@@ -215,7 +220,7 @@ function setChatFabVisible(show){
   if (!show){
     chatFab.classList.remove("has-unread");
     if (chatBadge) chatBadge.hidden = true;
-    if (chatOverlay?.classList.contains("open")) closeChat();
+    if (chatOverlay?.classList.contains("open") && typeof closeChat === "function") closeChat();
   }
 }
 
@@ -556,6 +561,11 @@ async function completeCurrentTask(){
   if (phase !== "started") return;
   if (myDead) return;
   if (myRole !== "tinocent") return;
+
+  if (!Array.isArray(zones) || !player){
+    setStartInfo("Zones/joueur non prêts.");
+    return;
+  }
 
   const t = currentTask();
   if (!t) return;
