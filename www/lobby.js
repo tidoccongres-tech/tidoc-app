@@ -2303,7 +2303,12 @@ async function ensureSpawnCenter(){
 
 onAuthStateChanged(auth, async (u) => {
   if (!u) { location.href = "./login.html"; return; }
-  if (!roomId) { location.href = "./game.html"; return; }
+  if (!roomId){
+  // on reste sur la page pour que tu voies le problème au lieu d’être renvoyée
+  console.warn("[LOBBY] roomId manquant -> pas de connexion Firestore");
+  setStartInfo("⚠️ Code de partie manquant. Reviens via “Créer une partie” ou utilise ?room=XXXX");
+  return;
+}
 
   myUid = u.uid;
 
