@@ -2445,9 +2445,13 @@ onAuthStateChanged(auth, async (u) => {
   });
 
   // players snapshot
-  onSnapshot(collection(db,"rooms",roomId,"players"), async (snap)=>{
-    const players = snap.docs.map(d=>d.data());
+ onSnapshot(collection(db,"rooms",roomId,"players"), async (snap)=>{
+  const roomSnap = await getDoc(doc(db,"rooms",roomId));
+  const room = roomSnap.data() || {};
+  const status = room.status;
 
+  const players = snap.docs.map(d=>d.data());
+   
     // toast “X a quitté”
     const nowMap = new Map(players.map(p => [p.uid, p.name || "Joueur"]));
     if (prevPlayersSnapshot.size){
