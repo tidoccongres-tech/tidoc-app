@@ -2096,8 +2096,8 @@ function draw(){
 
     ctx.drawImage(bg, 0, 0, bw, bh);
 
-    const scaleX = bw / MAP_W;
-    const scaleY = bh / MAP_H;
+    const scaleX = bw / WORLD_W;
+    const scaleY = bh / WORLD_H;
 
     const arr = Array.from(playersMap.values())
       .map(p => ({
