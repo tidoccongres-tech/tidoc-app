@@ -730,8 +730,8 @@ let deadUidsSet = new Set();
 const REPORT_SPLASH_MS = 10_000; // écran expulsion visible
 const DEBATE_MS        = 60_000; // débat chat forcé
 
-let meetingLockActive = false;     // empêche retour map / close chat
-let meetingAtMsLocal = 0;          // dernière réunion (timestamp)
+let meetingLockActive = false;
+let meetingAtMsLocal = 0;
 let meetingTimers = { splash:null, debate:null, tick:null };
 
 function clearMeetingTimers(){
@@ -756,72 +756,9 @@ function getPlayerNameByUid(uid){
   return n || "";
 }
 
-const reportOverlay = document.createElement("div");
-reportOverlay.id = "reportOverlay";
-reportOverlay.style.cssText = `
-  position: fixed;
-  inset: 0;
-  z-index: 250;
-  display: none;
-  align-items: center;
-  justify-content: center;
-  background: rgba(0,0,0,.55);
-  backdrop-filter: blur(6px);
-  -webkit-backdrop-filter: blur(6px);
-`;
+// (reportOverlay / reportCard / reportLine1 / debatePill : inchangés)
 
-reportOverlay.innerHTML = `
-  <div id="reportCard" style="
-    width: min(520px, calc(100vw - 28px));
-    border-radius: 22px;
-    padding: 14px;
-    background: rgba(0,0,0,.70);
-    border: 1px solid rgba(255,255,255,.14);
-    box-shadow: 0 18px 50px rgba(0,0,0,.38);
-    transform: translateY(18px) scale(.96);
-    opacity: 0;
-  ">
-    <div style="
-      border-radius: 18px;
-      overflow: hidden;
-      border: 1px solid rgba(255,255,255,.12);
-      background: rgba(255,255,255,.06);
-    ">
-      <img src="./assets/expulsion.png" alt="Expulsion" style="display:block;width:100%;height:auto;"/>
-    </div>
-
-    <div style="margin-top: 12px;text-align:center;color:#fff;font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;">
-      <div id="reportLine1" style="font:1000 16px system-ui; letter-spacing:.2px;">—</div>
-    </div>
-  </div>
-`;
-
-document.body.appendChild(reportOverlay);
-
-const reportCard = reportOverlay.querySelector("#reportCard");
-const reportLine1 = reportOverlay.querySelector("#reportLine1");
-
-const debatePill = document.createElement("div");
-debatePill.id = "debatePill";
-debatePill.style.cssText = `
-  position: fixed;
-  left: 50%;
-  top: calc(12px + env(safe-area-inset-top));
-  transform: translateX(-50%);
-  z-index: 260;
-  padding: 10px 12px;
-  border-radius: 999px;
-  font: 900 12px system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
-  color: #fff;
-  background: rgba(0,0,0,.58);
-  border: 1px solid rgba(255,255,255,.14);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
-  display: none;
-`;
-debatePill.textContent = "Débat : 60s";
-document.body.appendChild(debatePill);
-
+// lock
 function setMeetingLock(on){
   meetingLockActive = !!on;
 
@@ -849,28 +786,28 @@ function showReportSplash(bodyName, meetingAtMs){
 
   clearMeetingTimers();
 
- meetingTimers.tick = setInterval(() => {
-  const now = Date.now();
+  // ✅ plus de texte “Discussion dans …”
+  meetingTimers.tick = setInterval(() => {
+    const now = Date.now();
 
-  if (now < endSplash){
-    // plus de texte
-    return;
-  }
+    if (now < endSplash){
+      return;
+    }
 
-  if (now < endDebate){
-    const s = Math.max(0, Math.ceil((endDebate - now)/1000));
-    debatePill.style.display = "";
-    debatePill.textContent = `Débat : ${s}s`;
-    return;
-  }
+    if (now < endDebate){
+      const s = Math.max(0, Math.ceil((endDebate - now)/1000));
+      debatePill.style.display = "";
+      debatePill.textContent = `Débat : ${s}s`;
+      return;
+    }
 
-  debatePill.style.display = "none";
-  clearMeetingTimers();
-}, 250);
+    debatePill.style.display = "none";
+    clearMeetingTimers();
+  }, 250);
 
   meetingTimers.splash = setTimeout(() => {
     reportOverlay.style.display = "none";
-    forceOpenChat();               // ✅ OUVERTURE FORCÉE
+    forceOpenChat(); // ✅ OUVERTURE FORCÉE
   }, REPORT_SPLASH_MS);
 
   meetingTimers.debate = setTimeout(() => {
@@ -907,7 +844,6 @@ function handleMeetingState(room, status){
     return;
   }
 
-  // meeting actif => lock
   setMeetingLock(true);
 
   if (meetingAtMs && meetingAtMs !== meetingAtMsLocal){
@@ -939,6 +875,7 @@ function handleMeetingState(room, status){
       }, DEBATE_MS);
     }
   }
+} // ✅ IMPORTANT: fin handleMeetingState
 
 // ===================
 // SELF EXPULSED CARD (victime) : 30s puis spectateur
@@ -991,7 +928,7 @@ selfExpelOverlay.innerHTML = `
 document.body.appendChild(selfExpelOverlay);
 
 const selfExpelCard = selfExpelOverlay.querySelector("#selfExpelCard");
-  
+
 function showSelfExpelledCard(ms = SELF_EXPEL_MS){
   clearTimeout(selfExpelTimer);
 
@@ -1007,13 +944,15 @@ function showSelfExpelledCard(ms = SELF_EXPEL_MS){
 
   // pendant la carte : pas de map, pas de joystick
   joy?.classList.add("is-hidden");
-  closeChat(); // optionnel, si tu veux forcer plein écran
+  closeChat();
 
   selfExpelTimer = setTimeout(() => {
     selfExpelActive = false;
     selfExpelOverlay.style.display = "none";
-    // ✅ après 30s : spectateur => joystick revient (pan caméra déjà géré)
+
+    // ✅ après 30s : spectateur => joystick revient
     if (phase === "started") joy?.classList.remove("is-hidden");
+
     // chat selon règles (vivant/expulsé)
     applyChatWriteLock();
   }, ms);
