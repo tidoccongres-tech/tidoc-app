@@ -1294,12 +1294,18 @@ let move = { x: 0, y: 0 };
 const PLAYER_RADIUS_LOBBY = 22;
 const PLAYER_RADIUS_GAME  = 22;
 
+// ===================
+// LOBBY WORLD BASE (évite que MAP_W/MAP_H change et casse le lobby)
+// ===================
+const WORLD_W = 1536;
+const WORLD_H = 1024;
+
 // Blanc = walkable (lobby-NB.png)
 function isWalkableLobby(wx, wy){
   if (!lobbyMaskData || !LOBBY_W || !LOBBY_H) return true;
 
-  const mx = Math.floor(wx * (LOBBY_W / MAP_W));
-  const my = Math.floor(wy * (LOBBY_H / MAP_H));
+  const mx = Math.floor(wx * (LOBBY_W / WORLD_W));
+  const my = Math.floor(wy * (LOBBY_H / WORLD_H));
 
   if (mx < 0 || my < 0 || mx >= LOBBY_W || my >= LOBBY_H) return false;
 
