@@ -2561,7 +2561,7 @@ onAuthStateChanged(auth, async (u) => {
       myLastExpelAtMs = (typeof me.lastExpelAtMs === "number") ? me.lastExpelAtMs : (myLastExpelAtMs || 0);
 
       if (!wasDead && myDead){
-        showSelfExpelledCard(30_000);  // ✅ carte expulsion victime 30s
+        showSelfExpelledCard(10_000);  // ✅ carte expulsion victime 30s
 
         specCamX = (typeof me.x === "number") ? me.x : player.x;
         specCamY = (typeof me.y === "number") ? me.y : player.y;
