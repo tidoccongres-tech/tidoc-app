@@ -1,32 +1,52 @@
-// billets.js (MODULE) — VERSION FIXED (standalone)
-// ✅ Inclut toutes les fonctions manquantes : scanPdfForQR, extractMetaFromPdfText, loadImageToCanvas, cropTopRight, ocrCanvas, scanCanvasForQR,
-// sha256Hex, claimQrOrThrow, syncNameFromTicket, deleteMyTicketAndUnclaim.
-// ✅ Admin boutons + modals quotas + codes promos ok.
+// billets.js (MODULE) — VERSION COMPLÈTE + SAFE (anti-crash)
+// ✅ Admin boutons (quotas + codes promo) affichés si isAdmin() true
+// ✅ Packs = 4 fixes, labels figés, quotas éditables (conf / packs workshop remisés / autre)
+// ✅ Codes promo = pools séparés (premium/standard/essentiel) + attribution auto 1 fois / user
+// ✅ Workshops = billets séparés (multi) dans userWorkshopTickets
+// ✅ Vérif officielle pack via GitHub raw JSON (qrHash -> pack)
+// ✅ AUCUN "..." / aucune référence à une fonction non définie qui ferait planter le script
+//
+// ⚠️ IMPORTANT : tu dois déjà avoir (dans ce même fichier ou importées globalement) ces fonctions UTILISÉES ici :
+// - sha256Hex(qrText)
+// - scanPdfForQR(file) -> { pdf, qrText }
+// - extractMetaFromPdfText(pdf) -> { packKey, holderName, ticketNumber }
+// - loadImageToCanvas(file) -> canvas
+// - scanCanvasForQR(canvas) -> qrText
+// - cropTopRight(canvas) -> canvasCrop
+// - ocrCanvas(canvasCrop) -> text
+// - claimQrOrThrow(qrText)
+// - syncNameFromTicket(holderName)
+// - deleteMyTicketAndUnclaim()   (OPTIONNEL : si absent, on ne crash pas, on ignore juste le bouton delete)
+//
+// Si une de ces fonctions est absente, le script NE DOIT PAS crasher (on protège), mais l’import billet ne marchera pas.
 
 import { firebaseConfig } from "./firebase-config.js";
 import { initializeApp, getApps, getApp } from "https://www.gstatic.com/firebasejs/10.12.4/firebase-app.js";
 import {
-  getFirestore, doc, getDoc, setDoc, deleteDoc, runTransaction, serverTimestamp,
+  getFirestore, doc, getDoc, setDoc, runTransaction, serverTimestamp,
   collection, query, where, getDocs
 } from "https://www.gstatic.com/firebasejs/10.12.4/firebase-firestore.js";
-import { getAuth, onAuthStateChanged, updateProfile } from "https://www.gstatic.com/firebasejs/10.12.4/firebase-auth.js";
+import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.4/firebase-auth.js";
 
+// =====================
+// Firebase init
+// =====================
 const app  = getApps().length ? getApp() : initializeApp(firebaseConfig);
 const db   = getFirestore(app);
 const auth = getAuth(app);
 
 // =====================
-// UI
+// UI refs
 // =====================
 const uploadBtn = document.getElementById("uploadTicketBtn");
-const deleteBtn = document.getElementById("deleteTicketBtn"); // (ok si absent)
+const deleteBtn = document.getElementById("deleteTicketBtn"); // si tu l’as encore dans ton HTML
 const fileInput = document.getElementById("ticketFileInput");
 const statusEl  = document.getElementById("ticketStatus");
 const boxEl     = document.getElementById("ticketBox");
 
 function setStatus(t = "") { if (statusEl) statusEl.textContent = t; }
 function escapeHTML(s = "") {
-  return String(s ?? "")
+  return String(s)
     .replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;")
     .replaceAll('"', "&quot;").replaceAll("'", "&#039;");
 }
@@ -34,42 +54,49 @@ function escapeHTML(s = "") {
 // =====================
 // OFFICIAL TICKET INDEX (GitHub raw JSON)
 // =====================
+// Format attendu : { "<qrHash>": "premium"|"standard"|"essentiel"|"workshop", ... }
 const OFFICIAL_TICKETS_URL =
-  "https://raw.githubusercontent.com/<USER>/<REPO>/main/tickets_officiels.json"; // <-- METS TON VRAI RAW
+  "https://raw.githubusercontent.com/<USER>/<REPO>/main/tickets_officiels.json"; // <-- remplace
 
 let OFFICIAL_CACHE = null;
 
 async function fetchOfficialTicketsIndex() {
   if (OFFICIAL_CACHE) return OFFICIAL_CACHE;
 
+  // cache localStorage 5 min (optionnel)
   try {
     const cached = JSON.parse(localStorage.getItem("tidoc_official_index") || "null");
     if (cached?.data && cached?.ts && (Date.now() - cached.ts) < 5 * 60 * 1000) {
       OFFICIAL_CACHE = cached.data;
       return OFFICIAL_CACHE;
     }
-  } catch(_) {}
+  } catch (_) {}
 
   const res = await fetch(OFFICIAL_TICKETS_URL, { cache: "no-store" });
-  if (!res.ok) throw new Error("Index officiel indisponible (vérification billet impossible).");
+  if (!res.ok) throw new Error("Impossible de vérifier le billet (index officiel indisponible).");
 
   const data = await res.json();
   OFFICIAL_CACHE = data;
 
   try {
     localStorage.setItem("tidoc_official_index", JSON.stringify({ ts: Date.now(), data }));
-  } catch(_) {}
+  } catch (_) {}
 
   return OFFICIAL_CACHE;
 }
 
 async function verifyPackWithQrOrThrow(qrText, detectedPackKey) {
+  if (typeof sha256Hex !== "function") {
+    throw new Error("sha256Hex() manquante — impossible de vérifier le billet.");
+  }
+
   const qrHash = await sha256Hex(qrText);
   const index = await fetchOfficialTicketsIndex();
 
   const officialPack = (index && index[qrHash]) ? String(index[qrHash]).toLowerCase() : "";
   if (!officialPack) throw new Error("Billet non reconnu (QR absent de la liste officielle).");
 
+  // si OCR n’a rien trouvé : on “remplit” avec l’officiel
   if (!detectedPackKey) return { qrHash, officialPack, finalPackKey: officialPack };
 
   const det = String(detectedPackKey).toLowerCase();
@@ -83,19 +110,20 @@ async function verifyPackWithQrOrThrow(qrText, detectedPackKey) {
 // =====================
 // PACKS (quotas) — 4 packs fixes
 // =====================
+// workshopDiscountPacks = nb de "packs workshop remisés" accordés par billet principal
 const PACKS_FALLBACK = {
-  premium:  { label: "Premium",   conferencesAllowed: 999, workshopDiscountPacks: 3, otherAllowed: 0 },
-  standard: { label: "Standard",  conferencesAllowed: 7,   workshopDiscountPacks: 2, otherAllowed: 0 },
-  essentiel:{ label: "Essentiel", conferencesAllowed: 2,   workshopDiscountPacks: 1, otherAllowed: 0 },
-  workshop: { label: "Workshop",  conferencesAllowed: 0,   workshopDiscountPacks: 0, otherAllowed: 0 },
+  premium:   { label: "Premium",   conferencesAllowed: 999, workshopDiscountPacks: 3, otherAllowed: 0 },
+  standard:  { label: "Standard",  conferencesAllowed: 7,   workshopDiscountPacks: 2, otherAllowed: 0 },
+  essentiel: { label: "Essentiel", conferencesAllowed: 2,   workshopDiscountPacks: 1, otherAllowed: 0 },
+  workshop:  { label: "Workshop",  conferencesAllowed: 0,   workshopDiscountPacks: 0, otherAllowed: 0 },
 };
 
 let PACKS = { ...PACKS_FALLBACK };
 
-function normalizePackConfig(obj){
+function normalizePackConfig(obj) {
   const src = obj && typeof obj === "object" ? obj : {};
   const out = {};
-  for (const k of Object.keys(src)){
+  for (const k of Object.keys(src)) {
     const v = src[k] || {};
     out[String(k).toLowerCase()] = {
       label: String(v.label || k),
@@ -107,26 +135,28 @@ function normalizePackConfig(obj){
   return out;
 }
 
-async function loadPackConfig(){
-  try{
+async function loadPackConfig() {
+  try {
     const snap = await getDoc(doc(db, "config", "packs"));
-    if (!snap.exists()){
+    if (!snap.exists()) {
       PACKS = { ...PACKS_FALLBACK };
       return;
     }
+
     const normalized = normalizePackConfig(snap.data() || {});
     PACKS = {
-      premium:  { ...PACKS_FALLBACK.premium,  ...(normalized.premium  || {}) },
-      standard: { ...PACKS_FALLBACK.standard, ...(normalized.standard || {}) },
-      essentiel:{ ...PACKS_FALLBACK.essentiel,...(normalized.essentiel|| {}) },
-      workshop: { ...PACKS_FALLBACK.workshop, ...(normalized.workshop || {}) },
+      premium:   { ...PACKS_FALLBACK.premium,   ...(normalized.premium   || {}) },
+      standard:  { ...PACKS_FALLBACK.standard,  ...(normalized.standard  || {}) },
+      essentiel: { ...PACKS_FALLBACK.essentiel, ...(normalized.essentiel || {}) },
+      workshop:  { ...PACKS_FALLBACK.workshop,  ...(normalized.workshop  || {}) },
     };
+
     // labels figés
     PACKS.premium.label   = PACKS_FALLBACK.premium.label;
     PACKS.standard.label  = PACKS_FALLBACK.standard.label;
     PACKS.essentiel.label = PACKS_FALLBACK.essentiel.label;
     PACKS.workshop.label  = PACKS_FALLBACK.workshop.label;
-  } catch (e){
+  } catch (e) {
     console.log("loadPackConfig error:", e);
     PACKS = { ...PACKS_FALLBACK };
   }
@@ -134,15 +164,18 @@ async function loadPackConfig(){
 
 // =====================
 // PROMO CODES — pools séparés
+// Firestore: config/promoPools
+// { premium:[...], standard:[...], essentiel:[...], updatedAt: ... }
 // =====================
 let PROMO_POOLS = { premium: [], standard: [], essentiel: [] };
 
-function normalizeCodes(list){
+function normalizeCodes(list) {
   const arr = Array.isArray(list) ? list : [];
   const cleaned = arr.map(x => String(x || "").trim()).filter(Boolean);
+
   const seen = new Set();
   const out = [];
-  for (const c of cleaned){
+  for (const c of cleaned) {
     const k = c.toLowerCase();
     if (seen.has(k)) continue;
     seen.add(k);
@@ -151,10 +184,10 @@ function normalizeCodes(list){
   return out;
 }
 
-async function loadPromoPools(){
-  try{
+async function loadPromoPools() {
+  try {
     const snap = await getDoc(doc(db, "config", "promoPools"));
-    if (!snap.exists()){
+    if (!snap.exists()) {
       PROMO_POOLS = { premium: [], standard: [], essentiel: [] };
       return;
     }
@@ -164,26 +197,28 @@ async function loadPromoPools(){
       standard: normalizeCodes(d.standard),
       essentiel: normalizeCodes(d.essentiel),
     };
-  } catch(e){
+  } catch (e) {
     console.log("loadPromoPools error:", e);
     PROMO_POOLS = { premium: [], standard: [], essentiel: [] };
   }
 }
 
-async function assignPromoCodeIfNeeded(packKey){
+// Attribuer 1 code selon le pack (premium/standard/essentiel), et le retirer du pool
+async function assignPromoCodeIfNeeded(packKey) {
   const u = auth.currentUser;
   if (!u) return { code: "" };
 
   const tier = String(packKey || "").toLowerCase();
-  if (!["premium","standard","essentiel"].includes(tier)) return { code: "" };
+  if (!["premium", "standard", "essentiel"].includes(tier)) return { code: "" };
 
-  const userRef = doc(db, "userTickets", u.uid);
+  const userRef  = doc(db, "userTickets", u.uid);
   const poolsRef = doc(db, "config", "promoPools");
 
   const res = await runTransaction(db, async (tx) => {
     const userSnap = await tx.get(userRef);
     const userData = userSnap.exists() ? (userSnap.data() || {}) : {};
     const existing = String(userData?.promoCode || "").trim();
+
     if (existing) return { code: existing, already: true };
 
     const poolsSnap = await tx.get(poolsRef);
@@ -196,7 +231,11 @@ async function assignPromoCodeIfNeeded(packKey){
     const rest = list.slice(1);
 
     tx.set(poolsRef, { ...poolsData, [tier]: rest, updatedAt: serverTimestamp() }, { merge: true });
-    tx.set(userRef, { promoCode: code, promoTier: tier, promoAssignedAt: serverTimestamp() }, { merge: true });
+    tx.set(userRef, {
+      promoCode: code,
+      promoTier: tier,
+      promoAssignedAt: serverTimestamp()
+    }, { merge: true });
 
     return { code, already: false };
   });
@@ -205,7 +244,7 @@ async function assignPromoCodeIfNeeded(packKey){
 }
 
 // =====================
-// ICON (trash)
+// Trash icon
 // =====================
 const TRASH_TIDOC_SVG = `
 <svg class="trash-ico" viewBox="0 0 408.483 408.483" aria-hidden="true">
@@ -223,79 +262,7 @@ const TRASH_TIDOC_SVG = `
 `;
 
 // =====================
-// MAIN IMPORT HANDLER
-// =====================
-async function handleFile(file) {
-  if (!file) return;
-
-  try {
-    setStatus("⏳ Analyse du billet…");
-
-    let qrText = "";
-    let packKey = "";
-    let holderName = "";
-    let ticketNumber = "";
-
-    if (file.type === "application/pdf") {
-      const { pdf, qrText: qrFromPdf, fullText } = await scanPdfForQR(file);
-      qrText = qrFromPdf || "";
-
-      const meta = extractMetaFromPdfText(fullText || "");
-      packKey = meta.packKey || "";
-      holderName = meta.holderName || "";
-      ticketNumber = meta.ticketNumber || "";
-    } else if (file.type.startsWith("image/")) {
-      const canvas = await loadImageToCanvas(file);
-
-      qrText = scanCanvasForQR(canvas);
-
-      const crop = cropTopRight(canvas);
-      const text = await ocrCanvas(crop);
-      const meta = parseMetaFromText(text);
-
-      packKey = meta.packKey || "";
-      holderName = meta.holderName || "";
-      ticketNumber = meta.ticketNumber || "";
-    } else {
-      throw new Error("Format non supporté (PDF ou image uniquement).");
-    }
-
-    if (!qrText) throw new Error("QR Code non détecté sur le billet.");
-
-    // ✅ Vérif “détecté” VS “officiel”
-    const v = await verifyPackWithQrOrThrow(qrText, packKey);
-    packKey = v.finalPackKey;
-
-    // 🔐 anti-double billet (global)
-    await claimQrOrThrow(qrText);
-
-    // ✅ billet Workshop séparé (multi)
-    const p = String(packKey || "").toLowerCase();
-    if (p === "workshop") {
-      await saveWorkshopTicket({ qrText, packKey, holderName, ticketNumber });
-      await syncNameFromTicket(holderName);
-      await loadSavedTicket();
-      setStatus("✅ Billet workshop importé");
-      return;
-    }
-
-    // billet principal
-    await saveTicketToFirestore({ qrText, packKey, holderName, ticketNumber });
-    await syncNameFromTicket(holderName);
-
-    // 🎟️ Attribution auto code promo (si besoin)
-    await assignPromoCodeIfNeeded(packKey);
-
-    await loadSavedTicket();
-    setStatus("✅ Billet importé avec succès");
-  } catch (e) {
-    console.log("handleFile import error:", e);
-    setStatus("❌ " + (e?.message || String(e)));
-  }
-}
-
-// =====================
-// Parsing (PDF texte / OCR texte)
+// Parsing (OCR texte)
 // =====================
 function parseMetaFromText(raw = "") {
   const lines = String(raw)
@@ -336,6 +303,7 @@ function parseMetaFromText(raw = "") {
   const idxPack = lines.findIndex(l =>
     /pack\s*(essentiel|standard|premium|workshop|atelier)/i.test(l) || /⭐️|📘|🍻|🧑‍⚕️/.test(l)
   );
+
   if (idxPack > 0) {
     for (let j = idxPack - 1; j >= 0; j--) {
       const c = lines[j];
@@ -360,17 +328,14 @@ function parseMetaFromText(raw = "") {
   return { holderName, packKey, ticketNumber, rawText: raw };
 }
 
-// PDF meta = même parsing
-function extractMetaFromPdfText(fullText = "") {
-  return parseMetaFromText(fullText);
-}
-
 // =====================
-// Save Ticket principal
+// Save Ticket principal (userTickets/{uid})
 // =====================
 async function saveTicketToFirestore({ qrText, packKey, holderName, ticketNumber }) {
   const u = auth.currentUser;
   if (!u) throw new Error("Connexion requise.");
+  if (typeof sha256Hex !== "function") throw new Error("sha256Hex() manquante.");
+
   const qrHash = await sha256Hex(qrText);
 
   await setDoc(doc(db, "userTickets", u.uid), {
@@ -384,14 +349,16 @@ async function saveTicketToFirestore({ qrText, packKey, holderName, ticketNumber
 }
 
 // =====================
-// Save Workshop Ticket (multi)
+// Save Workshop Ticket (multi) userWorkshopTickets/{uid_qrHash}
 // =====================
-async function saveWorkshopTicket({ qrText, packKey, holderName, ticketNumber }){
+async function saveWorkshopTicket({ qrText, packKey, holderName, ticketNumber }) {
   const u = auth.currentUser;
   if (!u) throw new Error("Connexion requise.");
-  const qrHash = await sha256Hex(qrText);
+  if (typeof sha256Hex !== "function") throw new Error("sha256Hex() manquante.");
 
+  const qrHash = await sha256Hex(qrText);
   const id = `${u.uid}_${qrHash}`;
+
   await setDoc(doc(db, "userWorkshopTickets", id), {
     uid: u.uid,
     qrText,
@@ -417,12 +384,13 @@ function renderResult({ qrText, packKey, holderName, ticketNumber, promoCode, wo
   const discount = pack ? Number(pack.workshopDiscountPacks ?? 0) : 0;
   const imported = Number(workshopsImportedCount ?? 0);
 
+  // ✅ règle workshops : pas de quota “actif” tant que le user n’a pas importé de pack workshop
   const wsLine = imported > 0
     ? (discount > 0 ? `${imported} / ${discount}` : `${imported}`)
     : "0 (importe ton Pack Workshop pour activer)";
 
   const promo = String(promoCode || "").trim();
-  const showPromo = promo && ["premium","standard","essentiel"].includes(key);
+  const showPromo = promo && ["premium", "standard", "essentiel"].includes(key);
 
   boxEl.innerHTML = `
     <div style="position:relative; display:flex; flex-direction:column; gap:12px;">
@@ -448,9 +416,9 @@ function renderResult({ qrText, packKey, holderName, ticketNumber, promoCode, wo
         <div><b>Nom :</b> ${escapeHTML(holderName || "—")}</div>
         <div><b>N° billet :</b> ${escapeHTML(ticketNumber || "—")}</div>
         <div style="margin-top:8px;"><b>Pack :</b> ${escapeHTML(packLabel)}</div>
-        <div><b>Conférences :</b> ${conf}</div>
+        <div><b>Conférences :</b> ${escapeHTML(conf)}</div>
         <div><b>Workshops :</b> ${escapeHTML(wsLine)}</div>
-        <div><b>Autre :</b> ${other}</div>
+        <div><b>Autre :</b> ${escapeHTML(other)}</div>
       </div>
 
       ${showPromo ? `
@@ -476,9 +444,19 @@ function renderResult({ qrText, packKey, holderName, ticketNumber, promoCode, wo
     </div>
   `;
 
-  boxEl.querySelector("#deleteTicketInlineBtn")
-    ?.addEventListener("click", deleteMyTicketAndUnclaim);
+  // delete inline (SAFE)
+  const delInline = boxEl.querySelector("#deleteTicketInlineBtn");
+  if (delInline) {
+    delInline.addEventListener("click", () => {
+      if (typeof deleteMyTicketAndUnclaim === "function") {
+        deleteMyTicketAndUnclaim();
+      } else {
+        console.warn("deleteMyTicketAndUnclaim() manquante — suppression ignorée");
+      }
+    });
+  }
 
+  // render QR (qrcodejs)
   const host = boxEl.querySelector("#qrRender");
   if (host && window.QRCode && qrText) {
     host.innerHTML = "";
@@ -489,67 +467,22 @@ function renderResult({ qrText, packKey, holderName, ticketNumber, promoCode, wo
     </div>`;
   }
 
+  // copy promo
   const copyBtn = boxEl.querySelector("#copyPromoBtn");
   if (copyBtn && promo) {
     copyBtn.addEventListener("click", async () => {
       const msg = boxEl.querySelector("#copyPromoMsg");
-      try{
+      try {
         await navigator.clipboard.writeText(promo);
         if (msg) msg.textContent = "✅ Copié";
-      }catch{
+      } catch {
         if (msg) msg.textContent = "❌ Impossible de copier (copie manuelle).";
       }
     });
   }
 }
 
-// =====================
-// Load saved ticket + workshops
-// =====================
-async function loadSavedTicket() {
-  const u = auth.currentUser;
-  if (!u) {
-    setStatus("Connecte-toi pour afficher ton billet.");
-    boxEl.textContent = "Aucun billet importé pour l’instant.";
-    return;
-  }
-
-  const snap = await getDoc(doc(db, "userTickets", u.uid));
-
-  const wsQ = query(collection(db, "userWorkshopTickets"), where("uid", "==", u.uid));
-  const wsSnap = await getDocs(wsQ);
-  const workshops = wsSnap.docs.map(d => d.data() || {}).filter(Boolean);
-
-  if (!snap.exists()) {
-    setStatus(workshops.length ? "✅ Billets workshop chargés" : "");
-    boxEl.textContent = "Aucun billet importé pour l’instant.";
-
-    if (workshops.length) {
-      boxEl.innerHTML = `
-        <div style="font-weight:900; color:var(--tidoc); margin-bottom:10px;">🎫 Tes billets workshop</div>
-        <div id="workshopsListBox"></div>
-      `;
-      renderWorkshopsList(workshops);
-    }
-    return;
-  }
-
-  const t = snap.data() || {};
-  setStatus("✅ Billet chargé");
-
-  renderResult({
-    qrText: t.qrText || "",
-    packKey: t.packKey || "",
-    holderName: t.holderName || "",
-    ticketNumber: t.ticketNumber || "",
-    promoCode: t.promoCode || "",
-    workshopsImportedCount: workshops.length
-  });
-
-  renderWorkshopsList(workshops);
-}
-
-function renderWorkshopsList(workshops = []){
+function renderWorkshopsList(workshops = []) {
   const listBox = document.getElementById("workshopsListBox");
   if (!listBox) return;
 
@@ -579,43 +512,188 @@ function renderWorkshopsList(workshops = []){
 }
 
 // =====================
+// Load saved ticket + workshops
+// =====================
+async function loadSavedTicket() {
+  const u = auth.currentUser;
+
+  if (!u) {
+    setStatus("Connecte-toi pour afficher ton billet.");
+    if (boxEl) boxEl.textContent = "Aucun billet importé pour l’instant.";
+    return;
+  }
+
+  const snap = await getDoc(doc(db, "userTickets", u.uid));
+
+  const wsQ = query(collection(db, "userWorkshopTickets"), where("uid", "==", u.uid));
+  const wsSnap = await getDocs(wsQ);
+  const workshops = wsSnap.docs.map(d => d.data() || {}).filter(Boolean);
+
+  if (!snap.exists()) {
+    setStatus(workshops.length ? "✅ Billets workshop chargés" : "");
+    if (!boxEl) return;
+
+    if (!workshops.length) {
+      boxEl.textContent = "Aucun billet importé pour l’instant.";
+      return;
+    }
+
+    boxEl.innerHTML = `
+      <div style="font-weight:900; color:var(--tidoc); margin-bottom:10px;">🎫 Tes billets workshop</div>
+      <div id="workshopsListBox"></div>
+    `;
+    renderWorkshopsList(workshops);
+    return;
+  }
+
+  const t = snap.data() || {};
+  setStatus("✅ Billet chargé");
+
+  renderResult({
+    qrText: t.qrText || "",
+    packKey: t.packKey || "",
+    holderName: t.holderName || "",
+    ticketNumber: t.ticketNumber || "",
+    promoCode: t.promoCode || "",
+    workshopsImportedCount: workshops.length
+  });
+
+  renderWorkshopsList(workshops);
+}
+
+// =====================
+// MAIN IMPORT HANDLER
+// =====================
+async function handleFile(file) {
+  if (!file) return;
+
+  try {
+    setStatus("⏳ Analyse du billet…");
+
+    // garde-fous : fonctions indispensables import
+    const need = [
+      ["scanPdfForQR", scanPdfForQR],
+      ["extractMetaFromPdfText", extractMetaFromPdfText],
+      ["loadImageToCanvas", loadImageToCanvas],
+      ["scanCanvasForQR", scanCanvasForQR],
+      ["cropTopRight", cropTopRight],
+      ["ocrCanvas", ocrCanvas],
+      ["claimQrOrThrow", claimQrOrThrow],
+      ["syncNameFromTicket", syncNameFromTicket],
+      ["sha256Hex", sha256Hex],
+    ];
+    for (const [name, fn] of need) {
+      if (typeof fn !== "function") {
+        throw new Error(`${name}() manquante — import impossible (fonction non chargée).`);
+      }
+    }
+
+    let qrText = "";
+    let packKey = "";
+    let holderName = "";
+    let ticketNumber = "";
+
+    // PDF
+    if (file.type === "application/pdf") {
+      const out = await scanPdfForQR(file);
+      qrText = out?.qrText || "";
+      const pdf = out?.pdf;
+
+      const meta = await extractMetaFromPdfText(pdf);
+      packKey = meta?.packKey || "";
+      holderName = meta?.holderName || "";
+      ticketNumber = meta?.ticketNumber || "";
+    }
+    // IMAGE
+    else if (file.type.startsWith("image/")) {
+      const canvas = await loadImageToCanvas(file);
+      qrText = scanCanvasForQR(canvas) || "";
+
+      const crop = cropTopRight(canvas);
+      const text = await ocrCanvas(crop);
+      const meta = parseMetaFromText(text);
+
+      packKey = meta.packKey || "";
+      holderName = meta.holderName || "";
+      ticketNumber = meta.ticketNumber || "";
+    }
+    else {
+      throw new Error("Format non supporté (PDF ou image uniquement).");
+    }
+
+    if (!qrText) throw new Error("QR Code non détecté sur le billet.");
+
+    // Vérif officiel pack via GitHub index
+    const v = await verifyPackWithQrOrThrow(qrText, packKey);
+    packKey = v.finalPackKey;
+
+    // anti double billet (global)
+    await claimQrOrThrow(qrText);
+
+    // workshop -> collection séparée
+    const p = String(packKey || "").toLowerCase();
+    if (p === "workshop") {
+      await saveWorkshopTicket({ qrText, packKey, holderName, ticketNumber });
+      await syncNameFromTicket(holderName);
+      await loadSavedTicket();
+      setStatus("✅ Billet workshop importé");
+      return;
+    }
+
+    // billet principal
+    await saveTicketToFirestore({ qrText, packKey, holderName, ticketNumber });
+    await syncNameFromTicket(holderName);
+
+    // attrib promo si besoin
+    await assignPromoCodeIfNeeded(packKey);
+
+    // rendu safe : reload depuis Firestore
+    await loadSavedTicket();
+    setStatus("✅ Billet importé avec succès");
+  } catch (e) {
+    console.log("handleFile import error:", e);
+    setStatus("❌ " + (e?.message || String(e)));
+  }
+}
+
+// =====================
 // ADMIN UI (packs editor)
 // =====================
 const ADMIN_EMAIL = "tidoc.congres@gmail.com";
 
-function isAdmin(){
+function isAdmin() {
   if (window.TIDOC_AUTH?.isAdmin) return true;
-  const email = (auth.currentUser?.email || "").toLowerCase();
+  const email = String(auth.currentUser?.email || "").toLowerCase();
   return email === ADMIN_EMAIL.toLowerCase();
 }
 
-const adminBtn   = document.getElementById("adminEditPacksBtn");
-const adminModal = document.getElementById("adminPacksModal");
-const adminForm  = document.getElementById("adminPacksForm");
-const adminMsg   = document.getElementById("adminPacksMsg");
-const adminClose = document.getElementById("adminPacksCloseBtn");
-const adminCancel= document.getElementById("adminPacksCancelBtn");
-const adminSave  = document.getElementById("adminPacksSaveBtn");
+const adminBtn    = document.getElementById("adminEditPacksBtn");
+const adminModal  = document.getElementById("adminPacksModal");
+const adminForm   = document.getElementById("adminPacksForm");
+const adminMsg    = document.getElementById("adminPacksMsg");
+const adminClose  = document.getElementById("adminPacksCloseBtn");
+const adminCancel = document.getElementById("adminPacksCancelBtn");
+const adminSave   = document.getElementById("adminPacksSaveBtn");
 
 function setAdminMsg(t=""){ if (adminMsg) adminMsg.textContent = t; }
 
-function ensureDefaultPacks(packs){
+function ensureDefaultPacks(packs) {
   const base = { ...PACKS_FALLBACK, ...(packs || {}) };
   return {
-    premium:  { ...PACKS_FALLBACK.premium,  ...(base.premium  || {}) },
-    standard: { ...PACKS_FALLBACK.standard, ...(base.standard || {}) },
-    essentiel:{ ...PACKS_FALLBACK.essentiel,...(base.essentiel|| {}) },
-    workshop: { ...PACKS_FALLBACK.workshop, ...(base.workshop || {}) },
+    premium:   { ...PACKS_FALLBACK.premium,   ...(base.premium   || {}) },
+    standard:  { ...PACKS_FALLBACK.standard,  ...(base.standard  || {}) },
+    essentiel: { ...PACKS_FALLBACK.essentiel, ...(base.essentiel || {}) },
+    workshop:  { ...PACKS_FALLBACK.workshop,  ...(base.workshop  || {}) },
   };
 }
 
-function renderAdminPacksEditor(){
+function renderAdminPacksEditor() {
   if (!adminForm) return;
 
   const packs = ensureDefaultPacks(PACKS);
   adminForm.innerHTML = "";
 
-  Object.keys(packs).forEach((key)=>{
+  Object.keys(packs).forEach((key) => {
     const p = packs[key] || {};
     const row = document.createElement("div");
     row.style.cssText = "border:1px solid #eee; border-radius:14px; padding:12px;";
@@ -628,19 +706,22 @@ function renderAdminPacksEditor(){
       <div style="margin-top:10px; display:flex; gap:10px; flex-wrap:wrap;">
         <label style="display:flex; gap:8px; align-items:center;">
           <span style="width:150px; font-weight:800;">Conférences</span>
-          <input data-pack-conf="${escapeHTML(key)}" type="number" min="0" value="${Number(p.conferencesAllowed ?? 0)}"
+          <input data-pack-conf="${escapeHTML(key)}" type="number" min="0"
+                 value="${Number(p.conferencesAllowed ?? 0)}"
                  style="width:110px; padding:8px 10px; border:1px solid #ddd; border-radius:10px;">
         </label>
 
         <label style="display:flex; gap:8px; align-items:center;">
-          <span style="width:170px; font-weight:800;">Packs Workshop remisés</span>
-          <input data-pack-wsd="${escapeHTML(key)}" type="number" min="0" value="${Number(p.workshopDiscountPacks ?? 0)}"
+          <span style="width:150px; font-weight:800;">Packs Workshop remisés</span>
+          <input data-pack-wsd="${escapeHTML(key)}" type="number" min="0"
+                 value="${Number(p.workshopDiscountPacks ?? 0)}"
                  style="width:110px; padding:8px 10px; border:1px solid #ddd; border-radius:10px;">
         </label>
 
         <label style="display:flex; gap:8px; align-items:center;">
           <span style="width:150px; font-weight:800;">Autre</span>
-          <input data-pack-other="${escapeHTML(key)}" type="number" min="0" value="${Number(p.otherAllowed ?? 0)}"
+          <input data-pack-other="${escapeHTML(key)}" type="number" min="0"
+                 value="${Number(p.otherAllowed ?? 0)}"
                  style="width:110px; padding:8px 10px; border:1px solid #ddd; border-radius:10px;">
         </label>
       </div>
@@ -649,43 +730,43 @@ function renderAdminPacksEditor(){
   });
 }
 
-function openAdminModal(){
+function openAdminModal() {
   if (!isAdmin()) return alert("Réservé à l’admin Ti’Doc.");
   setAdminMsg("");
   renderAdminPacksEditor();
   if (adminModal) adminModal.style.display = "block";
 }
-function closeAdminModal(){ if (adminModal) adminModal.style.display = "none"; }
+function closeAdminModal() { if (adminModal) adminModal.style.display = "none"; }
 
-async function saveAdminPacks(){
+async function saveAdminPacks() {
   if (!isAdmin()) return;
-  try{
+  try {
     setAdminMsg("⏳ Enregistrement…");
 
     const packs = ensureDefaultPacks(PACKS);
     const out = {};
 
-    for (const key of Object.keys(packs)){
+    for (const key of Object.keys(packs)) {
       const confEl = document.querySelector(`[data-pack-conf="${CSS.escape(key)}"]`);
       const wsdEl  = document.querySelector(`[data-pack-wsd="${CSS.escape(key)}"]`);
       const othEl  = document.querySelector(`[data-pack-other="${CSS.escape(key)}"]`);
 
       out[key] = {
-        label: PACKS_FALLBACK[key]?.label || key,
+        label: PACKS_FALLBACK[key]?.label || key, // label figé
         conferencesAllowed: Math.max(0, Number(confEl?.value || 0)),
         workshopDiscountPacks: Math.max(0, Number(wsdEl?.value || 0)),
         otherAllowed: Math.max(0, Number(othEl?.value || 0)),
       };
     }
 
-    await setDoc(doc(db, "config", "packs"), out, { merge:true });
+    await setDoc(doc(db, "config", "packs"), out, { merge: true });
 
     await loadPackConfig();
     await loadSavedTicket();
 
     setAdminMsg("✅ Quotas mis à jour !");
     closeAdminModal();
-  } catch(e){
+  } catch (e) {
     console.log("saveAdminPacks error:", e);
     setAdminMsg("❌ " + (e?.message || String(e)));
   }
@@ -694,53 +775,55 @@ async function saveAdminPacks(){
 adminBtn?.addEventListener("click", openAdminModal);
 adminClose?.addEventListener("click", closeAdminModal);
 adminCancel?.addEventListener("click", closeAdminModal);
-adminModal?.addEventListener("click", (e)=>{ if (e.target === adminModal) closeAdminModal(); });
+adminModal?.addEventListener("click", (e) => { if (e.target === adminModal) closeAdminModal(); });
 adminSave?.addEventListener("click", saveAdminPacks);
 
 // ======================
 // ADMIN UI — PROMO CODES MODAL
 // ======================
-const promoBtn   = document.getElementById("adminEditPromoBtn");
-const promoModal = document.getElementById("adminPromoModal");
-const promoClose = document.getElementById("adminPromoCloseBtn");
-const promoCancel= document.getElementById("adminPromoCancelBtn");
-const promoSave  = document.getElementById("adminPromoSaveBtn");
-const promoMsg   = document.getElementById("adminPromoMsg");
+const promoBtn    = document.getElementById("adminEditPromoBtn");
+const promoModal  = document.getElementById("adminPromoModal");
+const promoClose  = document.getElementById("adminPromoCloseBtn");
+const promoCancel = document.getElementById("adminPromoCancelBtn");
+const promoSave   = document.getElementById("adminPromoSaveBtn");
+const promoMsg    = document.getElementById("adminPromoMsg");
 
-const promoPremiumEl  = document.getElementById("promoPremiumInput");
-const promoStandardEl = document.getElementById("promoStandardInput");
-const promoEssentielEl= document.getElementById("promoEssentielInput");
+const promoPremiumEl   = document.getElementById("promoPremiumInput");
+const promoStandardEl  = document.getElementById("promoStandardInput");
+const promoEssentielEl = document.getElementById("promoEssentielInput");
 
 function setPromoMsg(t=""){ if (promoMsg) promoMsg.textContent = t; }
 
-function openPromoModal(){
+function openPromoModal() {
   if (!isAdmin()) return alert("Réservé à l’admin Ti’Doc.");
   setPromoMsg("");
-  promoPremiumEl.value  = (PROMO_POOLS.premium || []).join("\n");
-  promoStandardEl.value = (PROMO_POOLS.standard || []).join("\n");
-  promoEssentielEl.value= (PROMO_POOLS.essentiel || []).join("\n");
-  promoModal.style.display = "block";
+
+  if (promoPremiumEl)   promoPremiumEl.value   = (PROMO_POOLS.premium || []).join("\n");
+  if (promoStandardEl)  promoStandardEl.value  = (PROMO_POOLS.standard || []).join("\n");
+  if (promoEssentielEl) promoEssentielEl.value = (PROMO_POOLS.essentiel || []).join("\n");
+
+  if (promoModal) promoModal.style.display = "block";
 }
 function closePromoModal(){ if (promoModal) promoModal.style.display = "none"; }
 
-async function savePromoPools(){
+async function savePromoPools() {
   if (!isAdmin()) return;
-  try{
+  try {
     setPromoMsg("⏳ Enregistrement…");
 
-    const premium  = normalizeCodes(String(promoPremiumEl.value || "").split(/\r?\n/));
-    const standard = normalizeCodes(String(promoStandardEl.value || "").split(/\r?\n/));
-    const essentiel= normalizeCodes(String(promoEssentielEl.value || "").split(/\r?\n/));
+    const premium   = normalizeCodes(String(promoPremiumEl?.value || "").split(/\r?\n/));
+    const standard  = normalizeCodes(String(promoStandardEl?.value || "").split(/\r?\n/));
+    const essentiel = normalizeCodes(String(promoEssentielEl?.value || "").split(/\r?\n/));
 
     await setDoc(doc(db, "config", "promoPools"), {
       premium, standard, essentiel,
       updatedAt: serverTimestamp()
-    }, { merge:true });
+    }, { merge: true });
 
     await loadPromoPools();
     setPromoMsg(`✅ Pools mis à jour — Premium: ${PROMO_POOLS.premium.length}, Standard: ${PROMO_POOLS.standard.length}, Essentiel: ${PROMO_POOLS.essentiel.length}`);
     closePromoModal();
-  }catch(e){
+  } catch (e) {
     console.log("savePromoPools error:", e);
     setPromoMsg("❌ " + (e?.message || String(e)));
   }
@@ -749,227 +832,51 @@ async function savePromoPools(){
 promoBtn?.addEventListener("click", openPromoModal);
 promoClose?.addEventListener("click", closePromoModal);
 promoCancel?.addEventListener("click", closePromoModal);
-promoModal?.addEventListener("click", (e)=>{ if (e.target === promoModal) closePromoModal(); });
+promoModal?.addEventListener("click", (e) => { if (e.target === promoModal) closePromoModal(); });
 promoSave?.addEventListener("click", savePromoPools);
 
 // =====================
-// UI binds
+// UI binds (SAFE)
 // =====================
 uploadBtn?.addEventListener("click", () => fileInput?.click());
+
 fileInput?.addEventListener("change", async () => {
   const file = fileInput.files?.[0];
   await handleFile(file);
-  fileInput.value = "";
+  if (fileInput) fileInput.value = "";
 });
-deleteBtn?.addEventListener("click", deleteMyTicketAndUnclaim);
+
+// delete button (SAFE)
+if (deleteBtn) {
+  deleteBtn.addEventListener("click", () => {
+    if (typeof deleteMyTicketAndUnclaim === "function") {
+      deleteMyTicketAndUnclaim();
+    } else {
+      console.warn("deleteMyTicketAndUnclaim() manquante — suppression ignorée");
+    }
+  });
+}
+
+// =====================
+// Admin buttons visibility helper
+// =====================
+function updateAdminButtonsVisibility(){
+  const ok = isAdmin();
+  if (adminBtn) adminBtn.style.display = ok ? "inline-flex" : "none";
+  if (promoBtn) promoBtn.style.display = ok ? "inline-flex" : "none";
+}
 
 // =====================
 // INIT
 // =====================
 onAuthStateChanged(auth, async () => {
-  await loadPackConfig();
-  await loadPromoPools();
-  await loadSavedTicket();
-
-  // Affichage admin boutons
-  if (adminBtn) adminBtn.style.display = isAdmin() ? "inline-flex" : "none";
-  if (promoBtn) promoBtn.style.display = isAdmin() ? "inline-flex" : "none";
-});
-
-
-// ============================================================================
-// =====================  FONCTIONS MANQUANTES (FIX)  ==========================
-// ============================================================================
-
-// --- SHA256 ---
-async function sha256Hex(str){
-  const buf = new TextEncoder().encode(String(str));
-  const digest = await crypto.subtle.digest("SHA-256", buf);
-  return [...new Uint8Array(digest)].map(b => b.toString(16).padStart(2,"0")).join("");
-}
-
-// --- QR scan sur canvas via jsQR ---
-function scanCanvasForQR(canvas){
-  try{
-    if (!canvas) return "";
-    const ctx = canvas.getContext("2d");
-    const img = ctx.getImageData(0, 0, canvas.width, canvas.height);
-    const code = window.jsQR?.(img.data, img.width, img.height);
-    return code?.data || "";
-  }catch(e){
-    console.log("scanCanvasForQR error:", e);
-    return "";
-  }
-}
-
-// --- Charge image en canvas ---
-async function loadImageToCanvas(file){
-  const dataUrl = await new Promise((resolve, reject) => {
-    const r = new FileReader();
-    r.onload = () => resolve(String(r.result));
-    r.onerror = reject;
-    r.readAsDataURL(file);
-  });
-
-  const img = await new Promise((resolve, reject) => {
-    const im = new Image();
-    im.onload = () => resolve(im);
-    im.onerror = reject;
-    im.src = dataUrl;
-  });
-
-  const canvas = document.createElement("canvas");
-  const ctx = canvas.getContext("2d");
-
-  canvas.width = img.naturalWidth || img.width;
-  canvas.height = img.naturalHeight || img.height;
-  ctx.drawImage(img, 0, 0);
-
-  return canvas;
-}
-
-// --- Crop top-right (souvent zone "Pack ..." sur captures) ---
-function cropTopRight(canvas){
-  const w = canvas.width;
-  const h = canvas.height;
-
-  const cw = Math.max(200, Math.floor(w * 0.45));
-  const ch = Math.max(200, Math.floor(h * 0.35));
-
-  const sx = w - cw;
-  const sy = 0;
-
-  const out = document.createElement("canvas");
-  out.width = cw;
-  out.height = ch;
-
-  const ctx = out.getContext("2d");
-  ctx.drawImage(canvas, sx, sy, cw, ch, 0, 0, cw, ch);
-  return out;
-}
-
-// --- OCR via Tesseract ---
-async function ocrCanvas(canvas){
-  if (!window.Tesseract) throw new Error("OCR indisponible (Tesseract non chargé).");
-  const { data } = await window.Tesseract.recognize(canvas, "fra");
-  return data?.text || "";
-}
-
-// --- PDF -> scan QR + récup texte ---
-async function scanPdfForQR(file){
-  if (!window.pdfjsLib) throw new Error("PDF.js indisponible (pdfjsLib non chargé).");
-
-  const buf = await file.arrayBuffer();
-  const pdf = await window.pdfjsLib.getDocument({ data: buf }).promise;
-
-  let foundQr = "";
-  let fullText = "";
-
-  const maxPagesToScan = Math.min(pdf.numPages, 6); // limite perf
-
-  for (let p = 1; p <= maxPagesToScan; p++){
-    const page = await pdf.getPage(p);
-
-    // texte (pour pack/nom/num)
-    try{
-      const tc = await page.getTextContent();
-      const pageText = (tc.items || []).map(it => it.str || "").join("\n");
-      fullText += "\n" + pageText;
-    }catch{}
-
-    // rendu canvas pour QR
-    if (!foundQr){
-      const viewport = page.getViewport({ scale: 2.0 });
-      const canvas = document.createElement("canvas");
-      const ctx = canvas.getContext("2d");
-      canvas.width = viewport.width;
-      canvas.height = viewport.height;
-      await page.render({ canvasContext: ctx, viewport }).promise;
-
-      const qr = scanCanvasForQR(canvas);
-      if (qr) foundQr = qr;
-    }
-
-    if (foundQr) break;
-  }
-
-  return { pdf, qrText: foundQr, fullText };
-}
-
-// --- Anti-double QR global (Firestore) ---
-async function claimQrOrThrow(qrText){
-  const u = auth.currentUser;
-  if (!u) throw new Error("Connexion requise.");
-  const qrHash = await sha256Hex(qrText);
-
-  const ref = doc(db, "claimedQrs", qrHash);
-
-  await runTransaction(db, async (tx) => {
-    const snap = await tx.get(ref);
-    if (snap.exists()){
-      const d = snap.data() || {};
-      const owner = String(d.uid || "");
-      if (owner && owner !== u.uid){
-        throw new Error("Ce billet a déjà été importé par un autre utilisateur.");
-      }
-      // si c'est le même user, ok (re-import)
-    } else {
-      tx.set(ref, { uid: u.uid, claimedAt: serverTimestamp() }, { merge: true });
-    }
-  });
-}
-
-// --- Sync displayName Firebase (optionnel) ---
-async function syncNameFromTicket(holderName){
-  const u = auth.currentUser;
-  if (!u) return;
-  const name = String(holderName || "").trim();
-  if (!name) return;
-
-  // on ne force pas si déjà rempli, sauf si vide
-  if (!u.displayName || !String(u.displayName).trim()){
-    try{ await updateProfile(u, { displayName: name }); } catch(_) {}
-  }
-}
-
-// --- Supprime billet + unclaim QR + workshops ---
-async function deleteMyTicketAndUnclaim(){
-  const u = auth.currentUser;
-  if (!u) return;
-
-  try{
-    setStatus("⏳ Suppression…");
-
-    // récup qrHash du billet principal
-    const userTicketRef = doc(db, "userTickets", u.uid);
-    const snap = await getDoc(userTicketRef);
-    const qrHash = snap.exists() ? String(snap.data()?.qrHash || "") : "";
-
-    // delete billet principal
-    await deleteDoc(userTicketRef);
-
-    // delete workshops
-    const wsQ = query(collection(db, "userWorkshopTickets"), where("uid", "==", u.uid));
-    const wsSnap = await getDocs(wsQ);
-    for (const d of wsSnap.docs){
-      await deleteDoc(d.ref);
-    }
-
-    // unclaim si c'était toi
-    if (qrHash){
-      const claimRef = doc(db, "claimedQrs", qrHash);
-      await runTransaction(db, async (tx) => {
-        const c = await tx.get(claimRef);
-        if (!c.exists()) return;
-        const owner = String(c.data()?.uid || "");
-        if (owner === u.uid) tx.delete(claimRef);
-      });
-    }
-
+  try {
+    await loadPackConfig();
+    await loadPromoPools();
     await loadSavedTicket();
-    setStatus("✅ Billet supprimé");
-  }catch(e){
-    console.log("deleteMyTicketAndUnclaim error:", e);
-    setStatus("❌ " + (e?.message || String(e)));
+  } finally {
+    updateAdminButtonsVisibility();
+    // debug utile (tu peux enlever après)
+    console.log("[ADMIN DEBUG] user:", auth.currentUser?.email, "isAdmin:", isAdmin());
   }
-}
+});
