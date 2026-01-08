@@ -31,6 +31,62 @@ function escapeHTML(s = "") {
 }
 
 // =====================
+// OFFICIAL TICKET INDEX (GitHub raw JSON)
+// =====================
+const OFFICIAL_TICKETS_URL = "https://raw.githubusercontent.com/<USER>/<REPO>/main/tickets_officiels.json";
+// ↑ tu remplaces avec ton raw github
+
+let OFFICIAL_CACHE = null;
+
+async function fetchOfficialTicketsIndex() {
+  // cache mémoire
+  if (OFFICIAL_CACHE) return OFFICIAL_CACHE;
+
+  // cache localStorage (optionnel)
+  try {
+    const cached = JSON.parse(localStorage.getItem("tidoc_official_index") || "null");
+    if (cached && cached.data && cached.ts && (Date.now() - cached.ts) < 5 * 60 * 1000) {
+      OFFICIAL_CACHE = cached.data;
+      return OFFICIAL_CACHE;
+    }
+  } catch(_) {}
+
+  const res = await fetch(OFFICIAL_TICKETS_URL, { cache: "no-store" });
+  if (!res.ok) throw new Error("Impossible de vérifier le billet (index officiel indisponible).");
+
+  const data = await res.json();
+  OFFICIAL_CACHE = data;
+
+  try {
+    localStorage.setItem("tidoc_official_index", JSON.stringify({ ts: Date.now(), data }));
+  } catch(_) {}
+
+  return OFFICIAL_CACHE;
+}
+
+async function verifyPackWithQrOrThrow(qrText, detectedPackKey) {
+  const qrHash = await sha256Hex(qrText);
+  const index = await fetchOfficialTicketsIndex();
+
+  const officialPack = (index && index[qrHash]) ? String(index[qrHash]).toLowerCase() : "";
+
+  if (!officialPack) {
+    throw new Error("Billet non reconnu (QR absent de la liste officielle).");
+  }
+
+  // si l’OCR n’a rien trouvé, on peut “remplir” avec l’officiel
+  if (!detectedPackKey) return { qrHash, officialPack, finalPackKey: officialPack };
+
+  const det = String(detectedPackKey).toLowerCase();
+
+  if (det !== officialPack) {
+    throw new Error(`Billet refusé : pack incohérent (détecté: ${det} / officiel: ${officialPack}).`);
+  }
+
+  return { qrHash, officialPack, finalPackKey: det };
+}
+
+// =====================
 // PACKS (quotas) — 4 packs fixes
 // =====================
 // NB: quotas = ce que TU veux afficher/contrôler dans l’app (modifiable par admin)
