@@ -1,24 +1,4 @@
-// billets.js (MODULE) — VERSION COMPLÈTE + SAFE (anti-crash)
-// ✅ Admin boutons (quotas + codes promo) affichés si isAdmin() true
-// ✅ Packs = 4 fixes, labels figés, quotas éditables (conf / packs workshop remisés / autre)
-// ✅ Codes promo = pools séparés (premium/standard/essentiel) + attribution auto 1 fois / user
-// ✅ Workshops = billets séparés (multi) dans userWorkshopTickets
-// ✅ Vérif officielle pack via GitHub raw JSON (qrHash -> pack)
-// ✅ AUCUN "..." / aucune référence à une fonction non définie qui ferait planter le script
-//
-// ⚠️ IMPORTANT : tu dois déjà avoir (dans ce même fichier ou importées globalement) ces fonctions UTILISÉES ici :
-// - sha256Hex(qrText)
-// - scanPdfForQR(file) -> { pdf, qrText }
-// - extractMetaFromPdfText(pdf) -> { packKey, holderName, ticketNumber }
-// - loadImageToCanvas(file) -> canvas
-// - scanCanvasForQR(canvas) -> qrText
-// - cropTopRight(canvas) -> canvasCrop
-// - ocrCanvas(canvasCrop) -> text
-// - claimQrOrThrow(qrText)
-// - syncNameFromTicket(holderName)
-// - deleteMyTicketAndUnclaim()   (OPTIONNEL : si absent, on ne crash pas, on ignore juste le bouton delete)
-//
-// Si une de ces fonctions est absente, le script NE DOIT PAS crasher (on protège), mais l’import billet ne marchera pas.
+// billets.js (MODULE) — VERSION COMPLETE + UI PROMOS (liste) + UI QUOTAS (sans "Autre") + FIX IMPORT (globals via window.*)
 
 import { firebaseConfig } from "./firebase-config.js";
 import { initializeApp, getApps, getApp } from "https://www.gstatic.com/firebasejs/10.12.4/firebase-app.js";
@@ -36,10 +16,16 @@ const db   = getFirestore(app);
 const auth = getAuth(app);
 
 // =====================
+// Helpers (globals via window.* pour éviter le bug module)
+// =====================
+const W = () => window;
+const getFn = (name) => (typeof W()[name] === "function" ? W()[name] : null);
+
+// =====================
 // UI refs
 // =====================
 const uploadBtn = document.getElementById("uploadTicketBtn");
-const deleteBtn = document.getElementById("deleteTicketBtn"); // si tu l’as encore dans ton HTML
+const deleteBtn = document.getElementById("deleteTicketBtn"); // si présent
 const fileInput = document.getElementById("ticketFileInput");
 const statusEl  = document.getElementById("ticketStatus");
 const boxEl     = document.getElementById("ticketBox");
@@ -63,7 +49,6 @@ let OFFICIAL_CACHE = null;
 async function fetchOfficialTicketsIndex() {
   if (OFFICIAL_CACHE) return OFFICIAL_CACHE;
 
-  // cache localStorage 5 min (optionnel)
   try {
     const cached = JSON.parse(localStorage.getItem("tidoc_official_index") || "null");
     if (cached?.data && cached?.ts && (Date.now() - cached.ts) < 5 * 60 * 1000) {
@@ -86,9 +71,8 @@ async function fetchOfficialTicketsIndex() {
 }
 
 async function verifyPackWithQrOrThrow(qrText, detectedPackKey) {
-  if (typeof sha256Hex !== "function") {
-    throw new Error("sha256Hex() manquante — impossible de vérifier le billet.");
-  }
+  const sha256Hex = getFn("sha256Hex");
+  if (!sha256Hex) throw new Error("sha256Hex() manquante — impossible de vérifier le billet.");
 
   const qrHash = await sha256Hex(qrText);
   const index = await fetchOfficialTicketsIndex();
@@ -96,7 +80,6 @@ async function verifyPackWithQrOrThrow(qrText, detectedPackKey) {
   const officialPack = (index && index[qrHash]) ? String(index[qrHash]).toLowerCase() : "";
   if (!officialPack) throw new Error("Billet non reconnu (QR absent de la liste officielle).");
 
-  // si OCR n’a rien trouvé : on “remplit” avec l’officiel
   if (!detectedPackKey) return { qrHash, officialPack, finalPackKey: officialPack };
 
   const det = String(detectedPackKey).toLowerCase();
@@ -109,13 +92,14 @@ async function verifyPackWithQrOrThrow(qrText, detectedPackKey) {
 
 // =====================
 // PACKS (quotas) — 4 packs fixes
+// NOTE: on garde conferencesAllowed pour "Conférences" OU pour "Workshops" (pack workshop)
+// workshopDiscountPacks = nb de "packs workshop remisés" accordés par billet principal (premium/standard/essentiel)
 // =====================
-// workshopDiscountPacks = nb de "packs workshop remisés" accordés par billet principal
 const PACKS_FALLBACK = {
-  premium:   { label: "Premium",   conferencesAllowed: 999, workshopDiscountPacks: 3, otherAllowed: 0 },
-  standard:  { label: "Standard",  conferencesAllowed: 7,   workshopDiscountPacks: 2, otherAllowed: 0 },
-  essentiel: { label: "Essentiel", conferencesAllowed: 2,   workshopDiscountPacks: 1, otherAllowed: 0 },
-  workshop:  { label: "Workshop",  conferencesAllowed: 0,   workshopDiscountPacks: 0, otherAllowed: 0 },
+  premium:   { label: "Premium",   conferencesAllowed: 999, workshopDiscountPacks: 3 },
+  standard:  { label: "Standard",  conferencesAllowed: 7,   workshopDiscountPacks: 2 },
+  essentiel: { label: "Essentiel", conferencesAllowed: 2,   workshopDiscountPacks: 1 },
+  workshop:  { label: "Workshop",  conferencesAllowed: 1,   workshopDiscountPacks: 0 }, // ici conferencesAllowed = nb de workshops
 };
 
 let PACKS = { ...PACKS_FALLBACK };
@@ -129,7 +113,6 @@ function normalizePackConfig(obj) {
       label: String(v.label || k),
       conferencesAllowed: Number(v.conferencesAllowed ?? 0),
       workshopDiscountPacks: Number(v.workshopDiscountPacks ?? 0),
-      otherAllowed: Number(v.otherAllowed ?? 0),
     };
   }
   return out;
@@ -156,6 +139,11 @@ async function loadPackConfig() {
     PACKS.standard.label  = PACKS_FALLBACK.standard.label;
     PACKS.essentiel.label = PACKS_FALLBACK.essentiel.label;
     PACKS.workshop.label  = PACKS_FALLBACK.workshop.label;
+
+    // default workshop=1 si vide
+    if (!Number.isFinite(PACKS.workshop.conferencesAllowed) || PACKS.workshop.conferencesAllowed <= 0) {
+      PACKS.workshop.conferencesAllowed = 1;
+    }
   } catch (e) {
     console.log("loadPackConfig error:", e);
     PACKS = { ...PACKS_FALLBACK };
@@ -168,6 +156,15 @@ async function loadPackConfig() {
 // { premium:[...], standard:[...], essentiel:[...], updatedAt: ... }
 // =====================
 let PROMO_POOLS = { premium: [], standard: [], essentiel: [] };
+
+// ✅ split robuste : retours à la ligne, espaces, virgules, ;
+function splitCodes(input = "") {
+  return String(input)
+    .replace(/\r/g, "\n")
+    .split(/[\n\s,;]+/g)
+    .map(x => String(x || "").trim())
+    .filter(Boolean);
+}
 
 function normalizeCodes(list) {
   const arr = Array.isArray(list) ? list : [];
@@ -218,24 +215,18 @@ async function assignPromoCodeIfNeeded(packKey) {
     const userSnap = await tx.get(userRef);
     const userData = userSnap.exists() ? (userSnap.data() || {}) : {};
     const existing = String(userData?.promoCode || "").trim();
-
     if (existing) return { code: existing, already: true };
 
     const poolsSnap = await tx.get(poolsRef);
     const poolsData = poolsSnap.exists() ? (poolsSnap.data() || {}) : {};
     const list = normalizeCodes(poolsData[tier]);
-
     if (!list.length) return { code: "", empty: true };
 
     const code = list[0];
     const rest = list.slice(1);
 
     tx.set(poolsRef, { ...poolsData, [tier]: rest, updatedAt: serverTimestamp() }, { merge: true });
-    tx.set(userRef, {
-      promoCode: code,
-      promoTier: tier,
-      promoAssignedAt: serverTimestamp()
-    }, { merge: true });
+    tx.set(userRef, { promoCode: code, promoTier: tier, promoAssignedAt: serverTimestamp() }, { merge: true });
 
     return { code, already: false };
   });
@@ -244,7 +235,7 @@ async function assignPromoCodeIfNeeded(packKey) {
 }
 
 // =====================
-// Trash icon
+// Trash icon (inline)
 // =====================
 const TRASH_TIDOC_SVG = `
 <svg class="trash-ico" viewBox="0 0 408.483 408.483" aria-hidden="true">
@@ -262,7 +253,7 @@ const TRASH_TIDOC_SVG = `
 `;
 
 // =====================
-// Parsing (OCR texte)
+// OCR parsing (image)
 // =====================
 function parseMetaFromText(raw = "") {
   const lines = String(raw)
@@ -329,18 +320,19 @@ function parseMetaFromText(raw = "") {
 }
 
 // =====================
-// Save Ticket principal (userTickets/{uid})
+// Save main ticket
 // =====================
 async function saveTicketToFirestore({ qrText, packKey, holderName, ticketNumber }) {
   const u = auth.currentUser;
   if (!u) throw new Error("Connexion requise.");
-  if (typeof sha256Hex !== "function") throw new Error("sha256Hex() manquante.");
+
+  const sha256Hex = getFn("sha256Hex");
+  if (!sha256Hex) throw new Error("sha256Hex() manquante.");
 
   const qrHash = await sha256Hex(qrText);
 
   await setDoc(doc(db, "userTickets", u.uid), {
-    qrText,
-    qrHash,
+    qrText, qrHash,
     packKey: packKey || "",
     holderName: holderName || "",
     ticketNumber: ticketNumber || "",
@@ -349,20 +341,21 @@ async function saveTicketToFirestore({ qrText, packKey, holderName, ticketNumber
 }
 
 // =====================
-// Save Workshop Ticket (multi) userWorkshopTickets/{uid_qrHash}
+// Save workshop ticket (multi)
 // =====================
 async function saveWorkshopTicket({ qrText, packKey, holderName, ticketNumber }) {
   const u = auth.currentUser;
   if (!u) throw new Error("Connexion requise.");
-  if (typeof sha256Hex !== "function") throw new Error("sha256Hex() manquante.");
+
+  const sha256Hex = getFn("sha256Hex");
+  if (!sha256Hex) throw new Error("sha256Hex() manquante.");
 
   const qrHash = await sha256Hex(qrText);
   const id = `${u.uid}_${qrHash}`;
 
   await setDoc(doc(db, "userWorkshopTickets", id), {
     uid: u.uid,
-    qrText,
-    qrHash,
+    qrText, qrHash,
     packKey: packKey || "workshop",
     holderName: holderName || "",
     ticketNumber: ticketNumber || "",
@@ -371,20 +364,19 @@ async function saveWorkshopTicket({ qrText, packKey, holderName, ticketNumber })
 }
 
 // =====================
-// Render principal + promo + workshops
+// Render ticket + promo + workshops list
 // =====================
 function renderResult({ qrText, packKey, holderName, ticketNumber, promoCode, workshopsImportedCount } = {}) {
+  if (!boxEl) return;
+
   const key = String(packKey || "").toLowerCase();
   const pack = PACKS[key] || null;
   const packLabel = pack ? pack.label : (key ? key : "Non détecté");
 
   const conf = pack ? (pack.conferencesAllowed === 999 ? "Toutes" : pack.conferencesAllowed) : "—";
-  const other = pack ? pack.otherAllowed : "—";
-
   const discount = pack ? Number(pack.workshopDiscountPacks ?? 0) : 0;
   const imported = Number(workshopsImportedCount ?? 0);
 
-  // ✅ règle workshops : pas de quota “actif” tant que le user n’a pas importé de pack workshop
   const wsLine = imported > 0
     ? (discount > 0 ? `${imported} / ${discount}` : `${imported}`)
     : "0 (importe ton Pack Workshop pour activer)";
@@ -418,7 +410,6 @@ function renderResult({ qrText, packKey, holderName, ticketNumber, promoCode, wo
         <div style="margin-top:8px;"><b>Pack :</b> ${escapeHTML(packLabel)}</div>
         <div><b>Conférences :</b> ${escapeHTML(conf)}</div>
         <div><b>Workshops :</b> ${escapeHTML(wsLine)}</div>
-        <div><b>Autre :</b> ${escapeHTML(other)}</div>
       </div>
 
       ${showPromo ? `
@@ -432,9 +423,7 @@ function renderResult({ qrText, packKey, holderName, ticketNumber, promoCode, wo
                         padding:10px 12px; border-radius:12px; background:#fff; border:1px solid rgba(0,0,0,.08);">
               ${escapeHTML(promo)}
             </div>
-            <button id="copyPromoBtn" class="btn-outline" type="button" style="height:40px;">
-              Copier
-            </button>
+            <button id="copyPromoBtn" class="btn-outline" type="button" style="height:40px;">Copier</button>
           </div>
           <div id="copyPromoMsg" style="margin-top:8px; font-size:12px; font-weight:800; color:rgba(31,75,86,.75);"></div>
         </div>
@@ -448,11 +437,9 @@ function renderResult({ qrText, packKey, holderName, ticketNumber, promoCode, wo
   const delInline = boxEl.querySelector("#deleteTicketInlineBtn");
   if (delInline) {
     delInline.addEventListener("click", () => {
-      if (typeof deleteMyTicketAndUnclaim === "function") {
-        deleteMyTicketAndUnclaim();
-      } else {
-        console.warn("deleteMyTicketAndUnclaim() manquante — suppression ignorée");
-      }
+      const del = getFn("deleteMyTicketAndUnclaim");
+      if (del) del();
+      else console.warn("deleteMyTicketAndUnclaim() manquante — suppression ignorée");
     });
   }
 
@@ -461,10 +448,6 @@ function renderResult({ qrText, packKey, holderName, ticketNumber, promoCode, wo
   if (host && window.QRCode && qrText) {
     host.innerHTML = "";
     new window.QRCode(host, { text: qrText, width: 220, height: 220 });
-  } else if (host) {
-    host.innerHTML = `<div style="opacity:.7;font-size:12px;text-align:center;padding:18px;">
-      (Ajoute qrcodejs pour afficher le QR ici)
-    </div>`;
   }
 
   // copy promo
@@ -570,22 +553,27 @@ async function handleFile(file) {
   try {
     setStatus("⏳ Analyse du billet…");
 
-    // garde-fous : fonctions indispensables import
-    const need = [
-      ["scanPdfForQR", scanPdfForQR],
-      ["extractMetaFromPdfText", extractMetaFromPdfText],
-      ["loadImageToCanvas", loadImageToCanvas],
-      ["scanCanvasForQR", scanCanvasForQR],
-      ["cropTopRight", cropTopRight],
-      ["ocrCanvas", ocrCanvas],
-      ["claimQrOrThrow", claimQrOrThrow],
-      ["syncNameFromTicket", syncNameFromTicket],
-      ["sha256Hex", sha256Hex],
-    ];
-    for (const [name, fn] of need) {
-      if (typeof fn !== "function") {
-        throw new Error(`${name}() manquante — import impossible (fonction non chargée).`);
-      }
+    const scanPdfForQR = getFn("scanPdfForQR");
+    const extractMetaFromPdfText = getFn("extractMetaFromPdfText");
+    const loadImageToCanvas = getFn("loadImageToCanvas");
+    const scanCanvasForQR = getFn("scanCanvasForQR");
+    const cropTopRight = getFn("cropTopRight");
+    const ocrCanvas = getFn("ocrCanvas");
+    const claimQrOrThrow = getFn("claimQrOrThrow");
+    const syncNameFromTicket = getFn("syncNameFromTicket");
+
+    const missing = [];
+    if (!scanPdfForQR) missing.push("scanPdfForQR");
+    if (!extractMetaFromPdfText) missing.push("extractMetaFromPdfText");
+    if (!loadImageToCanvas) missing.push("loadImageToCanvas");
+    if (!scanCanvasForQR) missing.push("scanCanvasForQR");
+    if (!cropTopRight) missing.push("cropTopRight");
+    if (!ocrCanvas) missing.push("ocrCanvas");
+    if (!claimQrOrThrow) missing.push("claimQrOrThrow");
+    if (!syncNameFromTicket) missing.push("syncNameFromTicket");
+
+    if (missing.length) {
+      throw new Error(`Import impossible : fonctions manquantes : ${missing.join(", ")} (pas chargées dans window).`);
     }
 
     let qrText = "";
@@ -593,7 +581,6 @@ async function handleFile(file) {
     let holderName = "";
     let ticketNumber = "";
 
-    // PDF
     if (file.type === "application/pdf") {
       const out = await scanPdfForQR(file);
       qrText = out?.qrText || "";
@@ -603,11 +590,9 @@ async function handleFile(file) {
       packKey = meta?.packKey || "";
       holderName = meta?.holderName || "";
       ticketNumber = meta?.ticketNumber || "";
-    }
-    // IMAGE
-    else if (file.type.startsWith("image/")) {
+    } else if (file.type.startsWith("image/")) {
       const canvas = await loadImageToCanvas(file);
-      qrText = scanCanvasForQR(canvas) || "";
+      qrText = (scanCanvasForQR(canvas) || "");
 
       const crop = cropTopRight(canvas);
       const text = await ocrCanvas(crop);
@@ -616,21 +601,17 @@ async function handleFile(file) {
       packKey = meta.packKey || "";
       holderName = meta.holderName || "";
       ticketNumber = meta.ticketNumber || "";
-    }
-    else {
+    } else {
       throw new Error("Format non supporté (PDF ou image uniquement).");
     }
 
     if (!qrText) throw new Error("QR Code non détecté sur le billet.");
 
-    // Vérif officiel pack via GitHub index
     const v = await verifyPackWithQrOrThrow(qrText, packKey);
     packKey = v.finalPackKey;
 
-    // anti double billet (global)
     await claimQrOrThrow(qrText);
 
-    // workshop -> collection séparée
     const p = String(packKey || "").toLowerCase();
     if (p === "workshop") {
       await saveWorkshopTicket({ qrText, packKey, holderName, ticketNumber });
@@ -640,14 +621,11 @@ async function handleFile(file) {
       return;
     }
 
-    // billet principal
     await saveTicketToFirestore({ qrText, packKey, holderName, ticketNumber });
     await syncNameFromTicket(holderName);
 
-    // attrib promo si besoin
     await assignPromoCodeIfNeeded(packKey);
 
-    // rendu safe : reload depuis Firestore
     await loadSavedTicket();
     setStatus("✅ Billet importé avec succès");
   } catch (e) {
@@ -657,7 +635,7 @@ async function handleFile(file) {
 }
 
 // =====================
-// ADMIN UI (packs editor)
+// ADMIN
 // =====================
 const ADMIN_EMAIL = "tidoc.congres@gmail.com";
 
@@ -667,6 +645,11 @@ function isAdmin() {
   return email === ADMIN_EMAIL.toLowerCase();
 }
 
+// =====================
+// ADMIN UI — PACKS (quotas)  (SANS "Autre")
+// Premium/Standard/Essentiel: Conférences + Packs workshop remisés
+// Workshop: Workshops (via conferencesAllowed) ONLY
+// =====================
 const adminBtn    = document.getElementById("adminEditPacksBtn");
 const adminModal  = document.getElementById("adminPacksModal");
 const adminForm   = document.getElementById("adminPacksForm");
@@ -698,34 +681,40 @@ function renderAdminPacksEditor() {
     const row = document.createElement("div");
     row.style.cssText = "border:1px solid #eee; border-radius:14px; padding:12px;";
 
+    const isWs = key === "workshop";
+
+    // labels
+    const labelPack = escapeHTML(PACKS_FALLBACK[key]?.label || key);
+    const labelMain = isWs ? "Workshops" : "Conférences";
+
     row.innerHTML = `
       <div style="display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap;">
-        <div style="font-weight:950;">Pack : ${escapeHTML(PACKS_FALLBACK[key]?.label || key)}</div>
+        <div style="font-weight:950;">Pack : ${labelPack}</div>
       </div>
 
       <div style="margin-top:10px; display:flex; gap:10px; flex-wrap:wrap;">
         <label style="display:flex; gap:8px; align-items:center;">
-          <span style="width:150px; font-weight:800;">Conférences</span>
-          <input data-pack-conf="${escapeHTML(key)}" type="number" min="0"
+          <span style="width:170px; font-weight:800;">${labelMain}</span>
+          <input data-pack-main="${escapeHTML(key)}" type="number" min="0"
                  value="${Number(p.conferencesAllowed ?? 0)}"
                  style="width:110px; padding:8px 10px; border:1px solid #ddd; border-radius:10px;">
         </label>
 
-        <label style="display:flex; gap:8px; align-items:center;">
-          <span style="width:150px; font-weight:800;">Packs Workshop remisés</span>
-          <input data-pack-wsd="${escapeHTML(key)}" type="number" min="0"
-                 value="${Number(p.workshopDiscountPacks ?? 0)}"
-                 style="width:110px; padding:8px 10px; border:1px solid #ddd; border-radius:10px;">
-        </label>
-
-        <label style="display:flex; gap:8px; align-items:center;">
-          <span style="width:150px; font-weight:800;">Autre</span>
-          <input data-pack-other="${escapeHTML(key)}" type="number" min="0"
-                 value="${Number(p.otherAllowed ?? 0)}"
-                 style="width:110px; padding:8px 10px; border:1px solid #ddd; border-radius:10px;">
-        </label>
+        ${
+          isWs
+            ? ""
+            : `
+              <label style="display:flex; gap:8px; align-items:center;">
+                <span style="width:170px; font-weight:800;">Packs Workshop remisés</span>
+                <input data-pack-wsd="${escapeHTML(key)}" type="number" min="0"
+                       value="${Number(p.workshopDiscountPacks ?? 0)}"
+                       style="width:110px; padding:8px 10px; border:1px solid #ddd; border-radius:10px;">
+              </label>
+            `
+        }
       </div>
     `;
+
     adminForm.appendChild(row);
   });
 }
@@ -747,15 +736,25 @@ async function saveAdminPacks() {
     const out = {};
 
     for (const key of Object.keys(packs)) {
-      const confEl = document.querySelector(`[data-pack-conf="${CSS.escape(key)}"]`);
+      const mainEl = document.querySelector(`[data-pack-main="${CSS.escape(key)}"]`);
+
+      // workshop: seulement "main" (workshops)
+      if (key === "workshop") {
+        out[key] = {
+          label: PACKS_FALLBACK[key]?.label || key,
+          conferencesAllowed: Math.max(0, Number(mainEl?.value || 0)),
+          workshopDiscountPacks: 0, // forcé à 0
+        };
+        if (out[key].conferencesAllowed <= 0) out[key].conferencesAllowed = 1; // défaut 1
+        continue;
+      }
+
       const wsdEl  = document.querySelector(`[data-pack-wsd="${CSS.escape(key)}"]`);
-      const othEl  = document.querySelector(`[data-pack-other="${CSS.escape(key)}"]`);
 
       out[key] = {
-        label: PACKS_FALLBACK[key]?.label || key, // label figé
-        conferencesAllowed: Math.max(0, Number(confEl?.value || 0)),
+        label: PACKS_FALLBACK[key]?.label || key,
+        conferencesAllowed: Math.max(0, Number(mainEl?.value || 0)),
         workshopDiscountPacks: Math.max(0, Number(wsdEl?.value || 0)),
-        otherAllowed: Math.max(0, Number(othEl?.value || 0)),
       };
     }
 
@@ -779,7 +778,7 @@ adminModal?.addEventListener("click", (e) => { if (e.target === adminModal) clos
 adminSave?.addEventListener("click", saveAdminPacks);
 
 // ======================
-// ADMIN UI — PROMO CODES MODAL
+// ADMIN UI — PROMO CODES MODAL (LISTE + AJOUT + SUPPRESSION)
 // ======================
 const promoBtn    = document.getElementById("adminEditPromoBtn");
 const promoModal  = document.getElementById("adminPromoModal");
@@ -794,16 +793,104 @@ const promoEssentielEl = document.getElementById("promoEssentielInput");
 
 function setPromoMsg(t=""){ if (promoMsg) promoMsg.textContent = t; }
 
+// ---- UI dynamique : zone "Ajouter" + liste lisible sous chaque textarea
+function ensurePromoUI(tier, textareaEl) {
+  if (!promoModal || !textareaEl) return;
+
+  const wrapId = `promo_ui_${tier}`;
+  if (document.getElementById(wrapId)) return; // déjà créé
+
+  const wrap = document.createElement("div");
+  wrap.id = wrapId;
+  wrap.style.cssText = "margin-top:10px; padding:10px; border:1px dashed rgba(0,0,0,.12); border-radius:12px; background:rgba(0,0,0,.02);";
+
+  wrap.innerHTML = `
+    <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:center;">
+      <input id="promoAdd_${tier}" type="text" placeholder="Ajouter des codes (séparés par espaces, virgules, retours ligne)"
+             style="flex:1; min-width:240px; padding:10px 12px; border-radius:12px; border:1px solid rgba(0,0,0,.15);">
+      <button id="promoAddBtn_${tier}" type="button" class="btn-outline" style="height:40px;">Ajouter</button>
+      <div id="promoCount_${tier}" style="font-weight:900; color:rgba(15,35,42,.75);"></div>
+    </div>
+    <div id="promoList_${tier}" style="margin-top:10px; display:flex; gap:8px; flex-wrap:wrap;"></div>
+    <div style="margin-top:8px; font-size:12px; font-weight:800; color:rgba(15,35,42,.55);">
+      Astuce : clique sur un code pour le supprimer de la liste.
+    </div>
+  `;
+
+  // insère juste après le textarea
+  textareaEl.parentElement?.appendChild(wrap);
+
+  const addInput = document.getElementById(`promoAdd_${tier}`);
+  const addBtn   = document.getElementById(`promoAddBtn_${tier}`);
+
+  addBtn?.addEventListener("click", () => {
+    const toAdd = splitCodes(addInput?.value || "");
+    if (!toAdd.length) return;
+
+    const current = splitCodes(textareaEl.value || "");
+    const merged = normalizeCodes([...current, ...toAdd]);
+
+    textareaEl.value = merged.join("\n");
+    if (addInput) addInput.value = "";
+    renderPromoListForTier(tier, textareaEl);
+  });
+
+  textareaEl.addEventListener("input", () => renderPromoListForTier(tier, textareaEl));
+}
+
+function renderPromoListForTier(tier, textareaEl) {
+  const listEl  = document.getElementById(`promoList_${tier}`);
+  const countEl = document.getElementById(`promoCount_${tier}`);
+  if (!listEl || !countEl || !textareaEl) return;
+
+  const codes = normalizeCodes(splitCodes(textareaEl.value || ""));
+  countEl.textContent = `${codes.length} code(s)`;
+
+  if (!codes.length) {
+    listEl.innerHTML = `<div style="opacity:.7; font-weight:800;">(aucun code)</div>`;
+    return;
+  }
+
+  listEl.innerHTML = codes.map((c) => `
+    <button type="button" data-code="${escapeHTML(c)}"
+      style="border:1px solid rgba(0,0,0,.12); background:#fff; border-radius:999px;
+             padding:8px 10px; font-weight:900; font-size:12px; cursor:pointer;">
+      ${escapeHTML(c)}
+    </button>
+  `).join("");
+
+  // click = remove
+  listEl.querySelectorAll("button[data-code]").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const code = btn.getAttribute("data-code") || "";
+      const filtered = codes.filter(x => x.toLowerCase() !== code.toLowerCase());
+      textareaEl.value = filtered.join("\n");
+      renderPromoListForTier(tier, textareaEl);
+    });
+  });
+}
+
 function openPromoModal() {
   if (!isAdmin()) return alert("Réservé à l’admin Ti’Doc.");
   setPromoMsg("");
 
+  // remet textarea = pool (lisible)
   if (promoPremiumEl)   promoPremiumEl.value   = (PROMO_POOLS.premium || []).join("\n");
   if (promoStandardEl)  promoStandardEl.value  = (PROMO_POOLS.standard || []).join("\n");
   if (promoEssentielEl) promoEssentielEl.value = (PROMO_POOLS.essentiel || []).join("\n");
 
+  // UI dynamique + listes
+  ensurePromoUI("premium", promoPremiumEl);
+  ensurePromoUI("standard", promoStandardEl);
+  ensurePromoUI("essentiel", promoEssentielEl);
+
+  renderPromoListForTier("premium", promoPremiumEl);
+  renderPromoListForTier("standard", promoStandardEl);
+  renderPromoListForTier("essentiel", promoEssentielEl);
+
   if (promoModal) promoModal.style.display = "block";
 }
+
 function closePromoModal(){ if (promoModal) promoModal.style.display = "none"; }
 
 async function savePromoPools() {
@@ -811,9 +898,9 @@ async function savePromoPools() {
   try {
     setPromoMsg("⏳ Enregistrement…");
 
-    const premium   = normalizeCodes(String(promoPremiumEl?.value || "").split(/\r?\n/));
-    const standard  = normalizeCodes(String(promoStandardEl?.value || "").split(/\r?\n/));
-    const essentiel = normalizeCodes(String(promoEssentielEl?.value || "").split(/\r?\n/));
+    const premium   = normalizeCodes(splitCodes(promoPremiumEl?.value || ""));
+    const standard  = normalizeCodes(splitCodes(promoStandardEl?.value || ""));
+    const essentiel = normalizeCodes(splitCodes(promoEssentielEl?.value || ""));
 
     await setDoc(doc(db, "config", "promoPools"), {
       premium, standard, essentiel,
@@ -821,6 +908,7 @@ async function savePromoPools() {
     }, { merge: true });
 
     await loadPromoPools();
+
     setPromoMsg(`✅ Pools mis à jour — Premium: ${PROMO_POOLS.premium.length}, Standard: ${PROMO_POOLS.standard.length}, Essentiel: ${PROMO_POOLS.essentiel.length}`);
     closePromoModal();
   } catch (e) {
@@ -836,7 +924,7 @@ promoModal?.addEventListener("click", (e) => { if (e.target === promoModal) clos
 promoSave?.addEventListener("click", savePromoPools);
 
 // =====================
-// UI binds (SAFE)
+// UI binds
 // =====================
 uploadBtn?.addEventListener("click", () => fileInput?.click());
 
@@ -846,19 +934,16 @@ fileInput?.addEventListener("change", async () => {
   if (fileInput) fileInput.value = "";
 });
 
-// delete button (SAFE)
 if (deleteBtn) {
   deleteBtn.addEventListener("click", () => {
-    if (typeof deleteMyTicketAndUnclaim === "function") {
-      deleteMyTicketAndUnclaim();
-    } else {
-      console.warn("deleteMyTicketAndUnclaim() manquante — suppression ignorée");
-    }
+    const del = getFn("deleteMyTicketAndUnclaim");
+    if (del) del();
+    else console.warn("deleteMyTicketAndUnclaim() manquante — suppression ignorée");
   });
 }
 
 // =====================
-// Admin buttons visibility helper
+// Admin buttons visibility
 // =====================
 function updateAdminButtonsVisibility(){
   const ok = isAdmin();
@@ -876,7 +961,6 @@ onAuthStateChanged(auth, async () => {
     await loadSavedTicket();
   } finally {
     updateAdminButtonsVisibility();
-    // debug utile (tu peux enlever après)
     console.log("[ADMIN DEBUG] user:", auth.currentUser?.email, "isAdmin:", isAdmin());
   }
 });
