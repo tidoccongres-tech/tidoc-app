@@ -91,10 +91,10 @@ async function verifyPackWithQrOrThrow(qrText, detectedPackKey) {
 // =====================
 // NB: quotas = ce que TU veux afficher/contrôler dans l’app (modifiable par admin)
 const PACKS_FALLBACK = {
-  premium:  { label: "Premium",  workshopsAllowed: 3, conferencesAllowed: 999, otherAllowed: 0 },
-  standard: { label: "Standard", workshopsAllowed: 2, conferencesAllowed: 7,   otherAllowed: 0 },
-  essentiel:{ label: "Essentiel",workshopsAllowed: 1, conferencesAllowed: 2,   otherAllowed: 0 },
-  workshop: { label: "Workshop", workshopsAllowed: 1, conferencesAllowed: 0,   otherAllowed: 0 },
+  premium:  { label: "Premium",  conferencesAllowed: 999, workshopDiscountPacks: 3, otherAllowed: 0 },
+  standard: { label: "Standard", conferencesAllowed: 7,   workshopDiscountPacks: 2, otherAllowed: 0 },
+  essentiel:{ label: "Essentiel",conferencesAllowed: 2,   workshopDiscountPacks: 1, otherAllowed: 0 },
+  workshop: { label: "Workshop", conferencesAllowed: 0,   workshopDiscountPacks: 0, otherAllowed: 0 },
 };
 let PACKS = { ...PACKS_FALLBACK };
 
@@ -318,8 +318,17 @@ async function handleFile(file) {
     const promo = await assignPromoCodeIfNeeded(packKey);
 
     // 🎨 affichage immédiat (avec code si dispo)
-    renderResult({ qrText, packKey, holderName, ticketNumber, promoCode: promo?.code || "" });
+    renderResult({
+  qrText: t.qrText || "",
+  packKey: t.packKey || "",
+  holderName: t.holderName || "",
+  ticketNumber: t.ticketNumber || "",
+  promoCode: t.promoCode || "",
+  workshopsImportedCount: workshops.length
+});
 
+renderWorkshopsList(workshops);
+    
     setStatus("✅ Billet importé avec succès");
   } catch (e) {
     console.log("handleFile import error:", e);
@@ -447,11 +456,13 @@ async function deleteMyTicketAndUnclaim() {
 // =====================
 // Render (ajoute promoCode + liste workshops)
 // =====================
-function renderResult({ qrText, packKey, holderName, ticketNumber, promoCode } = {}) {
-  const key = String(packKey || "").toLowerCase();
+function renderResult({ qrText, packKey, holderName, ticketNumber, promoCode, workshopsImportedCount } = {}) {  const key = String(packKey || "").toLowerCase();
   const pack = PACKS[key] || null;
   const packLabel = pack ? pack.label : (key ? key : "Non détecté");
 
+  const discount = pack ? Number(pack.workshopDiscountPacks ?? 0) : 0;
+  const imported = Number(workshopsImportedCount ?? 0);                                                                                                           
+                                                                                                              
   const conf = pack ? (pack.conferencesAllowed === 999 ? "Toutes" : pack.conferencesAllowed) : "—";
   const ws   = pack ? pack.workshopsAllowed : "—";
   const other = pack ? pack.otherAllowed : "—";
