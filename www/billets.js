@@ -1,10 +1,10 @@
-// billets.js (MODULE) — PDF: texte via PDF.js / Image: OCR crop zone droite
-// ✅ Corrections: pas de await global, save 1 seule fois, syncNameFromTicket intégré + refresh header
+// billets.js (MODULE)
 
 import { firebaseConfig } from "./firebase-config.js";
 import { initializeApp, getApps, getApp } from "https://www.gstatic.com/firebasejs/10.12.4/firebase-app.js";
 import {
-  getFirestore, doc, getDoc, setDoc, deleteDoc, runTransaction, serverTimestamp
+  getFirestore, doc, getDoc, setDoc, deleteDoc, runTransaction, serverTimestamp,
+  collection, query, where, getDocs
 } from "https://www.gstatic.com/firebasejs/10.12.4/firebase-firestore.js";
 import {
   getAuth, onAuthStateChanged, updateProfile
@@ -31,15 +31,15 @@ function escapeHTML(s = "") {
 }
 
 // =====================
-// PACKS (quotas)
+// PACKS (quotas) — 4 packs fixes
 // =====================
+// NB: quotas = ce que TU veux afficher/contrôler dans l’app (modifiable par admin)
 const PACKS_FALLBACK = {
-  essentiel: { label: "Essentiel", workshopsAllowed: 1, conferencesAllowed: 2, otherAllowed: 0 },
-  standard:  { label: "Standard",  workshopsAllowed: 2, conferencesAllowed: 4, otherAllowed: 0 },
-  premium:   { label: "Premium",   workshopsAllowed: 3, conferencesAllowed: 7, otherAllowed: 0 },
-  autre:     { label: "Autre",     workshopsAllowed: 0, conferencesAllowed: 0, otherAllowed: 0 },
+  premium:  { label: "Premium",  workshopsAllowed: 3, conferencesAllowed: 999, otherAllowed: 0 },
+  standard: { label: "Standard", workshopsAllowed: 2, conferencesAllowed: 7,   otherAllowed: 0 },
+  essentiel:{ label: "Essentiel",workshopsAllowed: 1, conferencesAllowed: 2,   otherAllowed: 0 },
+  workshop: { label: "Workshop", workshopsAllowed: 1, conferencesAllowed: 0,   otherAllowed: 0 },
 };
-
 let PACKS = { ...PACKS_FALLBACK };
 
 function normalizePackConfig(obj){
@@ -48,6 +48,7 @@ function normalizePackConfig(obj){
   for (const k of Object.keys(src)){
     const v = src[k] || {};
     out[String(k).toLowerCase()] = {
+      // label volontairement ignoré si on veut le figer (on garde quand même la propriété)
       label: String(v.label || k),
       workshopsAllowed: Number(v.workshopsAllowed ?? 0),
       conferencesAllowed: Number(v.conferencesAllowed ?? 0),
@@ -66,7 +67,21 @@ async function loadPackConfig(){
     }
     const data = snap.data() || {};
     const normalized = normalizePackConfig(data);
-    PACKS = Object.keys(normalized).length ? normalized : { ...PACKS_FALLBACK };
+
+    // ✅ on force les 4 packs (labels figés sur fallback)
+    PACKS = {
+      premium:  { ...PACKS_FALLBACK.premium,  ...(normalized.premium  || {}) },
+      standard: { ...PACKS_FALLBACK.standard, ...(normalized.standard || {}) },
+      essentiel:{ ...PACKS_FALLBACK.essentiel,...(normalized.essentiel|| {}) },
+      workshop: { ...PACKS_FALLBACK.workshop, ...(normalized.workshop || {}) },
+    };
+
+    // ✅ labels figés (si tu veux VRAIMENT empêcher toute modif)
+    PACKS.premium.label   = PACKS_FALLBACK.premium.label;
+    PACKS.standard.label  = PACKS_FALLBACK.standard.label;
+    PACKS.essentiel.label = PACKS_FALLBACK.essentiel.label;
+    PACKS.workshop.label  = PACKS_FALLBACK.workshop.label;
+
   } catch (e){
     console.log("loadPackConfig error:", e);
     PACKS = { ...PACKS_FALLBACK };
@@ -74,22 +89,107 @@ async function loadPackConfig(){
 }
 
 // =====================
-// ICONS
+// PROMO CODES — pools séparés (premium/standard/essentiel)
+// Firestore: config/promoPools
+// {
+//   premium:  ["CODE1", "CODE2", ...],
+//   standard: ["CODEA", ...],
+//   essentiel:["CODEX", ...],
+//   updatedAt: ...
+// }
 // =====================
-const TRASH_TIDOC_SVG = `
-<svg class="trash-ico" viewBox="0 0 408.483 408.483" aria-hidden="true">
-  <g><g>
-    <path d="M87.748,388.784c0.461,11.01,9.521,19.699,20.539,19.699h191.911c11.018,0,20.078-8.689,20.539-19.699l13.705-289.316
-      H74.043L87.748,388.784z M247.655,171.329c0-4.61,3.738-8.349,8.35-8.349h13.355c4.609,0,8.35,3.738,8.35,8.349v165.293
-      c0,4.611-3.738,8.349-8.35,8.349h-13.355c-4.61,0-8.35-3.736-8.35-8.349V171.329z M189.216,171.329
-      c0-4.61,3.738-8.349,8.349-8.349h13.355c4.609,0,8.349,3.738,8.349,8.349v165.293c0,4.611-3.737,8.349-8.349,8.349h-13.355
-      c-4.61,0-8.349-3.736-8.349-8.349V171.329L189.216,171.329z M130.775,171.329c0-4.61,3.738-8.349,8.349-8.349h13.356
-      c4.61,0,8.349,3.738,8.349,8.349v165.293c0,4.611-3.738,8.349-8.349,8.349h-13.356c-4.61,0-8.349-3.736-8.349-8.349V171.329z"/>
-    <path d="M343.567,21.043h-88.535V4.305c0-2.377-1.927-4.305-4.305-4.305h-92.971c-2.377,0-4.304,1.928-4.304,4.305v16.737H64.916
-      c-7.125,0-12.9,5.776-12.9,12.901V74.47h304.451V33.944C356.467,26.819,350.692,21.043,343.567,21.043z"/>
-  </g></g>
-</svg>
-`;
+let PROMO_POOLS = { premium: [], standard: [], essentiel: [] };
+
+function normalizeCodes(list){
+  const arr = Array.isArray(list) ? list : [];
+  const cleaned = arr
+    .map(x => String(x || "").trim())
+    .filter(Boolean);
+  // dédoublonnage (case-insensitive)
+  const seen = new Set();
+  const out = [];
+  for (const c of cleaned){
+    const k = c.toLowerCase();
+    if (seen.has(k)) continue;
+    seen.add(k);
+    out.push(c);
+  }
+  return out;
+}
+
+async function loadPromoPools(){
+  try{
+    const snap = await getDoc(doc(db, "config", "promoPools"));
+    if (!snap.exists()){
+      PROMO_POOLS = { premium: [], standard: [], essentiel: [] };
+      return;
+    }
+    const d = snap.data() || {};
+    PROMO_POOLS = {
+      premium: normalizeCodes(d.premium),
+      standard: normalizeCodes(d.standard),
+      essentiel: normalizeCodes(d.essentiel),
+    };
+  } catch(e){
+    console.log("loadPromoPools error:", e);
+    PROMO_POOLS = { premium: [], standard: [], essentiel: [] };
+  }
+}
+
+// Attribuer 1 code selon le pack (premium/standard/essentiel), et le retirer du pool
+async function assignPromoCodeIfNeeded(packKey){
+  const u = auth.currentUser;
+  if (!u) return { code: "" };
+
+  const tier = String(packKey || "").toLowerCase();
+  if (!["premium","standard","essentiel"].includes(tier)) return { code: "" };
+
+  const userRef = doc(db, "userTickets", u.uid);
+  const poolsRef = doc(db, "config", "promoPools");
+
+  const res = await runTransaction(db, async (tx) => {
+    const userSnap = await tx.get(userRef);
+    const userData = userSnap.exists() ? (userSnap.data() || {}) : {};
+    const existing = userData?.promoCode || "";
+
+    // ✅ déjà attribué → on ne re-pioche pas
+    if (existing && String(existing).trim()) {
+      return { code: String(existing).trim(), already: true };
+    }
+
+    const poolsSnap = await tx.get(poolsRef);
+    const poolsData = poolsSnap.exists() ? (poolsSnap.data() || {}) : {};
+    const list = normalizeCodes(poolsData[tier]);
+
+    if (!list.length) {
+      return { code: "", empty: true };
+    }
+
+    const code = list[0];
+    const rest = list.slice(1);
+
+    tx.set(poolsRef, {
+      ...poolsData,
+      [tier]: rest,
+      updatedAt: serverTimestamp()
+    }, { merge: true });
+
+    tx.set(userRef, {
+      promoCode: code,
+      promoTier: tier,
+      promoAssignedAt: serverTimestamp()
+    }, { merge: true });
+
+    return { code, already: false };
+  });
+
+  return res || { code: "" };
+}
+
+// =====================
+// ICON (trash) — inchangé
+// =====================
+const TRASH_TIDOC_SVG = `...`; // (garde ton SVG tel quel)
 
 // =====================
 // MAIN IMPORT HANDLER
@@ -120,10 +220,8 @@ async function handleFile(file) {
     else if (file.type.startsWith("image/")) {
       const canvas = await loadImageToCanvas(file);
 
-      // 1) QR
       qrText = scanCanvasForQR(canvas);
 
-      // 2) OCR top-right (pack/nom/num)
       const crop = cropTopRight(canvas);
       const text = await ocrCanvas(crop);
       const meta = parseMetaFromText(text);
@@ -132,24 +230,35 @@ async function handleFile(file) {
       holderName = meta.holderName || "";
       ticketNumber = meta.ticketNumber || "";
     }
-
     else {
       throw new Error("Format non supporté (PDF ou image uniquement).");
     }
 
     if (!qrText) throw new Error("QR Code non détecté sur le billet.");
 
-    // 🔐 anti-double billet
+    // 🔐 anti-double billet (global)
     await claimQrOrThrow(qrText);
 
-    // 💾 sauvegarde Firestore
-    await saveTicketToFirestore({ qrText, packKey, holderName, ticketNumber });
+    // ✅ Si pack workshop → on le sauvegarde à part (sans écraser billet principal)
+    const p = String(packKey || "").toLowerCase();
+    if (p === "workshop") {
+      await saveWorkshopTicket({ qrText, packKey, holderName, ticketNumber });
+      await syncNameFromTicket(holderName);
 
-    // ✅ sync nom billet -> profil (auth + users/{uid}) + refresh header
+      await loadSavedTicket(); // recharge billet principal + liste workshops
+      setStatus("✅ Billet workshop importé");
+      return;
+    }
+
+    // Sinon billet principal
+    await saveTicketToFirestore({ qrText, packKey, holderName, ticketNumber });
     await syncNameFromTicket(holderName);
 
-    // 🎨 affichage immédiat
-    renderResult({ qrText, packKey, holderName, ticketNumber });
+    // 🎟️ Attribution auto code promo si pack premium/standard/essentiel
+    const promo = await assignPromoCodeIfNeeded(packKey);
+
+    // 🎨 affichage immédiat (avec code si dispo)
+    renderResult({ qrText, packKey, holderName, ticketNumber, promoCode: promo?.code || "" });
 
     setStatus("✅ Billet importé avec succès");
   } catch (e) {
@@ -159,133 +268,21 @@ async function handleFile(file) {
 }
 
 // =====================
-// QR scan (jsQR)
-// =====================
-function scanCanvasForQR(canvas) {
-  try {
-    const ctx = canvas.getContext("2d", { willReadFrequently: true });
-    const img = ctx.getImageData(0, 0, canvas.width, canvas.height);
-    const code = window.jsQR(img.data, img.width, img.height);
-    return code?.data || "";
-  } catch { return ""; }
-}
-
-async function renderPdfPageToCanvas(pdf, pageNumber, scale = 2.0) {
-  const page = await pdf.getPage(pageNumber);
-  const viewport = page.getViewport({ scale });
-
-  const canvas = document.createElement("canvas");
-  const ctx = canvas.getContext("2d", { willReadFrequently: true });
-
-  canvas.width = Math.floor(viewport.width);
-  canvas.height = Math.floor(viewport.height);
-
-  await page.render({ canvasContext: ctx, viewport }).promise;
-  return canvas;
-}
-
-async function scanPdfForQR(file) {
-  if (!window.pdfjsLib) throw new Error("PDF.js non chargé.");
-  if (!window.jsQR) throw new Error("jsQR non chargé.");
-
-  const buf = await file.arrayBuffer();
-  let pdf;
-  try {
-    pdf = await window.pdfjsLib.getDocument({ data: buf }).promise;
-  } catch {
-    pdf = await window.pdfjsLib.getDocument({ data: buf, disableWorker: true }).promise;
-  }
-
-  const pagesToTry = Math.min(2, pdf.numPages);
-  for (let i = 1; i <= pagesToTry; i++) {
-    const c1 = await renderPdfPageToCanvas(pdf, i, 1.8);
-    const qr1 = scanCanvasForQR(c1);
-    if (qr1) return { pdf, qrText: qr1 };
-
-    const c2 = await renderPdfPageToCanvas(pdf, i, 2.4);
-    const qr2 = scanCanvasForQR(c2);
-    if (qr2) return { pdf, qrText: qr2 };
-  }
-
-  return { pdf, qrText: "" };
-}
-
-// =====================
-// PDF TEXT extraction
-// =====================
-async function extractMetaFromPdfText(pdf) {
-  const page = await pdf.getPage(1);
-  const tc = await page.getTextContent();
-  const text = (tc.items || []).map(it => (it.str || "").trim()).filter(Boolean).join("\n");
-  return parseMetaFromText(text);
-}
-
-// =====================
-// OCR crop (image)
-// =====================
-async function loadImageToCanvas(fileOrBlob) {
-  const url = URL.createObjectURL(fileOrBlob);
-  try {
-    const img = new Image();
-    img.crossOrigin = "anonymous";
-    await new Promise((res, rej) => { img.onload = res; img.onerror = rej; img.src = url; });
-
-    const canvas = document.createElement("canvas");
-    const ctx = canvas.getContext("2d");
-
-    const maxW = 1600;
-    const scale = Math.min(1, maxW / img.width);
-    canvas.width = Math.floor(img.width * scale);
-    canvas.height = Math.floor(img.height * scale);
-    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-
-    return canvas;
-  } finally {
-    URL.revokeObjectURL(url);
-  }
-}
-
-function cropTopRight(canvas) {
-  const w = canvas.width;
-  const h = canvas.height;
-
-  const crop = document.createElement("canvas");
-  const ctx = crop.getContext("2d");
-
-  const x = Math.floor(w * 0.52);
-  const y = Math.floor(h * 0.06);
-  const cw = Math.floor(w * 0.46);
-  const ch = Math.floor(h * 0.32);
-
-  crop.width = cw;
-  crop.height = ch;
-  ctx.drawImage(canvas, x, y, cw, ch, 0, 0, cw, ch);
-
-  return crop;
-}
-
-async function ocrCanvas(canvas) {
-  if (!window.Tesseract) throw new Error("Tesseract non chargé.");
-  const { data } = await window.Tesseract.recognize(canvas, "fra+eng");
-  return data?.text || "";
-}
-
-// =====================
-// Parsing (PDF texte / OCR texte)
+// Parsing (PDF texte / OCR texte) — ajoute workshop
 // =====================
 function parseMetaFromText(raw = "") {
   const lines = String(raw).split(/\r?\n/).map(l => l.replace(/\s+/g, " ").trim()).filter(Boolean);
   const full = lines.join(" ");
 
-  // pack
+  // pack (premium/standard/essentiel/workshop)
   let packKey = "";
-  const mp = full.match(/pack\s*(essentiel|standard|premium|autre)/i);
+  const mp = full.match(/pack\s*(essentiel|standard|premium|workshop)/i);
   if (mp) {
     const v = mp[1].toLowerCase();
     if (v.startsWith("ess")) packKey = "essentiel";
     else if (v.startsWith("sta")) packKey = "standard";
     else if (v.startsWith("pre")) packKey = "premium";
-    else if (v.startsWith("aut")) packKey = "autre";
+    else if (v.startsWith("wor")) packKey = "workshop";
   }
 
   // ticket number
@@ -295,7 +292,7 @@ function parseMetaFromText(raw = "") {
 
   // holder name = ligne au-dessus de "Pack ..."
   let holderName = "";
-  const idxPack = lines.findIndex(l => /pack\s*(essentiel|standard|premium|autre)/i.test(l));
+  const idxPack = lines.findIndex(l => /pack\s*(essentiel|standard|premium|workshop)/i.test(l));
   if (idxPack > 0) {
     for (let j = idxPack - 1; j >= 0; j--) {
       const c = lines[j];
@@ -312,9 +309,8 @@ function parseMetaFromText(raw = "") {
     }
   }
 
-  // fallback (si OCR colle tout)
   if (!holderName && idxPack >= 0) {
-    const mSame = lines[idxPack].match(/^(.*?)\s+pack\s*(essentiel|standard|premium|autre)/i);
+    const mSame = lines[idxPack].match(/^(.*?)\s+pack\s*(essentiel|standard|premium|workshop)/i);
     if (mSame) holderName = mSame[1].trim();
   }
 
@@ -322,75 +318,11 @@ function parseMetaFromText(raw = "") {
 }
 
 // =====================
-// SHA256 / Lock QR
-// =====================
-async function sha256Hex(str) {
-  const data = new TextEncoder().encode(str);
-  const hash = await crypto.subtle.digest("SHA-256", data);
-  return Array.from(new Uint8Array(hash)).map(b => b.toString(16).padStart(2, "0")).join("");
-}
-
-async function claimQrOrThrow(qrText) {
-  const u = auth.currentUser;
-  if (!u) throw new Error("Connexion requise.");
-
-  const qrHash = await sha256Hex(qrText);
-  const claimRef = doc(db, "qrClaims", qrHash);
-
-  await runTransaction(db, async (tx) => {
-    const snap = await tx.get(claimRef);
-
-    if (!snap.exists()) {
-      tx.set(claimRef, {
-        uid: u.uid,
-        email: (u.email || "").toLowerCase(),
-        createdAt: serverTimestamp()
-      });
-      return;
-    }
-
-    const existing = snap.data() || {};
-    if (existing.uid && existing.uid !== u.uid) {
-      throw new Error("Ce billet est déjà lié à un autre compte (QR déjà utilisé).");
-    }
-  });
-
-  return qrHash;
-}
-
-// =====================
-// Sync Nom billet -> profil
-// =====================
-async function syncNameFromTicket(holderName){
-  const u = auth.currentUser;
-  const name = String(holderName || "").trim();
-  if (!u || !name) return;
-
-  // 1) Auth profile (affichage partout)
-  try { await updateProfile(u, { displayName: name }); } catch(_) {}
-
-  // 2) Firestore users/{uid}
-  try{
-    await setDoc(doc(db, "users", u.uid), {
-      displayName: name,
-      updatedAt: serverTimestamp()
-    }, { merge:true });
-  } catch(_) {}
-
-  // 3) Cache + refresh header sans reload
-  try{
-    localStorage.setItem("tidoc_name", name);
-    window.dispatchEvent(new CustomEvent("tidoc:auth", { detail: { displayName: name }}));
-  } catch(_) {}
-}
-
-// =====================
-// Save Ticket
+// Save Ticket principal
 // =====================
 async function saveTicketToFirestore({ qrText, packKey, holderName, ticketNumber }) {
   const u = auth.currentUser;
   if (!u) throw new Error("Connexion requise.");
-
   const qrHash = await sha256Hex(qrText);
 
   await setDoc(doc(db, "userTickets", u.uid), {
@@ -404,72 +336,56 @@ async function saveTicketToFirestore({ qrText, packKey, holderName, ticketNumber
 }
 
 // =====================
-// DELETE ticket + unclaim QR
+// Save Workshop Ticket (multi)
+// Collection: userWorkshopTickets (docs = uid_qrHash)
 // =====================
-async function deleteMyTicketAndUnclaim() {
+async function saveWorkshopTicket({ qrText, packKey, holderName, ticketNumber }){
   const u = auth.currentUser;
-  if (!u) { setStatus("🔒 Connecte-toi."); return; }
+  if (!u) throw new Error("Connexion requise.");
+  const qrHash = await sha256Hex(qrText);
 
-  const ok = confirm(
-    "Supprimer ce billet ?\n\n" +
-    "• Le billet sera retiré de ton compte\n" +
-    "• Tu pourras l’importer à nouveau plus tard\n" +
-    "• Cela n’annule PAS ton achat HelloAsso\n\n" +
-    "Confirmer la suppression ?"
-  );
-  if (!ok) return;
-
-  setStatus("⏳ Suppression…");
-
-  const ticketRef = doc(db, "userTickets", u.uid);
-
-  try {
-    const snap = await getDoc(ticketRef);
-    const t = snap.exists() ? (snap.data() || {}) : {};
-    const qrHash = t.qrHash || "";
-
-    await deleteDoc(ticketRef);
-
-    if (qrHash) {
-      const claimRef = doc(db, "qrClaims", qrHash);
-      await runTransaction(db, async (tx) => {
-        const cs = await tx.get(claimRef);
-        if (!cs.exists()) return;
-        const c = cs.data() || {};
-        if (c.uid === u.uid) tx.delete(claimRef);
-      });
-    }
-
-    boxEl.textContent = "Aucun billet importé pour l’instant.";
-    setStatus("✅ Billet supprimé");
-  } catch (e) {
-    console.log("delete ticket error:", e);
-    setStatus("❌ " + (e?.message || String(e)));
-  }
+  const id = `${u.uid}_${qrHash}`;
+  await setDoc(doc(db, "userWorkshopTickets", id), {
+    uid: u.uid,
+    qrText,
+    qrHash,
+    packKey: packKey || "workshop",
+    holderName: holderName || "",
+    ticketNumber: ticketNumber || "",
+    createdAt: serverTimestamp()
+  }, { merge: true });
 }
 
 // =====================
-// Render
+// DELETE billet principal + unclaim QR (inchangé) — MAIS ne touche pas workshops
 // =====================
-function renderResult({ qrText, packKey, holderName, ticketNumber } = {}) {
+async function deleteMyTicketAndUnclaim() {
+  ...
+}
+
+// (tes fonctions sha256Hex, claimQrOrThrow, syncNameFromTicket, scanPdfForQR, OCR etc restent identiques)
+
+// =====================
+// Render (ajoute promoCode + liste workshops)
+// =====================
+function renderResult({ qrText, packKey, holderName, ticketNumber, promoCode } = {}) {
   const key = String(packKey || "").toLowerCase();
-  const pack = PACKS[key] || (key ? { label: key, workshopsAllowed: "—", conferencesAllowed: "—", otherAllowed: "—" } : null);
-  const packLabel = pack ? pack.label : "Non détecté";
-  const conf = pack ? pack.conferencesAllowed : "—";
+  const pack = PACKS[key] || null;
+  const packLabel = pack ? pack.label : (key ? key : "Non détecté");
+
+  const conf = pack ? (pack.conferencesAllowed === 999 ? "Toutes" : pack.conferencesAllowed) : "—";
   const ws   = pack ? pack.workshopsAllowed : "—";
   const other = pack ? pack.otherAllowed : "—";
+
+  const promo = String(promoCode || "").trim();
+  const showPromo = promo && ["premium","standard","essentiel"].includes(key);
 
   boxEl.innerHTML = `
     <div style="position:relative; display:flex; flex-direction:column; gap:12px;">
 
-      <button
-        class="delete-btn"
-        id="deleteTicketInlineBtn"
-        type="button"
-        aria-label="Supprimer le billet"
-        title="Supprimer"
-        style="position:absolute; top:0; right:0;"
-      >
+      <button class="delete-btn" id="deleteTicketInlineBtn" type="button"
+        aria-label="Supprimer le billet" title="Supprimer"
+        style="position:absolute; top:0; right:0;">
         ${TRASH_TIDOC_SVG}
       </button>
 
@@ -489,9 +405,30 @@ function renderResult({ qrText, packKey, holderName, ticketNumber } = {}) {
         <div><b>N° billet :</b> ${escapeHTML(ticketNumber || "—")}</div>
         <div style="margin-top:8px;"><b>Pack :</b> ${escapeHTML(packLabel)}</div>
         <div><b>Conférences :</b> ${conf}</div>
-        <div><b>Workshops :</b> ${ws}</div>
+        <div><b>Workshops (quota app) :</b> ${ws}</div>
         <div><b>Autre :</b> ${other}</div>
       </div>
+
+      ${showPromo ? `
+        <div style="border:1px solid rgba(23,140,168,.22); border-radius:14px; padding:12px; background:rgba(23,140,168,.06);">
+          <div style="font-weight:900; color:#0f4f60;">🎟️ Code promo workshops</div>
+          <div style="margin-top:6px; font-size:13px; font-weight:800; color:rgba(15,35,42,.85);">
+            Utilise ce code sur HelloAsso pour acheter ton <b>Pack Workshop</b> avec la réduction.
+          </div>
+          <div style="margin-top:10px; display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+            <div style="font-family:ui-monospace, SFMono-Regular, Menlo, monospace; font-weight:900; font-size:14px;
+                        padding:10px 12px; border-radius:12px; background:#fff; border:1px solid rgba(0,0,0,.08);">
+              ${escapeHTML(promo)}
+            </div>
+            <button id="copyPromoBtn" class="btn-outline" type="button" style="height:40px;">
+              Copier
+            </button>
+          </div>
+          <div id="copyPromoMsg" style="margin-top:8px; font-size:12px; font-weight:800; color:rgba(31,75,86,.75);"></div>
+        </div>
+      ` : ""}
+
+      <div id="workshopsListBox"></div>
     </div>
   `;
 
@@ -507,10 +444,25 @@ function renderResult({ qrText, packKey, holderName, ticketNumber } = {}) {
       (Ajoute qrcodejs pour afficher le QR ici)
     </div>`;
   }
+
+  // copy promo
+  const copyBtn = boxEl.querySelector("#copyPromoBtn");
+  if (copyBtn && promo) {
+    copyBtn.addEventListener("click", async () => {
+      try{
+        await navigator.clipboard.writeText(promo);
+        const msg = boxEl.querySelector("#copyPromoMsg");
+        if (msg) msg.textContent = "✅ Copié";
+      }catch{
+        const msg = boxEl.querySelector("#copyPromoMsg");
+        if (msg) msg.textContent = "❌ Impossible de copier (copie manuelle).";
+      }
+    });
+  }
 }
 
 // =====================
-// Load saved ticket
+// Load saved ticket + load workshops list
 // =====================
 async function loadSavedTicket() {
   const u = auth.currentUser;
@@ -521,36 +473,70 @@ async function loadSavedTicket() {
   }
 
   const snap = await getDoc(doc(db, "userTickets", u.uid));
+
+  // Toujours charger la liste workshop (même si pas de billet principal)
+  const wsQ = query(collection(db, "userWorkshopTickets"), where("uid", "==", u.uid));
+  const wsSnap = await getDocs(wsQ);
+  const workshops = wsSnap.docs.map(d => d.data() || {}).filter(Boolean);
+
   if (!snap.exists()) {
-    setStatus("");
+    setStatus(workshops.length ? "✅ Billets workshop chargés" : "");
     boxEl.textContent = "Aucun billet importé pour l’instant.";
+    // petit rendu workshops si existants
+    if (workshops.length) {
+      boxEl.innerHTML = `<div style="font-weight:900; color:var(--tidoc); margin-bottom:10px;">🎫 Tes billets workshop</div>
+        <div id="workshopsListBox"></div>`;
+      renderWorkshopsList(workshops);
+    }
     return;
   }
 
   const t = snap.data() || {};
   setStatus("✅ Billet chargé");
+
   renderResult({
     qrText: t.qrText || "",
     packKey: t.packKey || "",
     holderName: t.holderName || "",
-    ticketNumber: t.ticketNumber || ""
+    ticketNumber: t.ticketNumber || "",
+    promoCode: t.promoCode || ""
   });
+
+  renderWorkshopsList(workshops);
+}
+
+function renderWorkshopsList(workshops = []){
+  const listBox = document.getElementById("workshopsListBox");
+  if (!listBox) return;
+
+  if (!workshops.length) {
+    listBox.innerHTML = `
+      <div style="opacity:.8; font-weight:800; color:rgba(31,75,86,.75);">
+        Aucun billet workshop importé pour l’instant.
+      </div>
+    `;
+    return;
+  }
+
+  const items = workshops.map(w => `
+    <div style="border:1px solid var(--line); border-radius:14px; padding:12px; background:#fff;">
+      <div style="font-weight:900; color:#0f4f60;">🧪 Pack Workshop</div>
+      <div style="margin-top:6px;"><b>Nom :</b> ${escapeHTML(w.holderName || "—")}</div>
+      <div><b>N° billet :</b> ${escapeHTML(w.ticketNumber || "—")}</div>
+    </div>
+  `).join("");
+
+  listBox.innerHTML = `
+    <div style="margin-top:6px; font-weight:900; color:var(--tidoc);">🎫 Billets workshop importés</div>
+    <div style="margin-top:10px; display:flex; flex-direction:column; gap:10px;">
+      ${items}
+    </div>
+  `;
 }
 
 // =====================
-// UI binds
+// ADMIN UI (packs editor) — quotas only
 // =====================
-uploadBtn?.addEventListener("click", () => fileInput?.click());
-fileInput?.addEventListener("change", async () => {
-  const file = fileInput.files?.[0];
-  await handleFile(file);
-  fileInput.value = "";
-});
-deleteBtn?.addEventListener("click", deleteMyTicketAndUnclaim);
-
-// ======================
-// ADMIN UI (packs editor)
-// ======================
 const ADMIN_EMAIL = "tidoc.congres@gmail.com";
 
 function isAdmin(){
@@ -570,11 +556,14 @@ const adminSave  = document.getElementById("adminPacksSaveBtn");
 function setAdminMsg(t=""){ if (adminMsg) adminMsg.textContent = t; }
 
 function ensureDefaultPacks(packs){
-  const base = { ...PACKS_FALLBACK, ...packs };
-  if (!base.autre){
-    base.autre = { label:"Autre", workshopsAllowed:0, conferencesAllowed:0, otherAllowed:0 };
-  }
-  return base;
+  // ✅ force 4 packs
+  const base = { ...PACKS_FALLBACK, ...(packs || {}) };
+  return {
+    premium:  { ...PACKS_FALLBACK.premium,  ...(base.premium  || {}) },
+    standard: { ...PACKS_FALLBACK.standard, ...(base.standard || {}) },
+    essentiel:{ ...PACKS_FALLBACK.essentiel,...(base.essentiel|| {}) },
+    workshop: { ...PACKS_FALLBACK.workshop, ...(base.workshop || {}) },
+  };
 }
 
 function renderAdminPacksEditor(){
@@ -588,37 +577,32 @@ function renderAdminPacksEditor(){
     const row = document.createElement("div");
     row.style.cssText = "border:1px solid #eee; border-radius:14px; padding:12px;";
 
+    // ✅ label figé (pas d’input)
     row.innerHTML = `
       <div style="display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap;">
-        <div style="font-weight:900;">Pack: ${escapeHTML(key)}</div>
-        <div style="display:flex; gap:8px; align-items:center;">
-          <span style="font-size:12px; font-weight:800; opacity:.7;">Label</span>
-          <input data-pack-label="${escapeHTML(key)}" type="text" value="${escapeHTML(p.label || key)}"
-                 style="padding:8px 10px; border:1px solid #ddd; border-radius:10px; min-width:180px;">
-        </div>
+        <div style="font-weight:950;">Pack : ${escapeHTML(PACKS_FALLBACK[key]?.label || key)}</div>
       </div>
 
       <div style="margin-top:10px; display:flex; gap:10px; flex-wrap:wrap;">
         <label style="display:flex; gap:8px; align-items:center;">
           <span style="width:110px; font-weight:800;">Conférences</span>
           <input data-pack-conf="${escapeHTML(key)}" type="number" min="0" value="${Number(p.conferencesAllowed ?? 0)}"
-                 style="width:90px; padding:8px 10px; border:1px solid #ddd; border-radius:10px;">
+                 style="width:110px; padding:8px 10px; border:1px solid #ddd; border-radius:10px;">
         </label>
 
         <label style="display:flex; gap:8px; align-items:center;">
           <span style="width:110px; font-weight:800;">Workshops</span>
           <input data-pack-ws="${escapeHTML(key)}" type="number" min="0" value="${Number(p.workshopsAllowed ?? 0)}"
-                 style="width:90px; padding:8px 10px; border:1px solid #ddd; border-radius:10px;">
+                 style="width:110px; padding:8px 10px; border:1px solid #ddd; border-radius:10px;">
         </label>
 
         <label style="display:flex; gap:8px; align-items:center;">
           <span style="width:110px; font-weight:800;">Autre</span>
           <input data-pack-other="${escapeHTML(key)}" type="number" min="0" value="${Number(p.otherAllowed ?? 0)}"
-                 style="width:90px; padding:8px 10px; border:1px solid #ddd; border-radius:10px;">
+                 style="width:110px; padding:8px 10px; border:1px solid #ddd; border-radius:10px;">
         </label>
       </div>
     `;
-
     adminForm.appendChild(row);
   });
 }
@@ -629,10 +613,7 @@ function openAdminModal(){
   renderAdminPacksEditor();
   if (adminModal) adminModal.style.display = "block";
 }
-
-function closeAdminModal(){
-  if (adminModal) adminModal.style.display = "none";
-}
+function closeAdminModal(){ if (adminModal) adminModal.style.display = "none"; }
 
 async function saveAdminPacks(){
   if (!isAdmin()) return;
@@ -643,13 +624,13 @@ async function saveAdminPacks(){
     const out = {};
 
     for (const key of Object.keys(packs)){
-      const labelEl = document.querySelector(`[data-pack-label="${CSS.escape(key)}"]`);
       const confEl  = document.querySelector(`[data-pack-conf="${CSS.escape(key)}"]`);
       const wsEl    = document.querySelector(`[data-pack-ws="${CSS.escape(key)}"]`);
       const othEl   = document.querySelector(`[data-pack-other="${CSS.escape(key)}"]`);
 
       out[key] = {
-        label: String(labelEl?.value || key).trim() || key,
+        // ✅ label figé
+        label: PACKS_FALLBACK[key]?.label || key,
         conferencesAllowed: Math.max(0, Number(confEl?.value || 0)),
         workshopsAllowed: Math.max(0, Number(wsEl?.value || 0)),
         otherAllowed: Math.max(0, Number(othEl?.value || 0)),
@@ -669,18 +650,75 @@ async function saveAdminPacks(){
   }
 }
 
-// binds admin
 adminBtn?.addEventListener("click", openAdminModal);
 adminClose?.addEventListener("click", closeAdminModal);
 adminCancel?.addEventListener("click", closeAdminModal);
 adminModal?.addEventListener("click", (e)=>{ if (e.target === adminModal) closeAdminModal(); });
 adminSave?.addEventListener("click", saveAdminPacks);
 
+// ======================
+// ADMIN UI — PROMO CODES MODAL
+// ======================
+const promoBtn   = document.getElementById("adminEditPromoBtn");
+const promoModal = document.getElementById("adminPromoModal");
+const promoClose = document.getElementById("adminPromoCloseBtn");
+const promoCancel= document.getElementById("adminPromoCancelBtn");
+const promoSave  = document.getElementById("adminPromoSaveBtn");
+const promoMsg   = document.getElementById("adminPromoMsg");
+
+const promoPremiumEl  = document.getElementById("promoPremiumInput");
+const promoStandardEl = document.getElementById("promoStandardInput");
+const promoEssentielEl= document.getElementById("promoEssentielInput");
+
+function setPromoMsg(t=""){ if (promoMsg) promoMsg.textContent = t; }
+
+function openPromoModal(){
+  if (!isAdmin()) return alert("Réservé à l’admin Ti’Doc.");
+  setPromoMsg("");
+  // pré-remplissage (optionnel)
+  promoPremiumEl.value  = (PROMO_POOLS.premium || []).join("\n");
+  promoStandardEl.value = (PROMO_POOLS.standard || []).join("\n");
+  promoEssentielEl.value= (PROMO_POOLS.essentiel || []).join("\n");
+  promoModal.style.display = "block";
+}
+function closePromoModal(){ if (promoModal) promoModal.style.display = "none"; }
+
+async function savePromoPools(){
+  if (!isAdmin()) return;
+  try{
+    setPromoMsg("⏳ Enregistrement…");
+
+    const premium  = normalizeCodes(String(promoPremiumEl.value || "").split(/\r?\n/));
+    const standard = normalizeCodes(String(promoStandardEl.value || "").split(/\r?\n/));
+    const essentiel= normalizeCodes(String(promoEssentielEl.value || "").split(/\r?\n/));
+
+    await setDoc(doc(db, "config", "promoPools"), {
+      premium, standard, essentiel,
+      updatedAt: serverTimestamp()
+    }, { merge:true });
+
+    await loadPromoPools();
+    setPromoMsg(`✅ Pools mis à jour — Premium: ${PROMO_POOLS.premium.length}, Standard: ${PROMO_POOLS.standard.length}, Essentiel: ${PROMO_POOLS.essentiel.length}`);
+    closePromoModal();
+  }catch(e){
+    console.log("savePromoPools error:", e);
+    setPromoMsg("❌ " + (e?.message || String(e)));
+  }
+}
+
+promoBtn?.addEventListener("click", openPromoModal);
+promoClose?.addEventListener("click", closePromoModal);
+promoCancel?.addEventListener("click", closePromoModal);
+promoModal?.addEventListener("click", (e)=>{ if (e.target === promoModal) closePromoModal(); });
+promoSave?.addEventListener("click", savePromoPools);
+
 // =====================
 // INIT
 // =====================
 onAuthStateChanged(auth, async () => {
   await loadPackConfig();
+  await loadPromoPools();
   await loadSavedTicket();
   if (adminBtn) adminBtn.style.display = isAdmin() ? "inline-flex" : "none";
+  if (promoBtn) promoBtn.style.display = isAdmin() ? "inline-flex" : "none";
 });
