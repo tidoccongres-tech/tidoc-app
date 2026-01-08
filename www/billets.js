@@ -292,6 +292,10 @@ async function handleFile(file) {
 
     if (!qrText) throw new Error("QR Code non détecté sur le billet.");
 
+   // ✅ Vérif “texte/emojis” VS “officiel (QR -> GitHub)”
+   const v = await verifyPackWithQrOrThrow(qrText, packKey);
+   packKey = v.finalPackKey; // garde celui détecté (ou rempli par l’officiel si vide)
+    
     // 🔐 anti-double billet (global)
     await claimQrOrThrow(qrText);
 
@@ -633,6 +637,13 @@ function setAdminMsg(t=""){ if (adminMsg) adminMsg.textContent = t; }
 function ensureDefaultPacks(packs){
   // ✅ force 4 packs
   const base = { ...PACKS_FALLBACK, ...(packs || {}) };
+  const PACKS_FALLBACK = {
+  premium:   { label: "Premium",   workshopsAllowed: 0, conferencesAllowed: 0, otherAllowed: 0 },
+  standard:  { label: "Standard",  workshopsAllowed: 0, conferencesAllowed: 0, otherAllowed: 0 },
+  essentiel: { label: "Essentiel", workshopsAllowed: 0, conferencesAllowed: 0, otherAllowed: 0 },
+  workshop:  { label: "Workshop",  workshopsAllowed: 1, conferencesAllowed: 0, otherAllowed: 0 },
+  autre:     { label: "Autre",     workshopsAllowed: 0, conferencesAllowed: 0, otherAllowed: 0 },
+};
   return {
     premium:  { ...PACKS_FALLBACK.premium,  ...(base.premium  || {}) },
     standard: { ...PACKS_FALLBACK.standard, ...(base.standard || {}) },
