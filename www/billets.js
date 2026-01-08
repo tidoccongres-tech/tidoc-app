@@ -268,21 +268,39 @@ async function handleFile(file) {
 }
 
 // =====================
-// Parsing (PDF texte / OCR texte) — ajoute workshop
+// Parsing (PDF texte / OCR texte)
 // =====================
 function parseMetaFromText(raw = "") {
-  const lines = String(raw).split(/\r?\n/).map(l => l.replace(/\s+/g, " ").trim()).filter(Boolean);
+  const lines = String(raw)
+    .split(/\r?\n/)
+    .map(l => l.replace(/\s+/g, " ").trim())
+    .filter(Boolean);
+
   const full = lines.join(" ");
 
-  // pack (premium/standard/essentiel/workshop)
+  // ✅ 1) Pack via emojis (prioritaire)
+  const EMOJI_PACK = [
+    { emoji: "⭐️", key: "premium" },
+    { emoji: "📘", key: "standard" },
+    { emoji: "🍻", key: "essentiel" },
+    { emoji: "🧑‍⚕️", key: "workshop" },
+  ];
+
   let packKey = "";
-  const mp = full.match(/pack\s*(essentiel|standard|premium|workshop)/i);
-  if (mp) {
-    const v = mp[1].toLowerCase();
-    if (v.startsWith("ess")) packKey = "essentiel";
-    else if (v.startsWith("sta")) packKey = "standard";
-    else if (v.startsWith("pre")) packKey = "premium";
-    else if (v.startsWith("wor")) packKey = "workshop";
+  for (const e of EMOJI_PACK) {
+    if (full.includes(e.emoji)) { packKey = e.key; break; }
+  }
+
+  // ✅ 2) Pack via texte ("Pack premium/standard/essentiel/workshop")
+  if (!packKey) {
+    const mp = full.match(/pack\s*(essentiel|standard|premium|workshop|atelier)/i);
+    if (mp) {
+      const v = mp[1].toLowerCase();
+      if (v.startsWith("ess")) packKey = "essentiel";
+      else if (v.startsWith("sta")) packKey = "standard";
+      else if (v.startsWith("pre")) packKey = "premium";
+      else if (v.startsWith("wor") || v.startsWith("ate")) packKey = "workshop";
+    }
   }
 
   // ticket number
@@ -292,7 +310,7 @@ function parseMetaFromText(raw = "") {
 
   // holder name = ligne au-dessus de "Pack ..."
   let holderName = "";
-  const idxPack = lines.findIndex(l => /pack\s*(essentiel|standard|premium|workshop)/i.test(l));
+  const idxPack = lines.findIndex(l => /pack\s*(essentiel|standard|premium|workshop|atelier)/i.test(l) || /⭐️|📘|🍻|🧑‍⚕️/.test(l));
   if (idxPack > 0) {
     for (let j = idxPack - 1; j >= 0; j--) {
       const c = lines[j];
@@ -309,8 +327,9 @@ function parseMetaFromText(raw = "") {
     }
   }
 
+  // fallback (si OCR colle tout)
   if (!holderName && idxPack >= 0) {
-    const mSame = lines[idxPack].match(/^(.*?)\s+pack\s*(essentiel|standard|premium|workshop)/i);
+    const mSame = lines[idxPack].match(/^(.*?)\s+pack\s*(essentiel|standard|premium|workshop|atelier)/i);
     if (mSame) holderName = mSame[1].trim();
   }
 
