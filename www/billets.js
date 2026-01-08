@@ -1,4 +1,10 @@
-// billets.js (MODULE)
+// billets.js (MODULE) — VERSION MODIFIÉE + SAFE (anti-bug)
+// ✅ Règle workshops respectée : on n'affiche PAS un quota workshop tant que le Pack Workshop n'est pas importé.
+// ✅ Fix crash handleFile (t/workshops undefined) : on fait toujours loadSavedTicket() après import.
+// ✅ Fix packs : workshopDiscountPacks géré partout (plus de workshopsAllowed).
+// ✅ Admin packs : modifie conférences / nb de "packs workshop remisés" / autre (labels figés).
+// ⚠️ IMPORTANT : garde tes fonctions existantes (scanPdfForQR, extractMetaFromPdfText, loadImageToCanvas, cropTopRight, ocrCanvas, scanCanvasForQR,
+// sha256Hex, claimQrOrThrow, syncNameFromTicket, deleteMyTicketAndUnclaim) identiques à ta version précédente.
 
 import { firebaseConfig } from "./firebase-config.js";
 import { initializeApp, getApps, getApp } from "https://www.gstatic.com/firebasejs/10.12.4/firebase-app.js";
@@ -34,15 +40,13 @@ function escapeHTML(s = "") {
 // OFFICIAL TICKET INDEX (GitHub raw JSON)
 // =====================
 const OFFICIAL_TICKETS_URL = "https://raw.githubusercontent.com/<USER>/<REPO>/main/tickets_officiels.json";
-// ↑ tu remplaces avec ton raw github
+// ↑ remplace avec ton raw github
 
 let OFFICIAL_CACHE = null;
 
 async function fetchOfficialTicketsIndex() {
-  // cache mémoire
   if (OFFICIAL_CACHE) return OFFICIAL_CACHE;
 
-  // cache localStorage (optionnel)
   try {
     const cached = JSON.parse(localStorage.getItem("tidoc_official_index") || "null");
     if (cached && cached.data && cached.ts && (Date.now() - cached.ts) < 5 * 60 * 1000) {
@@ -69,16 +73,11 @@ async function verifyPackWithQrOrThrow(qrText, detectedPackKey) {
   const index = await fetchOfficialTicketsIndex();
 
   const officialPack = (index && index[qrHash]) ? String(index[qrHash]).toLowerCase() : "";
+  if (!officialPack) throw new Error("Billet non reconnu (QR absent de la liste officielle).");
 
-  if (!officialPack) {
-    throw new Error("Billet non reconnu (QR absent de la liste officielle).");
-  }
-
-  // si l’OCR n’a rien trouvé, on peut “remplir” avec l’officiel
   if (!detectedPackKey) return { qrHash, officialPack, finalPackKey: officialPack };
 
   const det = String(detectedPackKey).toLowerCase();
-
   if (det !== officialPack) {
     throw new Error(`Billet refusé : pack incohérent (détecté: ${det} / officiel: ${officialPack}).`);
   }
@@ -89,13 +88,14 @@ async function verifyPackWithQrOrThrow(qrText, detectedPackKey) {
 // =====================
 // PACKS (quotas) — 4 packs fixes
 // =====================
-// NB: quotas = ce que TU veux afficher/contrôler dans l’app (modifiable par admin)
+// workshopDiscountPacks = nombre de "packs workshop remisés" accordés par le billet principal
 const PACKS_FALLBACK = {
-  premium:  { label: "Premium",  conferencesAllowed: 999, workshopDiscountPacks: 3, otherAllowed: 0 },
-  standard: { label: "Standard", conferencesAllowed: 7,   workshopDiscountPacks: 2, otherAllowed: 0 },
-  essentiel:{ label: "Essentiel",conferencesAllowed: 2,   workshopDiscountPacks: 1, otherAllowed: 0 },
-  workshop: { label: "Workshop", conferencesAllowed: 0,   workshopDiscountPacks: 0, otherAllowed: 0 },
+  premium:  { label: "Premium",   conferencesAllowed: 999, workshopDiscountPacks: 3, otherAllowed: 0 },
+  standard: { label: "Standard",  conferencesAllowed: 7,   workshopDiscountPacks: 2, otherAllowed: 0 },
+  essentiel:{ label: "Essentiel", conferencesAllowed: 2,   workshopDiscountPacks: 1, otherAllowed: 0 },
+  workshop: { label: "Workshop",  conferencesAllowed: 0,   workshopDiscountPacks: 0, otherAllowed: 0 },
 };
+
 let PACKS = { ...PACKS_FALLBACK };
 
 function normalizePackConfig(obj){
@@ -104,10 +104,9 @@ function normalizePackConfig(obj){
   for (const k of Object.keys(src)){
     const v = src[k] || {};
     out[String(k).toLowerCase()] = {
-      // label volontairement ignoré si on veut le figer (on garde quand même la propriété)
       label: String(v.label || k),
-      workshopsAllowed: Number(v.workshopsAllowed ?? 0),
       conferencesAllowed: Number(v.conferencesAllowed ?? 0),
+      workshopDiscountPacks: Number(v.workshopDiscountPacks ?? 0),
       otherAllowed: Number(v.otherAllowed ?? 0),
     };
   }
@@ -121,10 +120,10 @@ async function loadPackConfig(){
       PACKS = { ...PACKS_FALLBACK };
       return;
     }
+
     const data = snap.data() || {};
     const normalized = normalizePackConfig(data);
 
-    // ✅ on force les 4 packs (labels figés sur fallback)
     PACKS = {
       premium:  { ...PACKS_FALLBACK.premium,  ...(normalized.premium  || {}) },
       standard: { ...PACKS_FALLBACK.standard, ...(normalized.standard || {}) },
@@ -132,7 +131,7 @@ async function loadPackConfig(){
       workshop: { ...PACKS_FALLBACK.workshop, ...(normalized.workshop || {}) },
     };
 
-    // ✅ labels figés (si tu veux VRAIMENT empêcher toute modif)
+    // labels figés
     PACKS.premium.label   = PACKS_FALLBACK.premium.label;
     PACKS.standard.label  = PACKS_FALLBACK.standard.label;
     PACKS.essentiel.label = PACKS_FALLBACK.essentiel.label;
@@ -145,23 +144,14 @@ async function loadPackConfig(){
 }
 
 // =====================
-// PROMO CODES — pools séparés (premium/standard/essentiel)
-// Firestore: config/promoPools
-// {
-//   premium:  ["CODE1", "CODE2", ...],
-//   standard: ["CODEA", ...],
-//   essentiel:["CODEX", ...],
-//   updatedAt: ...
-// }
+// PROMO CODES — pools séparés
 // =====================
 let PROMO_POOLS = { premium: [], standard: [], essentiel: [] };
 
 function normalizeCodes(list){
   const arr = Array.isArray(list) ? list : [];
-  const cleaned = arr
-    .map(x => String(x || "").trim())
-    .filter(Boolean);
-  // dédoublonnage (case-insensitive)
+  const cleaned = arr.map(x => String(x || "").trim()).filter(Boolean);
+
   const seen = new Set();
   const out = [];
   for (const c of cleaned){
@@ -192,7 +182,6 @@ async function loadPromoPools(){
   }
 }
 
-// Attribuer 1 code selon le pack (premium/standard/essentiel), et le retirer du pool
 async function assignPromoCodeIfNeeded(packKey){
   const u = auth.currentUser;
   if (!u) return { code: "" };
@@ -206,29 +195,20 @@ async function assignPromoCodeIfNeeded(packKey){
   const res = await runTransaction(db, async (tx) => {
     const userSnap = await tx.get(userRef);
     const userData = userSnap.exists() ? (userSnap.data() || {}) : {};
-    const existing = userData?.promoCode || "";
+    const existing = String(userData?.promoCode || "").trim();
 
-    // ✅ déjà attribué → on ne re-pioche pas
-    if (existing && String(existing).trim()) {
-      return { code: String(existing).trim(), already: true };
-    }
+    if (existing) return { code: existing, already: true };
 
     const poolsSnap = await tx.get(poolsRef);
     const poolsData = poolsSnap.exists() ? (poolsSnap.data() || {}) : {};
     const list = normalizeCodes(poolsData[tier]);
 
-    if (!list.length) {
-      return { code: "", empty: true };
-    }
+    if (!list.length) return { code: "", empty: true };
 
     const code = list[0];
     const rest = list.slice(1);
 
-    tx.set(poolsRef, {
-      ...poolsData,
-      [tier]: rest,
-      updatedAt: serverTimestamp()
-    }, { merge: true });
+    tx.set(poolsRef, { ...poolsData, [tier]: rest, updatedAt: serverTimestamp() }, { merge: true });
 
     tx.set(userRef, {
       promoCode: code,
@@ -243,7 +223,7 @@ async function assignPromoCodeIfNeeded(packKey){
 }
 
 // =====================
-// ICON (trash) — inchangé
+// ICON (trash)
 // =====================
 const TRASH_TIDOC_SVG = `
 <svg class="trash-ico" viewBox="0 0 408.483 408.483" aria-hidden="true">
@@ -305,43 +285,33 @@ async function handleFile(file) {
 
     if (!qrText) throw new Error("QR Code non détecté sur le billet.");
 
-   // ✅ Vérif “texte/emojis” VS “officiel (QR -> GitHub)”
-   const v = await verifyPackWithQrOrThrow(qrText, packKey);
-   packKey = v.finalPackKey; // garde celui détecté (ou rempli par l’officiel si vide)
-    
+    // ✅ Vérif “détecté” VS “officiel”
+    const v = await verifyPackWithQrOrThrow(qrText, packKey);
+    packKey = v.finalPackKey;
+
     // 🔐 anti-double billet (global)
     await claimQrOrThrow(qrText);
 
-    // ✅ Si pack workshop → on le sauvegarde à part (sans écraser billet principal)
+    // ✅ billet Workshop séparé (multi)
     const p = String(packKey || "").toLowerCase();
     if (p === "workshop") {
       await saveWorkshopTicket({ qrText, packKey, holderName, ticketNumber });
       await syncNameFromTicket(holderName);
 
-      await loadSavedTicket(); // recharge billet principal + liste workshops
+      await loadSavedTicket();
       setStatus("✅ Billet workshop importé");
       return;
     }
 
-    // Sinon billet principal
+    // billet principal
     await saveTicketToFirestore({ qrText, packKey, holderName, ticketNumber });
     await syncNameFromTicket(holderName);
 
-    // 🎟️ Attribution auto code promo si pack premium/standard/essentiel
-    const promo = await assignPromoCodeIfNeeded(packKey);
+    // 🎟️ Attribution auto code promo (si besoin)
+    await assignPromoCodeIfNeeded(packKey);
 
-    // 🎨 affichage immédiat (avec code si dispo)
-    renderResult({
-  qrText: t.qrText || "",
-  packKey: t.packKey || "",
-  holderName: t.holderName || "",
-  ticketNumber: t.ticketNumber || "",
-  promoCode: t.promoCode || "",
-  workshopsImportedCount: workshops.length
-});
-
-renderWorkshopsList(workshops);
-    
+    // ✅ rendu safe = reload depuis Firestore (évite toutes incohérences)
+    await loadSavedTicket();
     setStatus("✅ Billet importé avec succès");
   } catch (e) {
     console.log("handleFile import error:", e);
@@ -360,7 +330,7 @@ function parseMetaFromText(raw = "") {
 
   const full = lines.join(" ");
 
-  // ✅ 1) Pack via emojis (prioritaire)
+  // Pack via emojis
   const EMOJI_PACK = [
     { emoji: "⭐️", key: "premium" },
     { emoji: "📘", key: "standard" },
@@ -373,7 +343,7 @@ function parseMetaFromText(raw = "") {
     if (full.includes(e.emoji)) { packKey = e.key; break; }
   }
 
-  // ✅ 2) Pack via texte ("Pack premium/standard/essentiel/workshop")
+  // Pack via texte
   if (!packKey) {
     const mp = full.match(/pack\s*(essentiel|standard|premium|workshop|atelier)/i);
     if (mp) {
@@ -385,14 +355,14 @@ function parseMetaFromText(raw = "") {
     }
   }
 
-  // ticket number
   let ticketNumber = "";
   const mn = full.match(/n[°o]\s*de\s*billet\s*[:\-]?\s*([0-9]{5,})/i);
   if (mn) ticketNumber = mn[1];
 
-  // holder name = ligne au-dessus de "Pack ..."
   let holderName = "";
-  const idxPack = lines.findIndex(l => /pack\s*(essentiel|standard|premium|workshop|atelier)/i.test(l) || /⭐️|📘|🍻|🧑‍⚕️/.test(l));
+  const idxPack = lines.findIndex(l =>
+    /pack\s*(essentiel|standard|premium|workshop|atelier)/i.test(l) || /⭐️|📘|🍻|🧑‍⚕️/.test(l)
+  );
   if (idxPack > 0) {
     for (let j = idxPack - 1; j >= 0; j--) {
       const c = lines[j];
@@ -409,7 +379,6 @@ function parseMetaFromText(raw = "") {
     }
   }
 
-  // fallback (si OCR colle tout)
   if (!holderName && idxPack >= 0) {
     const mSame = lines[idxPack].match(/^(.*?)\s+pack\s*(essentiel|standard|premium|workshop|atelier)/i);
     if (mSame) holderName = mSame[1].trim();
@@ -438,7 +407,6 @@ async function saveTicketToFirestore({ qrText, packKey, holderName, ticketNumber
 
 // =====================
 // Save Workshop Ticket (multi)
-// Collection: userWorkshopTickets (docs = uid_qrHash)
 // =====================
 async function saveWorkshopTicket({ qrText, packKey, holderName, ticketNumber }){
   const u = auth.currentUser;
@@ -458,27 +426,23 @@ async function saveWorkshopTicket({ qrText, packKey, holderName, ticketNumber })
 }
 
 // =====================
-// DELETE billet principal + unclaim QR (inchangé) — MAIS ne touche pas workshops
+// Render principal + promo + workshops
 // =====================
-async function deleteMyTicketAndUnclaim() {
-  ...
-}
-
-// (tes fonctions sha256Hex, claimQrOrThrow, syncNameFromTicket, scanPdfForQR, OCR etc restent identiques)
-
-// =====================
-// Render (ajoute promoCode + liste workshops)
-// =====================
-function renderResult({ qrText, packKey, holderName, ticketNumber, promoCode, workshopsImportedCount } = {}) {  const key = String(packKey || "").toLowerCase();
+function renderResult({ qrText, packKey, holderName, ticketNumber, promoCode, workshopsImportedCount } = {}) {
+  const key = String(packKey || "").toLowerCase();
   const pack = PACKS[key] || null;
   const packLabel = pack ? pack.label : (key ? key : "Non détecté");
 
-  const discount = pack ? Number(pack.workshopDiscountPacks ?? 0) : 0;
-  const imported = Number(workshopsImportedCount ?? 0);                                                                                                           
-                                                                                                              
   const conf = pack ? (pack.conferencesAllowed === 999 ? "Toutes" : pack.conferencesAllowed) : "—";
-  const ws   = pack ? pack.workshopsAllowed : "—";
   const other = pack ? pack.otherAllowed : "—";
+
+  const discount = pack ? Number(pack.workshopDiscountPacks ?? 0) : 0;
+  const imported = Number(workshopsImportedCount ?? 0);
+
+  // ✅ Règle : pas de quota workshop si aucun billet workshop importé
+  const wsLine = imported > 0
+    ? (discount > 0 ? `${imported} / ${discount}` : `${imported}`)
+    : "0 (importe ton Pack Workshop pour activer)";
 
   const promo = String(promoCode || "").trim();
   const showPromo = promo && ["premium","standard","essentiel"].includes(key);
@@ -508,7 +472,7 @@ function renderResult({ qrText, packKey, holderName, ticketNumber, promoCode, wo
         <div><b>N° billet :</b> ${escapeHTML(ticketNumber || "—")}</div>
         <div style="margin-top:8px;"><b>Pack :</b> ${escapeHTML(packLabel)}</div>
         <div><b>Conférences :</b> ${conf}</div>
-        <div><b>Workshops (quota app) :</b> ${ws}</div>
+        <div><b>Workshops :</b> ${escapeHTML(wsLine)}</div>
         <div><b>Autre :</b> ${other}</div>
       </div>
 
@@ -548,7 +512,6 @@ function renderResult({ qrText, packKey, holderName, ticketNumber, promoCode, wo
     </div>`;
   }
 
-  // copy promo
   const copyBtn = boxEl.querySelector("#copyPromoBtn");
   if (copyBtn && promo) {
     copyBtn.addEventListener("click", async () => {
@@ -565,7 +528,7 @@ function renderResult({ qrText, packKey, holderName, ticketNumber, promoCode, wo
 }
 
 // =====================
-// Load saved ticket + load workshops list
+// Load saved ticket + workshops
 // =====================
 async function loadSavedTicket() {
   const u = auth.currentUser;
@@ -577,7 +540,6 @@ async function loadSavedTicket() {
 
   const snap = await getDoc(doc(db, "userTickets", u.uid));
 
-  // Toujours charger la liste workshop (même si pas de billet principal)
   const wsQ = query(collection(db, "userWorkshopTickets"), where("uid", "==", u.uid));
   const wsSnap = await getDocs(wsQ);
   const workshops = wsSnap.docs.map(d => d.data() || {}).filter(Boolean);
@@ -585,10 +547,12 @@ async function loadSavedTicket() {
   if (!snap.exists()) {
     setStatus(workshops.length ? "✅ Billets workshop chargés" : "");
     boxEl.textContent = "Aucun billet importé pour l’instant.";
-    // petit rendu workshops si existants
+
     if (workshops.length) {
-      boxEl.innerHTML = `<div style="font-weight:900; color:var(--tidoc); margin-bottom:10px;">🎫 Tes billets workshop</div>
-        <div id="workshopsListBox"></div>`;
+      boxEl.innerHTML = `
+        <div style="font-weight:900; color:var(--tidoc); margin-bottom:10px;">🎫 Tes billets workshop</div>
+        <div id="workshopsListBox"></div>
+      `;
       renderWorkshopsList(workshops);
     }
     return;
@@ -602,7 +566,8 @@ async function loadSavedTicket() {
     packKey: t.packKey || "",
     holderName: t.holderName || "",
     ticketNumber: t.ticketNumber || "",
-    promoCode: t.promoCode || ""
+    promoCode: t.promoCode || "",
+    workshopsImportedCount: workshops.length
   });
 
   renderWorkshopsList(workshops);
@@ -659,7 +624,6 @@ const adminSave  = document.getElementById("adminPacksSaveBtn");
 function setAdminMsg(t=""){ if (adminMsg) adminMsg.textContent = t; }
 
 function ensureDefaultPacks(packs){
-  // ✅ force 4 packs
   const base = { ...PACKS_FALLBACK, ...(packs || {}) };
   return {
     premium:  { ...PACKS_FALLBACK.premium,  ...(base.premium  || {}) },
@@ -680,7 +644,6 @@ function renderAdminPacksEditor(){
     const row = document.createElement("div");
     row.style.cssText = "border:1px solid #eee; border-radius:14px; padding:12px;";
 
-    // ✅ label figé (pas d’input)
     row.innerHTML = `
       <div style="display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap;">
         <div style="font-weight:950;">Pack : ${escapeHTML(PACKS_FALLBACK[key]?.label || key)}</div>
@@ -688,19 +651,19 @@ function renderAdminPacksEditor(){
 
       <div style="margin-top:10px; display:flex; gap:10px; flex-wrap:wrap;">
         <label style="display:flex; gap:8px; align-items:center;">
-          <span style="width:110px; font-weight:800;">Conférences</span>
+          <span style="width:150px; font-weight:800;">Conférences</span>
           <input data-pack-conf="${escapeHTML(key)}" type="number" min="0" value="${Number(p.conferencesAllowed ?? 0)}"
                  style="width:110px; padding:8px 10px; border:1px solid #ddd; border-radius:10px;">
         </label>
 
         <label style="display:flex; gap:8px; align-items:center;">
-          <span style="width:110px; font-weight:800;">Workshops</span>
-          <input data-pack-ws="${escapeHTML(key)}" type="number" min="0" value="${Number(p.workshopsAllowed ?? 0)}"
+          <span style="width:150px; font-weight:800;">Packs Workshop remisés</span>
+          <input data-pack-wsd="${escapeHTML(key)}" type="number" min="0" value="${Number(p.workshopDiscountPacks ?? 0)}"
                  style="width:110px; padding:8px 10px; border:1px solid #ddd; border-radius:10px;">
         </label>
 
         <label style="display:flex; gap:8px; align-items:center;">
-          <span style="width:110px; font-weight:800;">Autre</span>
+          <span style="width:150px; font-weight:800;">Autre</span>
           <input data-pack-other="${escapeHTML(key)}" type="number" min="0" value="${Number(p.otherAllowed ?? 0)}"
                  style="width:110px; padding:8px 10px; border:1px solid #ddd; border-radius:10px;">
         </label>
@@ -727,15 +690,14 @@ async function saveAdminPacks(){
     const out = {};
 
     for (const key of Object.keys(packs)){
-      const confEl  = document.querySelector(`[data-pack-conf="${CSS.escape(key)}"]`);
-      const wsEl    = document.querySelector(`[data-pack-ws="${CSS.escape(key)}"]`);
-      const othEl   = document.querySelector(`[data-pack-other="${CSS.escape(key)}"]`);
+      const confEl = document.querySelector(`[data-pack-conf="${CSS.escape(key)}"]`);
+      const wsdEl  = document.querySelector(`[data-pack-wsd="${CSS.escape(key)}"]`);
+      const othEl  = document.querySelector(`[data-pack-other="${CSS.escape(key)}"]`);
 
       out[key] = {
-        // ✅ label figé
         label: PACKS_FALLBACK[key]?.label || key,
         conferencesAllowed: Math.max(0, Number(confEl?.value || 0)),
-        workshopsAllowed: Math.max(0, Number(wsEl?.value || 0)),
+        workshopDiscountPacks: Math.max(0, Number(wsdEl?.value || 0)),
         otherAllowed: Math.max(0, Number(othEl?.value || 0)),
       };
     }
@@ -778,7 +740,6 @@ function setPromoMsg(t=""){ if (promoMsg) promoMsg.textContent = t; }
 function openPromoModal(){
   if (!isAdmin()) return alert("Réservé à l’admin Ti’Doc.");
   setPromoMsg("");
-  // pré-remplissage (optionnel)
   promoPremiumEl.value  = (PROMO_POOLS.premium || []).join("\n");
   promoStandardEl.value = (PROMO_POOLS.standard || []).join("\n");
   promoEssentielEl.value= (PROMO_POOLS.essentiel || []).join("\n");
@@ -814,6 +775,17 @@ promoClose?.addEventListener("click", closePromoModal);
 promoCancel?.addEventListener("click", closePromoModal);
 promoModal?.addEventListener("click", (e)=>{ if (e.target === promoModal) closePromoModal(); });
 promoSave?.addEventListener("click", savePromoPools);
+
+// =====================
+// UI binds (si présents dans ton HTML)
+// =====================
+uploadBtn?.addEventListener("click", () => fileInput?.click());
+fileInput?.addEventListener("change", async () => {
+  const file = fileInput.files?.[0];
+  await handleFile(file);
+  fileInput.value = "";
+});
+deleteBtn?.addEventListener("click", deleteMyTicketAndUnclaim);
 
 // =====================
 // INIT
