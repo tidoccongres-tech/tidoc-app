@@ -1012,6 +1012,12 @@ async function saveAdminPacks() {
   }
 }
 
+  if (adminModal) {
+    adminModal.style.display = "block";
+    adminModal.scrollTop = 0; // ✅ important
+  }
+  lockBodyScroll();
+
 adminBtn?.addEventListener("click", openAdminModal);
 adminClose?.addEventListener("click", closeAdminModal);
 adminCancel?.addEventListener("click", closeAdminModal);
@@ -1128,7 +1134,7 @@ function openPromoModal() {
   if (promoPremiumEl)   promoPremiumEl.value   = (PROMO_POOLS.premium || []).join("\n");
   if (promoStandardEl)  promoStandardEl.value  = (PROMO_POOLS.standard || []).join("\n");
   if (promoEssentielEl) promoEssentielEl.value = (PROMO_POOLS.essentiel || []).join("\n");
-
+  
   ensurePromoUI("premium", promoPremiumEl);
   ensurePromoUI("standard", promoStandardEl);
   ensurePromoUI("essentiel", promoEssentielEl);
@@ -1140,6 +1146,26 @@ function openPromoModal() {
   if (promoModal) promoModal.style.display = "block";
   lockBodyScroll(); // ✅
 }
+
+  // ✅ Auto-save sur frappe (une seule fois)
+  if (promoPremiumEl && !promoPremiumEl.dataset.autosave) {
+    promoPremiumEl.dataset.autosave = "1";
+    promoPremiumEl.addEventListener("input", schedulePromoAutosave);
+  }
+  if (promoStandardEl && !promoStandardEl.dataset.autosave) {
+    promoStandardEl.dataset.autosave = "1";
+    promoStandardEl.addEventListener("input", schedulePromoAutosave);
+  }
+  if (promoEssentielEl && !promoEssentielEl.dataset.autosave) {
+    promoEssentielEl.dataset.autosave = "1";
+    promoEssentielEl.addEventListener("input", schedulePromoAutosave);
+  }
+
+  if (promoModal) {
+    promoModal.style.display = "block";
+    promoModal.scrollTop = 0; // ✅ important
+  }
+  lockBodyScroll();
 
 function closePromoModal(){
   if (promoModal) promoModal.style.display = "none";
