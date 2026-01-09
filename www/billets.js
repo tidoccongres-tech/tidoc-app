@@ -1017,12 +1017,6 @@ async function saveAdminPacks() {
   }
 }
 
-  if (adminModal) {
-    adminModal.style.display = "block";
-    adminModal.scrollTop = 0; // ✅ important
-  }
-  lockBodyScroll();
-
 adminBtn?.addEventListener("click", openAdminModal);
 adminClose?.addEventListener("click", closeAdminModal);
 adminCancel?.addEventListener("click", closeAdminModal);
