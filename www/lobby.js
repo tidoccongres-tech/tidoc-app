@@ -1050,5 +1050,491 @@ getVisionRadiusWorld = function(){
 let lastRoomData = null;
 btnSabotage?.addEventListener("click", ()=> tryTriggerSabotage(lastRoomData));
 
+// ----------
+// Vote flow déclenché à la fin du débat meeting/report
+// On “enchaîne”: débat (chat) -> vote UI -> host apply -> reset
+// ----------
+function handleVoteState(room){
+  // room.voteState: "debate" | "vote" | null
+  const st = room?.voteState || null;
+  const at = (typeof room?.voteAtMs === "number") ? room.voteAtMs : 0;
+
+  if (!st || !at){
+    closeVoteUI();
+    return;
+  }
+
+  // liste vivants
+  const alive = Array.from(playersMap.values())
+    .filter(p => p && !p.isDead)
+    .map(p => ({ uid: p.uid, name: p.name || "Joueur" }))
+    .filter(p => p.uid !== myUid ? true : true);
+
+  if (st === "vote"){
+    openVoteUI();
+    voteTitleEl.textContent = "Vote";
+    voteSubEl.textContent = "Clique un joueur ou Passer";
+    renderVoteList(alive, false);
+
+    clearInterval(voteUiTimer);
+    const end = at + VOTE_TIME_MS;
+    voteUiTimer = setInterval(async ()=>{
+      const s = Math.max(0, Math.ceil((end - nowMs())/1000));
+      if (voteTimerEl) voteTimerEl.textContent = `${s}s`;
+
+      if (s <= 0){
+        clearInterval(voteUiTimer);
+        voteUiTimer = null;
+        renderVoteList(alive, true);
+        closeVoteUI();
+
+        // host clôture et applique
+        await hostCloseVoteAndApply(room);
+      }
+    }, 250);
+  } else {
+    closeVoteUI();
+  }
+}
+
+// ----------
+// Hook dans ta logique meeting: à la fin du débat, on lance voteState="vote"
+// Ici on gère côté host automatiquement.
+// ----------
+async function hostMaybeStartVote(room){
+  if (!myIsHost) return;
+  if (!room) return;
+  if (room.status !== "started") return;
+
+  // uniquement si meeting/report actif
+  const mt = room.meetingType;
+  const mAt = tsToMs(room.meetingAt);
+
+  if (!mAt || !(mt==="report" || mt==="meeting")) return;
+
+  // on attend que ton débat (déjà géré visuellement) soit fini:
+  // - tu as REPORT_SPLASH_MS + DEBATE_MS pour report
+  // - tu as DEBATE_MS pour meeting
+  const endDebateMs = (mt==="report")
+    ? (mAt + REPORT_SPLASH_MS + DEBATE_MS)
+    : (mAt + DEBATE_MS);
+
+  // si déjà vote lancé => stop
+  if (room.voteState === "vote" && room.voteAtMs) return;
+
+  // quand débat fini => start vote
+  if (nowMs() >= endDebateMs){
+    try{
+      await updateDoc(doc(db,"rooms",roomId), {
+        voteState: "vote",
+        voteAtMs: nowMs()
+      });
+    } catch(e){
+      console.log("start vote error:", e);
+    }
+  }
+}
+
+// ----------
+// Host: calc tasksTotal au start = 5 * nombre de Ti’Nocents
+// (on le fait quand roles sont assignés)
+// ----------
+async function hostSetTasksTotalFromRoles(){
+  if (!myIsHost) return;
+  try{
+    const snap = await getDocs(collection(db,"rooms",roomId,"privateRoles"));
+    const roles = snap.docs.map(d=>d.data());
+    const nocents = roles.filter(r=>r?.role==="tinocent").length;
+    const total = nocents * TASKS_PER_PLAYER;
+
+    await updateDoc(doc(db,"rooms",roomId), {
+      tasksTotal: total,
+      tasksDone: 0,
+      tasksSeed: 0
+    });
+  } catch(e){
+    console.log("hostSetTasksTotalFromRoles error:", e);
+  }
+}
+
+// ----------
+// IMPORTANT: on patch ton hostAssignRoles pour appeler hostSetTasksTotalFromRoles
+// ----------
+const __oldHostAssignRoles = hostAssignRoles;
+hostAssignRoles = async function(players){
+  await __oldHostAssignRoles(players);
+  await hostSetTasksTotalFromRoles();
+};
+
+// ===================
+// PATCH ROOM SNAPSHOT : sabotage + vote + endgame
+// -> Tu as déjà un onSnapshot(room) : on s’y accroche avec lastRoomData
+// ===================
+
+const __oldRoomSnapshotHook = (function(){
+  // On “wrap” rien ici: on va juste utiliser lastRoomData dans ton onSnapshot existant.
+  return true;
+})();
+
+// NOTE: Dans ton onSnapshot(doc(db,"rooms",roomId)) déjà présent,
+// ajoute juste ces 4 lignes à l’intérieur (après `const room = snap.data() || {};`):
+//
+//   lastRoomData = room;
+//   tasksSeed = (typeof room.tasksSeed === "number") ? room.tasksSeed : 0;
+//   applySabotageFromRoom(room);
+//   handleVoteState(room);
+//   hostMaybeStartVote(room);
+//
+// Et ajoute ce bloc ENDGAME (après ton calcul tasksDone/total):
+//
+//   if (room.status === "ended" && room.winner){
+//     showEndScreen(room.winner);
+//   }
+//
+// Et ajoute ce check endgame (host uniquement) dans status==="started":
+//
+//   await hostCheckEndgame(room);
+//
+// Je te donne hostCheckEndgame ci-dessous:
+
+async function hostCheckEndgame(room){
+  if (!myIsHost) return;
+  if (!room || room.status !== "started") return;
+
+  // Ti’Nocents win: tasks done
+  const done = (typeof room.tasksDone === "number") ? room.tasksDone : 0;
+  const total = (typeof room.tasksTotal === "number") ? room.tasksTotal : 0;
+  if (total > 0 && done >= total){
+    try{
+      await updateDoc(doc(db,"rooms",roomId), {
+        status: "ended",
+        winner: "tinocent",
+        endedAtMs: nowMs()
+      });
+    } catch(e){}
+    return;
+  }
+
+  // AmongUs classique: truants >= nocents
+  // On lit roles
+  let roles = [];
+  try{
+    const rs = await getDocs(collection(db,"rooms",roomId,"privateRoles"));
+    roles = rs.docs.map(d=>d.data());
+  } catch(e){}
+
+  const truantsSet = new Set(roles.filter(r=>r?.role==="titruant").map(r=>r.uid));
+  const nocentsSet = new Set(roles.filter(r=>r?.role==="tinocent").map(r=>r.uid));
+
+  let truantsAlive = 0;
+  let nocentsAlive = 0;
+
+  for (const p of playersMap.values()){
+    if (!p) continue;
+    if (p.isDead) continue;
+    if (truantsSet.has(p.uid)) truantsAlive++;
+    if (nocentsSet.has(p.uid)) nocentsAlive++;
+  }
+
+  if (nocentsAlive <= 0 || truantsAlive >= nocentsAlive){
+    try{
+      await updateDoc(doc(db,"rooms",roomId), {
+        status: "ended",
+        winner: "titruant",
+        endedAtMs: nowMs()
+      });
+    } catch(e){}
+  }
+}
+
+// ----------
+// visibilité sabotage button
+// ----------
+function refreshSabotageBtn(room){
+  if (phase !== "started") { setSabotageBtnVisible(false); return; }
+  if (myRole !== "titruant" || myDead) { setSabotageBtnVisible(false); return; }
+
+  // bouton visible tout le temps mais “cooldown” géré au click via nextSabotageAtMs
+  setSabotageBtnVisible(true);
+
+  // (Optionnel) si un sabotage est actif -> on désactive le bouton
+  const activeUntil = (room?.sabotageActive?.untilMs || 0);
+  if (btnSabotage){
+    btnSabotage.disabled = (activeUntil && nowMs() < activeUntil);
+    btnSabotage.style.opacity = btnSabotage.disabled ? "0.55" : "1";
+  }
+}
+
+// ===================
+// BLOCK 4 — STABILISATION / BUGFIX / PROPRETÉ
+// ===================
+
+// ----------
+// 1) Anti double-end-screen + anti double-redirect
+// ----------
+let __endShown = false;
+const __oldShowEndScreen = (typeof showEndScreen === "function") ? showEndScreen : null;
+
+if (__oldShowEndScreen){
+  showEndScreen = function(winner){
+    if (__endShown) return;
+    __endShown = true;
+
+    // lock inputs
+    try{
+      setMeetingLock(true);
+      closeChat(true);
+      setActionUI({ show:false });
+      joy?.classList.add("is-hidden");
+    } catch(_) {}
+
+    return __oldShowEndScreen(winner);
+  };
+}
+
+// ----------
+// 2) Sécurise le “vote / meeting” : si voteState se lance, on force chat visible (lecture/écriture selon mort)
+// ----------
+const __oldHandleVoteState = (typeof handleVoteState === "function") ? handleVoteState : null;
+if (__oldHandleVoteState){
+  handleVoteState = function(room){
+    try{
+      const st = room?.voteState || null;
+      if (st === "vote"){
+        // vote overlay => on laisse chat ouvert si meetingLockActive
+        chatCanViewNow = true;
+        setChatFabVisible(true);
+        applyChatWriteLock();
+      }
+    } catch(_) {}
+    return __oldHandleVoteState(room);
+  };
+}
+
+// ----------
+// 3) Ajuste le texte d’expulsion report splash: (déjà ok mais on évite “bodyUid vide”)
+// ----------
+const __oldShowReportSplash = (typeof showReportSplash === "function") ? showReportSplash : null;
+if (__oldShowReportSplash){
+  showReportSplash = function(bodyName, meetingAtMs){
+    const safeName = bodyName && String(bodyName).trim() ? bodyName : "Un Ti’Doc";
+    return __oldShowReportSplash(safeName, meetingAtMs);
+  };
+}
+
+// ----------
+// 4) Missions: robustesse + pas de “TASKS_TOTAL fixe” côté HUD
+// -> On force l’affichage avec room.tasksTotal seulement (si dispo)
+// ----------
+const __oldSetGlobalTasksProgress = (typeof setGlobalTasksProgress === "function") ? setGlobalTasksProgress : null;
+if (__oldSetGlobalTasksProgress){
+  setGlobalTasksProgress = function(done, total){
+    const safeTotal = (typeof total === "number" && total > 0) ? total : (typeof TASKS_PER_PLAYER === "number" ? TASKS_PER_PLAYER : 5) * 4;
+    return __oldSetGlobalTasksProgress(done, safeTotal);
+  };
+}
+
+// ----------
+// 5) SABOTAGE ADMIN: vraie “zone grisée + hachures” (sans asset)
+// -> Affiche un panneau en overlay quand on essaye d’ouvrir Admin pendant sabotage
+// ----------
+const __adminBlockOverlay = document.createElement("div");
+__adminBlockOverlay.id = "adminBlockOverlay";
+__adminBlockOverlay.style.cssText = `
+  position: fixed; inset:0; z-index: 275;
+  display:none; align-items:center; justify-content:center;
+  background: rgba(0,0,0,.55);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+`;
+__adminBlockOverlay.innerHTML = `
+  <div style="
+    width: min(520px, calc(100vw - 28px));
+    border-radius: 20px;
+    padding: 14px;
+    color:#fff;
+    font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+    background:
+      linear-gradient(rgba(0,0,0,.72), rgba(0,0,0,.72)),
+      repeating-linear-gradient(135deg, rgba(255,255,255,.10) 0 10px, rgba(255,255,255,.02) 10px 20px);
+    border: 1px solid rgba(255,255,255,.14);
+    box-shadow: 0 18px 55px rgba(0,0,0,.35);
+  ">
+    <div style="font:1000 16px system-ui;">Blocage administratif</div>
+    <div style="margin-top:8px; font:900 12px system-ui; opacity:.92;">
+      Cette zone est temporairement indisponible.
+    </div>
+    <button id="adminBlockOk" type="button" style="
+      margin-top: 12px;
+      width: 100%;
+      appearance:none; border:0;
+      padding: 12px 12px;
+      border-radius: 14px;
+      font: 1000 13px system-ui;
+      color:#000;
+      background: rgba(255,255,255,.88);
+    ">OK</button>
+  </div>
+`;
+document.body.appendChild(__adminBlockOverlay);
+
+__adminBlockOverlay.querySelector("#adminBlockOk")?.addEventListener("click", ()=>{
+  __adminBlockOverlay.style.display = "none";
+});
+__adminBlockOverlay.addEventListener("click", (e)=>{
+  if (e.target === __adminBlockOverlay) __adminBlockOverlay.style.display = "none";
+});
+
+function __showAdminBlocked(){
+  __adminBlockOverlay.style.display = "flex";
+}
+
+// On “re-wrap” doZoneAction (si bloc 3 l’a déjà wrap, ça reste compatible)
+const __doZoneAction_prev = doZoneAction;
+doZoneAction = async function(zone){
+  try{
+    if (zone?.id === "admin" && typeof sabotageIsActive === "function" && sabotageIsActive("admin")){
+      __showAdminBlocked();
+      return;
+    }
+  } catch(_) {}
+  return __doZoneAction_prev(zone);
+};
+
+// ----------
+// 6) SABOTAGE COMMS: brouillage aussi dans la liste (myTaskList) pas seulement la ligne
+// ----------
+const __updateMyTaskHud_prev = updateMyTaskHud;
+updateMyTaskHud = function(){
+  __updateMyTaskHud_prev();
+
+  try{
+    if (
+      typeof sabotageIsActive === "function" &&
+      sabotageIsActive("comms") &&
+      myRole === "tinocent" &&
+      !myDead &&
+      phase === "started"
+    ){
+      // brouille la liste aussi
+      const t = currentTask();
+      if (t?.label && myTaskListEl){
+        // on brouille seulement les labels (pas les emojis)
+        const raw = myTaskListEl.innerHTML || "";
+        myTaskListEl.innerHTML = raw.replaceAll(t.label, scrambleAlien(t.label));
+      }
+    }
+  } catch(_) {}
+};
+
+// ----------
+// 7) SABOTAGE LIGHTS: clamp vision pour éviter rayon trop petit sur petits écrans
+// ----------
+if (typeof getVisionRadiusWorld === "function"){
+  const __getVision_prev = getVisionRadiusWorld;
+  getVisionRadiusWorld = function(){
+    const r = __getVision_prev();
+    // minimum de confort
+    return Math.max(r, 85);
+  };
+}
+
+// ----------
+// 8) Vote: empêche vote contre un mort / contre soi si tu veux (optionnel)
+// -> ici on autorise voter soi-même (plus simple), mais on filtre les morts
+// ----------
+const __renderVoteList_prev = (typeof renderVoteList === "function") ? renderVoteList : null;
+if (__renderVoteList_prev){
+  renderVoteList = function(alivePlayers, locked=false){
+    const safeAlive = Array.isArray(alivePlayers) ? alivePlayers.filter(p => p && p.uid && !playersMap.get(p.uid)?.isDead) : [];
+    return __renderVoteList_prev(safeAlive, locked);
+  };
+}
+
+// ----------
+// 9) Meeting -> vote : sécurité si room.voteState reste bloqué (network / host)
+/// - Si vote est terminé depuis > 8s et que voteState est toujours "vote" : host force clôture
+// ----------
+async function __hostFailsafeVote(room){
+  if (!myIsHost) return;
+  if (!room || room.status !== "started") return;
+  if (room.voteState !== "vote") return;
+
+  const at = (typeof room.voteAtMs === "number") ? room.voteAtMs : 0;
+  if (!at) return;
+
+  const end = at + 30_000; // vote 30s
+  if (Date.now() > end + 8000){
+    try{
+      await hostCloseVoteAndApply(room);
+    } catch(_) {}
+  }
+}
+
+// ----------
+// 10) Fix chat gating pendant vote overlay (lecture ok, écriture si vivant)
+// ----------
+function __applyVoteChatPolicy(){
+  if (phase !== "started") return;
+  if (!lastRoomData) return;
+  if (lastRoomData.voteState === "vote"){
+    chatCanViewNow = true;
+    chatCanWriteNow = !myDead; // écriture vivants seulement
+    setChatFabVisible(true);
+    applyChatWriteLock();
+  }
+}
+
+// ----------
+// 11) Hook léger à appeler depuis ton onSnapshot(room)
+// -> ajoute 2 lignes dans ton onSnapshot(room), juste après les lignes du bloc 3:
+//    __hostFailsafeVote(room);
+//    __applyVoteChatPolicy();
+// ----------
+/* (rien d’autre à coller ici) */
+
+// ----------
+// 12) Labo: assets manquants -> fallback texte (ne crash pas si image absent)
+// ----------
+function __imgExists(src){
+  return new Promise(res=>{
+    const im = new Image();
+    im.onload = ()=> res(true);
+    im.onerror = ()=> res(false);
+    im.src = src;
+  });
+}
+
+async function __verifyTubeAssets(){
+  if (!Array.isArray(TUBE_ASSETS)) return;
+  for (const t of TUBE_ASSETS){
+    try{
+      const ok = await __imgExists(t.src);
+      if (!ok){
+        console.warn("[LABO] Asset manquant:", t.src);
+      }
+    } catch(_) {}
+  }
+}
+
+// On lance une fois au start
+let __tubeCheckDone = false;
+async function __maybeCheckTubes(){
+  if (__tubeCheckDone) return;
+  __tubeCheckDone = true;
+  await __verifyTubeAssets();
+}
+
+// ----------
+// 13) Global: quand on passe en started, on check tubes + sabotage btn refresh
+// ----------
+const __setGameMode_prev = setGameMode;
+setGameMode = function(){
+  __setGameMode_prev();
+  try{ __maybeCheckTubes(); } catch(_) {}
+  try{ refreshSabotageBtn(lastRoomData); } catch(_) {}
+  try{ __applyVoteChatPolicy(); } catch(_) {}
+};
+
 
 
