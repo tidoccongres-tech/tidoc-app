@@ -339,24 +339,27 @@ async function claimQrOrThrow(qrText) {
 // =====================
 // Sync Nom billet -> Firestore (NE TOUCHE PAS displayName)
 // =====================
+// =====================
+// Sync Nom billet -> Firestore (NE TOUCHE PAS le pseudo affiché)
+// =====================
 async function syncNameFromTicket(holderName){
   const u = auth.currentUser;
-  const ticketName = String(holderName || "").trim();
-  if (!u || !ticketName) return;
+  const ticketHolderName = String(holderName || "").trim();
+  if (!u || !ticketHolderName) return;
 
-  // ✅ On ne touche PLUS auth.displayName (sinon ça remplace ton pseudo "TDoc")
-  // On stocke juste le nom du billet dans Firestore
+  // ✅ On stocke le nom du billet dans un champ DÉDIÉ
+  // ⚠️ Ne jamais utiliser "ticketName" si ton header s'en sert pour afficher le pseudo
   try{
     await setDoc(doc(db, "users", u.uid), {
-      ticketName,
-      updatedAt: serverTimestamp()
+      ticketHolderName,
+      ticketUpdatedAt: serverTimestamp()
     }, { merge:true });
   } catch(_) {}
 
-  // optionnel: pour affichage local si tu veux
+  // optionnel: affichage local
   try{
-    localStorage.setItem("tidoc_ticket_name", ticketName);
-    window.dispatchEvent(new CustomEvent("tidoc:ticket", { detail: { ticketName }}));
+    localStorage.setItem("tidoc_ticket_holder_name", ticketHolderName);
+    window.dispatchEvent(new CustomEvent("tidoc:ticket", { detail: { ticketHolderName }}));
   } catch(_) {}
 }
 
