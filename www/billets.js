@@ -1148,20 +1148,6 @@ function openPromoModal() {
   renderPromoListForTier("standard", promoStandardEl);
   renderPromoListForTier("essentiel", promoEssentielEl);
 
-  // ✅ Auto-save sur frappe (une seule fois)
-  if (promoPremiumEl && !promoPremiumEl.dataset.autosave) {
-    promoPremiumEl.dataset.autosave = "1";
-    promoPremiumEl.addEventListener("input", schedulePromoAutosave);
-  }
-  if (promoStandardEl && !promoStandardEl.dataset.autosave) {
-    promoStandardEl.dataset.autosave = "1";
-    promoStandardEl.addEventListener("input", schedulePromoAutosave);
-  }
-  if (promoEssentielEl && !promoEssentielEl.dataset.autosave) {
-    promoEssentielEl.dataset.autosave = "1";
-    promoEssentielEl.addEventListener("input", schedulePromoAutosave);
-  }
-
   if (promoModal) {
     promoModal.style.display = "block";
     promoModal.scrollTop = 0; // ✅
