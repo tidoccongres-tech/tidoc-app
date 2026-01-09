@@ -1074,7 +1074,10 @@ function ensurePromoUI(tier, textareaEl) {
     renderPromoListForTier(tier, textareaEl);
   });
 
-  textareaEl.addEventListener("input", () => renderPromoListForTier(tier, textareaEl));
+    textareaEl.addEventListener("input", () => {
+    renderPromoListForTier(tier, textareaEl);
+    schedulePromoAutosave(); // ✅
+  });
 }
 
 function renderPromoListForTier(tier, textareaEl) {
