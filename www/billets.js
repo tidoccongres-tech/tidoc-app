@@ -309,21 +309,24 @@ async function claimQrOrThrow(qrText) {
 }
 
 // =====================
-// Sync Nom billet -> profil
+// Sync Nom billet -> Firestore (SANS toucher au pseudo compte)
 // =====================
 async function syncNameFromTicket(holderName){
   const u = auth.currentUser;
   const name = String(holderName || "").trim();
   if (!u || !name) return;
 
-  try { await updateProfile(u, { displayName: name }); } catch(_) {}
-
-  try{
+  // On stocke le nom du billet pour l'organisation / affichage billet
+  try {
     await setDoc(doc(db, "users", u.uid), {
-      displayName: name,
-      updatedAt: serverTimestamp()
+      ticketHolderName: name,
+      ticketUpdatedAt: serverTimestamp()
     }, { merge:true });
   } catch(_) {}
+
+  // IMPORTANT: on ne modifie PAS le profil Firebase Auth, ni localStorage pseudo
+  // (sinon ça écrase "TDoc")
+}}
 
   try{
     localStorage.setItem("tidoc_name", name);
