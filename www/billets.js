@@ -337,9 +337,6 @@ async function claimQrOrThrow(qrText) {
 }
 
 // =====================
-// Sync Nom billet -> Firestore (NE TOUCHE PAS displayName)
-// =====================
-// =====================
 // Sync Nom billet -> Firestore (NE TOUCHE PAS le pseudo affiché)
 // =====================
 async function syncNameFromTicket(holderName){
@@ -428,6 +425,14 @@ async function deleteMyTicketAndUnclaim() {
 
     await deleteDoc(ticketRef);
 
+   // Nettoyage du nom billet (optionnel)
+try {
+  await setDoc(doc(db, "users", u.uid), {
+    ticketHolderName: "",
+    ticketUpdatedAt: serverTimestamp()
+  }, { merge: true });
+} catch(_) {}
+    
     if (qrHash) {
       const claimRef = doc(db, "qrClaims", qrHash);
       await runTransaction(db, async (tx) => {
@@ -444,13 +449,6 @@ async function deleteMyTicketAndUnclaim() {
     console.log("delete ticket error:", e);
     setStatus("❌ " + (e?.message || String(e)));
   }
-  // Nettoyage du nom billet (optionnel)
-try {
-  await setDoc(doc(db, "users", u.uid), {
-    ticketHolderName: "",
-    ticketUpdatedAt: serverTimestamp()
-  }, { merge: true });
-} catch(_) {}
 }
 
 // =====================
