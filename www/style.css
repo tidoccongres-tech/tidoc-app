@@ -2332,3 +2332,22 @@ main.page.blog-page{ padding-top: calc(56px + 12px) !important; }
   }
 }
 
+/* ✅ Empêche le scroll de la page derrière quand un modal est ouvert */
+body.modal-open {
+  overflow: hidden !important;
+  height: 100vh;
+}
+
+/* ✅ Modals: on scroll dans le modal, pas derrière */
+#adminPromoModal,
+#adminPacksModal {
+  overflow: auto;              /* l’overlay peut scroller */
+  -webkit-overflow-scrolling: touch;
+  padding: 16px;               /* évite que le contenu colle aux bords */
+}
+
+#adminPromoModal > div,
+#adminPacksModal > div {
+  max-height: 84vh;            /* le bloc blanc scrolle si trop long */
+  overflow: auto;
+}
