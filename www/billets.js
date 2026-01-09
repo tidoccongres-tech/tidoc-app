@@ -694,30 +694,30 @@ function renderResult({ qrText, packKey, holderName, ticketNumber, promoCode, wo
   }
 
   // copy promo
+    // copy promo
   const copyBtn = boxEl.querySelector("#copyPromoBtn");
   if (copyBtn && promo) {
     copyBtn.addEventListener("click", async () => {
-  const msg = boxEl.querySelector("#copyPromoMsg");
-  try {
-    await navigator.clipboard.writeText(promo);
+      const msg = boxEl.querySelector("#copyPromoMsg");
+      try {
+        await navigator.clipboard.writeText(promo);
 
-    // ✅ marquer "copié" dans le registre admin
-    try {
-      const codeId = String(promo).toLowerCase();
-      await setDoc(doc(db, "promoCodes", codeId), {
-        copiedAt: serverTimestamp()
-      }, { merge: true });
-    } catch (e) {
-      console.log("mark copiedAt error:", e);
-    }
+        // ✅ marquer "copié" dans le registre admin
+        try {
+          const codeId = String(promo).toLowerCase();
+          await setDoc(doc(db, "promoCodes", codeId), {
+            copiedAt: serverTimestamp()
+          }, { merge: true });
+        } catch (e) {
+          console.log("mark copiedAt error:", e);
+        }
 
-    if (msg) msg.textContent = "✅ Copié";
-  } catch {
-    if (msg) msg.textContent = "❌ Impossible de copier (copie manuelle).";
+        if (msg) msg.textContent = "✅ Copié";
+      } catch {
+        if (msg) msg.textContent = "❌ Impossible de copier (copie manuelle).";
+      }
+    });
   }
-});
-  }
-}
 
 function renderWorkshopsList(workshops = []) {
   const listBox = document.getElementById("workshopsListBox");
