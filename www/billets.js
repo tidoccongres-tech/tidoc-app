@@ -425,14 +425,6 @@ async function deleteMyTicketAndUnclaim() {
 
     await deleteDoc(ticketRef);
 
-   // Nettoyage du nom billet (optionnel)
-try {
-  await setDoc(doc(db, "users", u.uid), {
-    ticketHolderName: "",
-    ticketUpdatedAt: serverTimestamp()
-  }, { merge: true });
-} catch(_) {}
-    
     if (qrHash) {
       const claimRef = doc(db, "qrClaims", qrHash);
       await runTransaction(db, async (tx) => {
@@ -442,6 +434,14 @@ try {
         if (c.uid === u.uid) tx.delete(claimRef);
       });
     }
+
+    // ✅ Nettoyage du nom billet SEULEMENT si la suppression a réussi
+    try {
+      await setDoc(doc(db, "users", u.uid), {
+        ticketHolderName: "",
+        ticketUpdatedAt: serverTimestamp()
+      }, { merge: true });
+    } catch(_) {}
 
     if (boxEl) boxEl.textContent = "Aucun billet importé pour l’instant.";
     setStatus("✅ Billet supprimé");
