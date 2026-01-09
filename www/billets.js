@@ -961,9 +961,13 @@ function openAdminModal() {
   setAdminMsg("");
   renderAdminPacksEditor();
   if (adminModal) adminModal.style.display = "block";
+  lockBodyScroll(); // ✅
 }
-function closeAdminModal() { if (adminModal) adminModal.style.display = "none"; }
-
+function closeAdminModal() {
+  if (adminModal) adminModal.style.display = "none";
+  unlockBodyScroll(); // ✅
+}
+  
 async function saveAdminPacks() {
   if (!isAdmin()) return;
   try {
@@ -1104,6 +1108,14 @@ function renderPromoListForTier(tier, textareaEl) {
   });
 }
 
+function lockBodyScroll() {
+  document.body.classList.add("modal-open");
+}
+
+function unlockBodyScroll() {
+  document.body.classList.remove("modal-open");
+}
+  
 function openPromoModal() {
   if (!isAdmin()) return alert("Réservé à l’admin Ti’Doc.");
   setPromoMsg("");
@@ -1121,9 +1133,13 @@ function openPromoModal() {
   renderPromoListForTier("essentiel", promoEssentielEl);
 
   if (promoModal) promoModal.style.display = "block";
+  lockBodyScroll(); // ✅
 }
 
-function closePromoModal(){ if (promoModal) promoModal.style.display = "none"; }
+function closePromoModal(){
+  if (promoModal) promoModal.style.display = "none";
+  unlockBodyScroll(); // ✅
+}
 
 async function savePromoPools() {
   if (!isAdmin()) return;
@@ -1155,6 +1171,42 @@ promoCancel?.addEventListener("click", closePromoModal);
 promoModal?.addEventListener("click", (e) => { if (e.target === promoModal) closePromoModal(); });
 promoSave?.addEventListener("click", savePromoPools);
 
+// ======================
+// ✅ AUTO-SAVE PROMO POOLS (admin)
+// - évite de perdre les codes si refresh
+// - écrit après 600ms sans frappe
+// ======================
+let promoAutosaveTimer = null;
+
+async function autosavePromoPoolsIfAdmin() {
+  if (!isAdmin()) return;
+  try {
+    const premium   = normalizeCodes(splitCodes(promoPremiumEl?.value || ""));
+    const standard  = normalizeCodes(splitCodes(promoStandardEl?.value || ""));
+    const essentiel = normalizeCodes(splitCodes(promoEssentielEl?.value || ""));
+
+    await setDoc(doc(db, "config", "promoPools"), {
+      premium, standard, essentiel,
+      updatedAt: serverTimestamp()
+    }, { merge: true });
+
+    // recharge local
+    PROMO_POOLS = { premium, standard, essentiel };
+    setPromoMsg("✅ Sauvegarde auto");
+  } catch (e) {
+    console.log("autosave promoPools error:", e);
+    setPromoMsg("❌ Auto-save impossible (rules ?) " + (e?.message || String(e)));
+  }
+}
+
+function schedulePromoAutosave() {
+  if (!isAdmin()) return;
+  if (promoAutosaveTimer) clearTimeout(promoAutosaveTimer);
+  promoAutosaveTimer = setTimeout(() => {
+    autosavePromoPoolsIfAdmin();
+  }, 600);
+}
+  
 // =====================
 // UI binds
 // =====================
