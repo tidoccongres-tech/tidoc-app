@@ -694,6 +694,7 @@ function renderResult({ qrText, packKey, holderName, ticketNumber, promoCode, wo
 
   // copy promo
     // copy promo
+    // copy promo
   const copyBtn = boxEl.querySelector("#copyPromoBtn");
   if (copyBtn && promo) {
     copyBtn.addEventListener("click", async () => {
@@ -717,6 +718,7 @@ function renderResult({ qrText, packKey, holderName, ticketNumber, promoCode, wo
       }
     });
   }
+} // ✅ <<< CETTE accolade manquait : fin de renderResult()
 
 function renderWorkshopsList(workshops = []) {
   const listBox = document.getElementById("workshopsListBox");
