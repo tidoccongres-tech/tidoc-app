@@ -444,6 +444,13 @@ async function deleteMyTicketAndUnclaim() {
     console.log("delete ticket error:", e);
     setStatus("❌ " + (e?.message || String(e)));
   }
+  // Nettoyage du nom billet (optionnel)
+try {
+  await setDoc(doc(db, "users", u.uid), {
+    ticketHolderName: "",
+    ticketUpdatedAt: serverTimestamp()
+  }, { merge: true });
+} catch(_) {}
 }
 
 // =====================
