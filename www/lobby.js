@@ -458,45 +458,38 @@ function startTapOrderMiniGame({ steps = 6 } = {}){
   const order = Array.from({length: steps}, (_,i)=>i+1);
   shuffleCryptoInPlace(order);
 
-  let need = 1;
+  let idx = 0; // index dans order
+
+  function setProgress(){
+    const pct = (idx/steps)*100;
+    activityBarEl.style.width = `${pct}%`;
+    activitySubEl.textContent = `Tape ${order[idx]} sur ${steps}`;
+  }
 
   const wrap = document.createElement("div");
   wrap.style.cssText = `display:flex; flex-wrap:wrap; gap:10px; justify-content:center;`;
-
-  function setProgress(){
-    const pct = ((need-1)/steps)*100;
-    activityBarEl.style.width = `${pct}%`;
-    activitySubEl.textContent = `Tape ${need} sur ${steps}`;
-  }
 
   for (let n=1; n<=steps; n++){
     const btn = document.createElement("button");
     btn.type = "button";
     btn.textContent = String(n);
-    btn.style.cssText = `
-      width: 64px; height: 64px;
-      border-radius: 16px;
-      appearance:none; border:0;
-      font: 1000 18px system-ui;
-      color: #000;
-      background: rgba(255,255,255,.85);
-      box-shadow: 0 10px 22px rgba(0,0,0,.25);
-    `;
+    btn.style.cssText = `width:64px;height:64px;border-radius:16px;appearance:none;border:0;font:1000 18px system-ui;color:#000;background:rgba(255,255,255,.85);box-shadow:0 10px 22px rgba(0,0,0,.25);`;
+
     btn.addEventListener("click", async () => {
       if (activityDone) return;
 
-      if (n !== need){
-        need = 1;
+      if (n !== order[idx]){
+        idx = 0;
         setProgress();
         return;
       }
 
       btn.style.opacity = "0.45";
       btn.disabled = true;
-      need++;
+      idx++;
       setProgress();
 
-      if (need > steps){
+      if (idx >= steps){
         activityDone = true;
         activityBarEl.style.width = `100%`;
         activitySubEl.textContent = "Terminé ✅";
@@ -509,6 +502,7 @@ function startTapOrderMiniGame({ steps = 6 } = {}){
     wrap.appendChild(btn);
   }
 
+  // mélange l’ordre d’affichage
   const children = Array.from(wrap.children);
   children.sort(() => (cryptoRandInt(2) ? 1 : -1));
   wrap.innerHTML = "";
