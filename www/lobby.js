@@ -939,3 +939,116 @@ async function hostCloseVoteAndApply(room){
   }
 }
 
+// ----------
+// ENDGAME (Among Us classique)
+// - Ti’Nocents gagnent: tasksDone >= tasksTotal
+// - Ti’Truants gagnent: truantsAlive >= nocentsAlive (ou nocentsAlive==0)
+// Host écrit room.status="ended" + room.winner
+// ----------
+const endOverlay = document.createElement("div");
+endOverlay.id = "endOverlay";
+endOverlay.style.cssText = `
+  position: fixed; inset:0; z-index: 290;
+  display:none; align-items:center; justify-content:center;
+  background: rgba(0,0,0,.72);
+  color:#fff; text-align:center;
+  font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+`;
+endOverlay.innerHTML = `
+  <div style="width:min(560px, calc(100vw - 24px));
+              padding:14px; border-radius:18px;
+              background: rgba(0,0,0,.70);
+              border:1px solid rgba(255,255,255,.14);
+              box-shadow:0 18px 55px rgba(0,0,0,.35);">
+    <img id="endImg" src="./assets/tinocent.png" alt="role" style="display:block;width:100%;max-width:360px;margin:0 auto;border-radius:16px;border:1px solid rgba(255,255,255,.12);"/>
+    <div id="endText" style="margin-top:14px; font:1000 24px system-ui; letter-spacing:.6px;">VICTOIRE</div>
+  </div>
+`;
+document.body.appendChild(endOverlay);
+
+const endImgEl = endOverlay.querySelector("#endImg");
+const endTextEl = endOverlay.querySelector("#endText");
+
+function showEndScreen(winner){
+  // winner: "tinocent"|"titruant"
+  const myCamp = (myRole === "titruant") ? "titruant" : "tinocent";
+  const win = (winner === myCamp);
+
+  if (endImgEl){
+    endImgEl.src = (myCamp === "titruant") ? "./assets/titruant.png" : "./assets/tinocent.png";
+  }
+  if (endTextEl){
+    endTextEl.textContent = win ? "VICTOIRE" : "DÉFAITE";
+  }
+
+  endOverlay.style.display = "flex";
+
+  // retour auto menu
+  setTimeout(()=>{
+    window.location.href = "./game.html";
+  }, 5500);
+}
+
+// ----------
+// Hook sur updateMyTaskHud pour sabotage comms (brouillage)
+// ----------
+const __oldUpdateMyTaskHud = updateMyTaskHud;
+updateMyTaskHud = function(){
+  __oldUpdateMyTaskHud();
+
+  // Si brouillage comm actif => on brouille la ligne mission (texte seulement)
+  if (sabotageIsActive("comms") && myTaskTextEl && myRole === "tinocent" && !myDead && phase==="started"){
+    const t = currentTask();
+    if (t?.label){
+      myTaskTextEl.textContent = `Ta mission: ${scrambleAlien(t.label)}`;
+    }
+  }
+};
+
+// ----------
+// Patch completeCurrentTask : utilise seeded assign + message sans flèche
+// ----------
+const __oldCompleteCurrentTask = completeCurrentTask;
+completeCurrentTask = async function(){
+  return __oldCompleteCurrentTask();
+};
+
+// ----------
+// Patch ensureMyTasksAssigned : on remplace par version seeded
+// ----------
+const __oldEnsureMyTasksAssigned = ensureMyTasksAssigned;
+ensureMyTasksAssigned = async function(){
+  return ensureMyTasksAssignedCompat();
+};
+
+// ----------
+// Patch doZoneAction pour sabotage admin (zone admin bloquée)
+// ----------
+const __oldDoZoneAction = doZoneAction;
+doZoneAction = async function(zone){
+  if (zone?.id === "admin" && sabotageIsActive("admin")){
+    setStartInfo("Blocage administratif : zone indisponible.");
+    return;
+  }
+  return __oldDoZoneAction(zone);
+};
+
+// ----------
+// Effet lumières : on réduit la vision (simple)
+// Tu as déjà vignette + clip, ici on réduit le radius
+// ----------
+const __oldGetVisionRadiusWorld = getVisionRadiusWorld;
+getVisionRadiusWorld = function(){
+  const base = __oldGetVisionRadiusWorld();
+  if (sabotageIsActive("lights")) return base * 0.55;
+  return base;
+};
+
+// ----------
+// Branch sabotage button click (on a besoin du dernier room snapshot)
+// ----------
+let lastRoomData = null;
+btnSabotage?.addEventListener("click", ()=> tryTriggerSabotage(lastRoomData));
+
+
+
