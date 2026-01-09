@@ -43,6 +43,24 @@ auth.languageCode = "fr";
 
 export const db = getFirestore(app);
 
+export async function setPseudo(newName){
+  const u = auth.currentUser;
+  if (!u) throw new Error("Connexion requise.");
+
+  const name = String(newName || "").trim();
+  if (!name) throw new Error("Pseudo requis.");
+
+  await updateProfile(u, { displayName: name });
+
+  await setDoc(doc(db, "users", u.uid), {
+    displayName: name,
+    updatedAt: serverTimestamp()
+  }, { merge:true });
+
+  try { localStorage.setItem("tidoc_name", name); } catch(_){}
+  window.dispatchEvent(new CustomEvent("tidoc:auth"));
+}
+
 // =====================
 // HELPERS
 // =====================
