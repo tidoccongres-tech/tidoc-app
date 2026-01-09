@@ -962,9 +962,14 @@ function openAdminModal() {
   if (!isAdmin()) return alert("Réservé à l’admin Ti’Doc.");
   setAdminMsg("");
   renderAdminPacksEditor();
-  if (adminModal) adminModal.style.display = "block";
+
+  if (adminModal) {
+    adminModal.style.display = "block";
+    adminModal.scrollTop = 0; // ✅
+  }
   lockBodyScroll(); // ✅
 }
+
 function closeAdminModal() {
   if (adminModal) adminModal.style.display = "none";
   unlockBodyScroll(); // ✅
@@ -1134,7 +1139,7 @@ function openPromoModal() {
   if (promoPremiumEl)   promoPremiumEl.value   = (PROMO_POOLS.premium || []).join("\n");
   if (promoStandardEl)  promoStandardEl.value  = (PROMO_POOLS.standard || []).join("\n");
   if (promoEssentielEl) promoEssentielEl.value = (PROMO_POOLS.essentiel || []).join("\n");
-  
+
   ensurePromoUI("premium", promoPremiumEl);
   ensurePromoUI("standard", promoStandardEl);
   ensurePromoUI("essentiel", promoEssentielEl);
@@ -1142,10 +1147,6 @@ function openPromoModal() {
   renderPromoListForTier("premium", promoPremiumEl);
   renderPromoListForTier("standard", promoStandardEl);
   renderPromoListForTier("essentiel", promoEssentielEl);
-
-  if (promoModal) promoModal.style.display = "block";
-  lockBodyScroll(); // ✅
-}
 
   // ✅ Auto-save sur frappe (une seule fois)
   if (promoPremiumEl && !promoPremiumEl.dataset.autosave) {
@@ -1163,9 +1164,10 @@ function openPromoModal() {
 
   if (promoModal) {
     promoModal.style.display = "block";
-    promoModal.scrollTop = 0; // ✅ important
+    promoModal.scrollTop = 0; // ✅
   }
-  lockBodyScroll();
+  lockBodyScroll(); // ✅
+}
 
 function closePromoModal(){
   if (promoModal) promoModal.style.display = "none";
