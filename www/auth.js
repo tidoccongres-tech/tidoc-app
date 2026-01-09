@@ -25,6 +25,21 @@ import {
   runTransaction
 } from "https://www.gstatic.com/firebasejs/10.12.4/firebase-firestore.js";
 
+import { updateProfile } from "https://www.gstatic.com/firebasejs/10.12.4/firebase-auth.js";
+import { auth, db } from "./auth.js";
+import { doc, setDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.4/firebase-firestore.js";
+
+async function setPseudo(newName){
+  const u = auth.currentUser;
+  if (!u) throw new Error("Connexion requise.");
+
+  const name = String(newName || "").trim();
+  if (!name) throw new Error("Pseudo requis.");
+
+  await updateProfile(u, { displayName: name }); // ✅ Auth
+  await setDoc(doc(db, "users", u.uid), { displayName: name, updatedAt: serverTimestamp() }, { merge:true }); // ✅ Firestore
+}
+
 // =====================
 // CONFIG
 // =====================
@@ -72,12 +87,10 @@ export async function ensureUserDoc(user, { displayName, avatarUrl } = {}) {
     else if (avatarUrl && avatarUrl !== data.avatarUrl) patch.avatarUrl = avatarUrl;
 
     // displayName:
-    const wantedName = (displayName || user.displayName || "Utilisateur").trim();
-    if (!data.displayName) patch.displayName = wantedName;
-    else if (displayName && wantedName !== data.displayName) patch.displayName = wantedName;
-    else if (!displayName && user.displayName && user.displayName.trim() !== data.displayName) {
-      patch.displayName = user.displayName.trim();
-    }
+    // displayName: on ne l'écrit QUE si manquant, ou si on fournit displayName explicitement
+const wantedName = (displayName || "").trim();
+if (!data.displayName) patch.displayName = wantedName || "Utilisateur";
+else if (wantedName && wantedName !== data.displayName) patch.displayName = wantedName;
 
     if (Object.keys(patch).length) {
       patch.updatedAt = serverTimestamp();
