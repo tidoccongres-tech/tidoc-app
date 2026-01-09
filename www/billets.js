@@ -12,6 +12,7 @@ import {
   doc,
   getDoc,
   setDoc,
+  updateDoc,
   deleteDoc,
   runTransaction,
   serverTimestamp,
@@ -217,6 +218,7 @@ async function loadPromoPools() {
 }
 
 // Attribuer 1 code selon le pack (premium/standard/essentiel), et le retirer du pool
+// + écrire un registre promoCodes/{codeLower} pour l’admin
 async function assignPromoCodeIfNeeded(packKey) {
   const u = auth.currentUser;
   if (!u) return { code: "" };
@@ -228,11 +230,13 @@ async function assignPromoCodeIfNeeded(packKey) {
   const poolsRef = doc(db, "config", "promoPools");
 
   const res = await runTransaction(db, async (tx) => {
+    // 1) si user a déjà un code -> on ne change rien
     const userSnap = await tx.get(userRef);
     const userData = userSnap.exists() ? (userSnap.data() || {}) : {};
     const existing = String(userData?.promoCode || "").trim();
     if (existing) return { code: existing, already: true };
 
+    // 2) lire le pool
     const poolsSnap = await tx.get(poolsRef);
     const poolsData = poolsSnap.exists() ? (poolsSnap.data() || {}) : {};
     const list = normalizeCodes(poolsData[tier]);
@@ -241,8 +245,33 @@ async function assignPromoCodeIfNeeded(packKey) {
     const code = list[0];
     const rest = list.slice(1);
 
+    // 3) écrire pool mis à jour (retire le code)
     tx.set(poolsRef, { ...poolsData, [tier]: rest, updatedAt: serverTimestamp() }, { merge: true });
-    tx.set(userRef, { promoCode: code, promoTier: tier, promoAssignedAt: serverTimestamp() }, { merge: true });
+
+    // 4) écrire dans userTickets
+    tx.set(userRef, {
+      promoCode: code,
+      promoTier: tier,
+      promoAssignedAt: serverTimestamp()
+    }, { merge: true });
+
+    // 5) écrire registre admin promoCodes/{codeLower}
+    const codeId = String(code).toLowerCase();
+    const codeRef = doc(db, "promoCodes", codeId);
+
+    // sécurité anti-collision (normalement impossible si pool propre)
+    const codeSnap = await tx.get(codeRef);
+    if (!codeSnap.exists()) {
+      tx.set(codeRef, {
+        code,
+        tier,
+        assignedTo: u.uid,
+        assignedEmail: String(u.email || "").toLowerCase(),
+        assignedAt: serverTimestamp(),
+        copiedAt: null,
+        redeemedAt: null
+      }, { merge: false });
+    }
 
     return { code, already: false };
   });
@@ -309,28 +338,26 @@ async function claimQrOrThrow(qrText) {
 }
 
 // =====================
-// Sync Nom billet -> Firestore (SANS toucher au pseudo compte)
+// Sync Nom billet -> Firestore (NE TOUCHE PAS displayName)
 // =====================
 async function syncNameFromTicket(holderName){
   const u = auth.currentUser;
-  const name = String(holderName || "").trim();
-  if (!u || !name) return;
+  const ticketName = String(holderName || "").trim();
+  if (!u || !ticketName) return;
 
-  // On stocke le nom du billet pour l'organisation / affichage billet
-  try {
+  // ✅ On ne touche PLUS auth.displayName (sinon ça remplace ton pseudo "TDoc")
+  // On stocke juste le nom du billet dans Firestore
+  try{
     await setDoc(doc(db, "users", u.uid), {
-      ticketHolderName: name,
-      ticketUpdatedAt: serverTimestamp()
+      ticketName,
+      updatedAt: serverTimestamp()
     }, { merge:true });
   } catch(_) {}
 
-  // IMPORTANT: on ne modifie PAS le profil Firebase Auth, ni localStorage pseudo
-  // (sinon ça écrase "TDoc")
-}}
-
+  // optionnel: pour affichage local si tu veux
   try{
-    localStorage.setItem("tidoc_name", name);
-    window.dispatchEvent(new CustomEvent("tidoc:auth", { detail: { displayName: name }}));
+    localStorage.setItem("tidoc_ticket_name", ticketName);
+    window.dispatchEvent(new CustomEvent("tidoc:ticket", { detail: { ticketName }}));
   } catch(_) {}
 }
 
@@ -670,14 +697,25 @@ function renderResult({ qrText, packKey, holderName, ticketNumber, promoCode, wo
   const copyBtn = boxEl.querySelector("#copyPromoBtn");
   if (copyBtn && promo) {
     copyBtn.addEventListener("click", async () => {
-      const msg = boxEl.querySelector("#copyPromoMsg");
-      try {
-        await navigator.clipboard.writeText(promo);
-        if (msg) msg.textContent = "✅ Copié";
-      } catch {
-        if (msg) msg.textContent = "❌ Impossible de copier (copie manuelle).";
-      }
-    });
+  const msg = boxEl.querySelector("#copyPromoMsg");
+  try {
+    await navigator.clipboard.writeText(promo);
+
+    // ✅ marquer "copié" dans le registre admin
+    try {
+      const codeId = String(promo).toLowerCase();
+      await setDoc(doc(db, "promoCodes", codeId), {
+        copiedAt: serverTimestamp()
+      }, { merge: true });
+    } catch (e) {
+      console.log("mark copiedAt error:", e);
+    }
+
+    if (msg) msg.textContent = "✅ Copié";
+  } catch {
+    if (msg) msg.textContent = "❌ Impossible de copier (copie manuelle).";
+  }
+});
   }
 }
 
