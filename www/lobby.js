@@ -1536,5 +1536,476 @@ setGameMode = function(){
   try{ __applyVoteChatPolicy(); } catch(_) {}
 };
 
+  // ===================
+  // ROOM SNAPSHOT (1 SEUL)
+  // ===================
+  onSnapshot(doc(db,"rooms",roomId), async (snap)=>{
+    if (!snap.exists()){
+      alert("Partie supprimée");
+      location.href="./game.html";
+      return;
+    }
+
+    const room = snap.data() || {};
+    const status = room.status || "lobby";
+    roomStatusCache = status;
+
+    // cache global (utilisé par bloc 3/4)
+    try { lastRoomData = room; } catch(_) {}
+
+    roomChatEnabled = !!room.chatEnabled;
+
+    // deadUids persistant
+    const deadArr = Array.isArray(room.deadUids) ? room.deadUids : [];
+    deadUidsSet = new Set(deadArr);
+
+    // tasks global
+    roomTasksDone = (typeof room.tasksDone === "number") ? room.tasksDone : 0;
+    const tasksTotalRoom = (typeof room.tasksTotal === "number") ? room.tasksTotal : TASKS_TOTAL;
+    setGlobalTasksProgress(roomTasksDone, tasksTotalRoom);
+
+    // ✅ fin de game par missions
+    if (status === "started" && roomTasksDone >= tasksTotalRoom){
+      // camp nocents gagnent
+      try { showEndScreen("tinocent"); } catch(_) {}
+    }
+
+    myIsHost = (room.hostUid === myUid);
+    if (btnStart) btnStart.style.display = myIsHost ? "" : "none";
+
+    // meeting/report (lock + splash)
+    handleMeetingState(room, status);
+
+    // ✅ vote overlay / report chain (bloc 3)
+    if (typeof handleVoteState === "function") handleVoteState(room);
+
+    // ✅ failsafe vote + chat policy vote (bloc 4)
+    if (typeof __hostFailsafeVote === "function") __hostFailsafeVote(room);
+    if (typeof __applyVoteChatPolicy === "function") __applyVoteChatPolicy();
+
+    // ✅ sabotages (bloc 3)
+    if (typeof handleSabotageState === "function") handleSabotageState(room);
+
+    // ✅ endgame (bloc 3) — par élimination truants / nocents
+    if (status === "started" && typeof checkEndConditions === "function"){
+      try { checkEndConditions(room); } catch(_) {}
+    }
+
+    // modes
+    if (status === "starting"){
+      if (lastRoomStatus !== "starting"){
+        setStartingMode();
+        startTriggeredLocal = false;
+      }
+
+      if (!startTriggeredLocal){
+        startTriggeredLocal = true;
+
+        showRoleOverlayBase();
+        spinRunning = true;
+
+        (async ()=>{
+          let flip = false;
+          while (spinRunning && !myRole){
+            flip = !flip;
+            setOverlayFace(flip ? "titruant" : "tinocent");
+            await sleep(55);
+          }
+          if (myRole){
+            await playSpinThenReveal(myRole);
+          } else {
+            hideRoleOverlay();
+            spinRunning = false;
+          }
+        })();
+      }
+
+    } else if (status === "started"){
+      spinRunning = false;
+      hideRoleOverlay();
+      setGameMode();
+
+    } else {
+      spinRunning = false;
+      hideRoleOverlay();
+      setLobbyMode();
+    }
+
+    // refresh chat gating (room side)
+    refreshChatGating(status);
+
+    if (lastRoomStatus !== status){
+      ensureSpawnCenter();
+    }
+    lastRoomStatus = status;
+  });
+
+  // ===================
+  // PLAYERS SNAPSHOT (COLLECTION)
+  // ===================
+  onSnapshot(collection(db,"rooms",roomId,"players"), async (snap)=>{
+    const status = roomStatusCache || lastRoomStatus || "lobby";
+    const players = snap.docs.map(d=>d.data());
+
+    // toast “X a quitté”
+    const nowMap = new Map(players.map(p => [p.uid, p.name || "Joueur"]));
+    if (prevPlayersSnapshot.size){
+      for (const [uid, name] of prevPlayersSnapshot.entries()){
+        if (!nowMap.has(uid) && uid !== myUid){
+          showLeaveToast(`${name} a quitté la partie`);
+        }
+      }
+    }
+    prevPlayersSnapshot = nowMap;
+
+    renderPlayers(players);
+
+    if (myIsHost && players.length >= 4) setStartInfo("");
+
+    for (const p of players) ensurePlayerState(p);
+
+    // cleanup disconnected
+    const live = new Set(players.map(p => p.uid));
+    for (const uid of Array.from(playersMap.keys())){
+      if (!live.has(uid)) playersMap.delete(uid);
+    }
+
+    const me = players.find(p => p.uid === myUid);
+    if (me?.name) myName = me.name;
+
+    if (me){
+      const wasDead = myDead;
+
+      myDead = !!me.isDead || deadUidsSet.has(myUid);
+      myLastExpelAtMs = (typeof me.lastExpelAtMs === "number")
+        ? me.lastExpelAtMs
+        : (myLastExpelAtMs || 0);
+
+      if (!wasDead && myDead){
+        showSelfExpelledCard(10_000);
+
+        specCamX = (typeof me.x === "number") ? me.x : player.x;
+        specCamY = (typeof me.y === "number") ? me.y : player.y;
+
+        updateMyTaskHud();
+        closeActivityUI();
+      }
+
+      if (wasDead && !myDead){
+        specCamX = null; specCamY = null;
+      }
+
+      if (!localPosReady){
+        if (typeof me.x === "number" && typeof me.y === "number"){
+          player.x = me.x;
+          player.y = me.y;
+        } else {
+          await ensureSpawnCenter();
+        }
+        localPosReady = true;
+      }
+
+      // ✅ me dans playersMap avec coords locales
+      ensurePlayerState({ ...me, x: player.x, y: player.y });
+
+      // ✅ chat gating après myDead connu
+      refreshChatGating(status);
+
+      // ✅ tasks uniquement en started + nocent + vivant
+      if (status === "started" && myRole === "tinocent" && !myDead){
+        await ensureMyTasksAssigned();
+      }
+      updateMyTaskHud();
+    }
+
+    startLoopOnce();
+  });
+
+  // ===================
+  // CHAT SNAPSHOT + SUBMIT (1 SEUL bind)
+  // ===================
+  if (chatForm && chatInput){
+    const q = query(
+      collection(db, "rooms", roomId, "messages"),
+      orderBy("createdAtMs", "asc"),
+      limit(120)
+    );
+
+    onSnapshot(q, (snap) => {
+      const msgs = snap.docs.map(d => d.data());
+      renderChat(msgs);
+
+      const canBadge = (phase !== "started") ? true : chatCanViewNow;
+      if (msgs.length && canBadge && !chatOverlay?.classList.contains("open")){
+        const last = msgs[msgs.length - 1];
+        if (last?.uid && last.uid !== myUid){
+          chatFab?.classList.add("has-unread");
+          if (chatBadge) chatBadge.hidden = false;
+        }
+      }
+    }, (err) => console.log("chat snapshot error:", err));
+
+    chatForm.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      if (!chatCanWriteNow) return;
+
+      const val = chatInput.value;
+      chatInput.value = "";
+      try { await sendChat(val); }
+      catch (err) { console.log("chat send error:", err); }
+    });
+  }
+
+  // ===================
+  // LEAVE
+  // ===================
+  btnLeave?.addEventListener("click", async ()=>{
+    try{
+      await deleteDoc(doc(db,"rooms",roomId,"players",myUid));
+      const roomSnap = await getDoc(doc(db,"rooms",roomId));
+      const room = roomSnap.data();
+      if (room?.hostUid === myUid){
+        await deleteDoc(doc(db,"rooms",roomId));
+      }
+    } catch(e){
+      console.log("leave error:", e);
+    }
+    window.location.href = "./game.html";
+  });
+});
+
+// ===================
+// BLOCK 4 — STABILISATION / BUGFIX / PROPRETÉ (COLLE ICI si pas déjà fait)
+// ===================
+
+// Anti double-end-screen + anti double-redirect
+let __endShown = false;
+const __oldShowEndScreen = (typeof showEndScreen === "function") ? showEndScreen : null;
+
+if (__oldShowEndScreen){
+  showEndScreen = function(winner){
+    if (__endShown) return;
+    __endShown = true;
+
+    try{
+      setMeetingLock(true);
+      closeChat(true);
+      setActionUI({ show:false });
+      joy?.classList.add("is-hidden");
+    } catch(_) {}
+
+    return __oldShowEndScreen(winner);
+  };
+}
+
+// Sécurise vote : force chat visible pendant vote
+const __oldHandleVoteState = (typeof handleVoteState === "function") ? handleVoteState : null;
+if (__oldHandleVoteState){
+  handleVoteState = function(room){
+    try{
+      const st = room?.voteState || null;
+      if (st === "vote"){
+        chatCanViewNow = true;
+        setChatFabVisible(true);
+        applyChatWriteLock();
+      }
+    } catch(_) {}
+    return __oldHandleVoteState(room);
+  };
+}
+
+// Ajuste report splash
+const __oldShowReportSplash = (typeof showReportSplash === "function") ? showReportSplash : null;
+if (__oldShowReportSplash){
+  showReportSplash = function(bodyName, meetingAtMs){
+    const safeName = bodyName && String(bodyName).trim() ? bodyName : "Un Ti’Doc";
+    return __oldShowReportSplash(safeName, meetingAtMs);
+  };
+}
+
+// Missions: robustesse total
+const __oldSetGlobalTasksProgress = (typeof setGlobalTasksProgress === "function") ? setGlobalTasksProgress : null;
+if (__oldSetGlobalTasksProgress){
+  setGlobalTasksProgress = function(done, total){
+    const safeTotal = (typeof total === "number" && total > 0)
+      ? total
+      : (typeof TASKS_PER_PLAYER === "number" ? TASKS_PER_PLAYER : 5) * 4;
+    return __oldSetGlobalTasksProgress(done, safeTotal);
+  };
+}
+
+// SABOTAGE ADMIN overlay hachures
+const __adminBlockOverlay = document.createElement("div");
+__adminBlockOverlay.id = "adminBlockOverlay";
+__adminBlockOverlay.style.cssText = `
+  position: fixed; inset:0; z-index: 275;
+  display:none; align-items:center; justify-content:center;
+  background: rgba(0,0,0,.55);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+`;
+__adminBlockOverlay.innerHTML = `
+  <div style="
+    width: min(520px, calc(100vw - 28px));
+    border-radius: 20px;
+    padding: 14px;
+    color:#fff;
+    font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+    background:
+      linear-gradient(rgba(0,0,0,.72), rgba(0,0,0,.72)),
+      repeating-linear-gradient(135deg, rgba(255,255,255,.10) 0 10px, rgba(255,255,255,.02) 10px 20px);
+    border: 1px solid rgba(255,255,255,.14);
+    box-shadow: 0 18px 55px rgba(0,0,0,.35);
+  ">
+    <div style="font:1000 16px system-ui;">Blocage administratif</div>
+    <div style="margin-top:8px; font:900 12px system-ui; opacity:.92;">
+      Cette zone est temporairement indisponible.
+    </div>
+    <button id="adminBlockOk" type="button" style="
+      margin-top: 12px;
+      width: 100%;
+      appearance:none; border:0;
+      padding: 12px 12px;
+      border-radius: 14px;
+      font: 1000 13px system-ui;
+      color:#000;
+      background: rgba(255,255,255,.88);
+    ">OK</button>
+  </div>
+`;
+document.body.appendChild(__adminBlockOverlay);
+
+__adminBlockOverlay.querySelector("#adminBlockOk")?.addEventListener("click", ()=>{
+  __adminBlockOverlay.style.display = "none";
+});
+__adminBlockOverlay.addEventListener("click", (e)=>{
+  if (e.target === __adminBlockOverlay) __adminBlockOverlay.style.display = "none";
+});
+
+function __showAdminBlocked(){
+  __adminBlockOverlay.style.display = "flex";
+}
+
+// wrap doZoneAction : si admin sabotage actif => block
+const __doZoneAction_prev = doZoneAction;
+doZoneAction = async function(zone){
+  try{
+    if (zone?.id === "admin" && typeof sabotageIsActive === "function" && sabotageIsActive("admin")){
+      __showAdminBlocked();
+      return;
+    }
+  } catch(_) {}
+  return __doZoneAction_prev(zone);
+};
+
+// SABOTAGE COMMS: brouille aussi myTaskList
+const __updateMyTaskHud_prev = updateMyTaskHud;
+updateMyTaskHud = function(){
+  __updateMyTaskHud_prev();
+
+  try{
+    if (
+      typeof sabotageIsActive === "function" &&
+      sabotageIsActive("comms") &&
+      myRole === "tinocent" &&
+      !myDead &&
+      phase === "started"
+    ){
+      const t = currentTask();
+      if (t?.label && myTaskListEl){
+        const raw = myTaskListEl.innerHTML || "";
+        myTaskListEl.innerHTML = raw.replaceAll(t.label, scrambleAlien(t.label));
+      }
+    }
+  } catch(_) {}
+};
+
+// SABOTAGE LIGHTS: clamp vision mini
+if (typeof getVisionRadiusWorld === "function"){
+  const __getVision_prev = getVisionRadiusWorld;
+  getVisionRadiusWorld = function(){
+    const r = __getVision_prev();
+    return Math.max(r, 85);
+  };
+}
+
+// Vote list: filtre morts
+const __renderVoteList_prev = (typeof renderVoteList === "function") ? renderVoteList : null;
+if (__renderVoteList_prev){
+  renderVoteList = function(alivePlayers, locked=false){
+    const safeAlive = Array.isArray(alivePlayers)
+      ? alivePlayers.filter(p => p && p.uid && !playersMap.get(p.uid)?.isDead)
+      : [];
+    return __renderVoteList_prev(safeAlive, locked);
+  };
+}
+
+// Failsafe vote host
+async function __hostFailsafeVote(room){
+  if (!myIsHost) return;
+  if (!room || room.status !== "started") return;
+  if (room.voteState !== "vote") return;
+
+  const at = (typeof room.voteAtMs === "number") ? room.voteAtMs : 0;
+  if (!at) return;
+
+  const end = at + 30_000;
+  if (Date.now() > end + 8000){
+    try{
+      await hostCloseVoteAndApply(room);
+    } catch(_) {}
+  }
+}
+
+// Chat policy pendant vote
+function __applyVoteChatPolicy(){
+  if (phase !== "started") return;
+  if (typeof lastRoomData !== "object" || !lastRoomData) return;
+
+  if (lastRoomData.voteState === "vote"){
+    chatCanViewNow = true;
+    chatCanWriteNow = !myDead;
+    setChatFabVisible(true);
+    applyChatWriteLock();
+  }
+}
+
+// Tubes assets warnings (pas de crash)
+function __imgExists(src){
+  return new Promise(res=>{
+    const im = new Image();
+    im.onload = ()=> res(true);
+    im.onerror = ()=> res(false);
+    im.src = src;
+  });
+}
+
+async function __verifyTubeAssets(){
+  if (!Array.isArray(TUBE_ASSETS)) return;
+  for (const t of TUBE_ASSETS){
+    try{
+      const ok = await __imgExists(t.src);
+      if (!ok) console.warn("[LABO] Asset manquant:", t.src);
+    } catch(_) {}
+  }
+}
+
+let __tubeCheckDone = false;
+async function __maybeCheckTubes(){
+  if (__tubeCheckDone) return;
+  __tubeCheckDone = true;
+  await __verifyTubeAssets();
+}
+
+// Hook setGameMode: check tubes + sabotage btn + vote chat
+const __setGameMode_prev = setGameMode;
+setGameMode = function(){
+  __setGameMode_prev();
+  try{ __maybeCheckTubes(); } catch(_) {}
+  try{ if (typeof refreshSabotageBtn === "function") refreshSabotageBtn(lastRoomData); } catch(_) {}
+  try{ __applyVoteChatPolicy(); } catch(_) {}
+};
+
 
 
