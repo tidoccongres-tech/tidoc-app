@@ -211,20 +211,23 @@ function buildBell(right){
 async function getPrettyName(user){
   if (!user) return "Utilisateur";
 
+  // 1) Firestore : on ne prend QUE displayName/username (pas "name")
   if (db){
     try{
       const snap = await getDoc(doc(db, "users", user.uid));
       if (snap.exists()){
         const d = snap.data() || {};
-        const n = (d.displayName || d.username || d.name || "").trim();
+        const n = (d.displayName || d.username || "").trim(); // ✅ name retiré
         if (n){ localStorage.setItem(LS_NAME, n); return n; }
       }
     }catch(_){}
   }
 
+  // 2) Cache
   const cached = (localStorage.getItem(LS_NAME) || "").trim();
   if (cached) return cached;
 
+  // 3) Auth
   const dn = (user.displayName || "").trim();
   if (dn) { localStorage.setItem(LS_NAME, dn); return dn; }
 
