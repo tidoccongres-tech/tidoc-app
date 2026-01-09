@@ -25,21 +25,6 @@ import {
   runTransaction
 } from "https://www.gstatic.com/firebasejs/10.12.4/firebase-firestore.js";
 
-import { updateProfile } from "https://www.gstatic.com/firebasejs/10.12.4/firebase-auth.js";
-import { auth, db } from "./auth.js";
-import { doc, setDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.4/firebase-firestore.js";
-
-async function setPseudo(newName){
-  const u = auth.currentUser;
-  if (!u) throw new Error("Connexion requise.");
-
-  const name = String(newName || "").trim();
-  if (!name) throw new Error("Pseudo requis.");
-
-  await updateProfile(u, { displayName: name }); // ✅ Auth
-  await setDoc(doc(db, "users", u.uid), { displayName: name, updatedAt: serverTimestamp() }, { merge:true }); // ✅ Firestore
-}
-
 // =====================
 // CONFIG
 // =====================
