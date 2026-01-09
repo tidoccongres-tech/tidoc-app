@@ -2742,6 +2742,126 @@ async function ensureSpawnCenter(){
   }
 }
 
+// ===================
+// END SCREEN (Victoire / Défaite) — V1
+// ===================
+const endOverlay = document.createElement("div");
+endOverlay.id = "endOverlay";
+endOverlay.style.cssText = `
+  position: fixed; inset:0; z-index: 999;
+  display:none; align-items:center; justify-content:center;
+  background: rgba(0,0,0,.72);
+  color:#fff; text-align:center;
+  font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+`;
+
+endOverlay.innerHTML = `
+  <div style="
+    width:min(560px, calc(100vw - 24px));
+    padding:14px; border-radius:18px;
+    background: rgba(0,0,0,.70);
+    border:1px solid rgba(255,255,255,.14);
+    box-shadow:0 18px 55px rgba(0,0,0,.35);
+  ">
+    <img id="endImg" src="./assets/tinocent.png" alt="fin"
+      style="display:block;width:100%;max-width:360px;margin:0 auto;border-radius:16px;border:1px solid rgba(255,255,255,.12);"/>
+    <div id="endText" style="margin-top:14px; font:1000 24px system-ui; letter-spacing:.6px;">FIN</div>
+    <div id="endSub" style="margin-top:8px; font:900 12px system-ui; opacity:.92;">Retour au menu…</div>
+  </div>
+`;
+document.body.appendChild(endOverlay);
+
+const endImgEl  = endOverlay.querySelector("#endImg");
+const endTextEl = endOverlay.querySelector("#endText");
+const endSubEl  = endOverlay.querySelector("#endSub");
+
+// anti double affichage + anti double redirect
+let __endShown = false;
+let __endRedirectTimer = null;
+
+function freezeAllInputs(){
+  try{ meetingLockActive = true; } catch(_) {}
+  try{ activityOpen = true; } catch(_) {} // empêche actions
+  try{ move.x = 0; move.y = 0; } catch(_) {}
+  try{ setActionUI({ show:false }); } catch(_) {}
+  try{ closeActivityUI?.(); } catch(_) {}
+  try{ closeChat?.(true); } catch(_) {}
+  try{ joy?.classList.add("is-hidden"); } catch(_) {}
+}
+
+function showEndScreen(winnerCamp){
+  // winnerCamp: "tinocent" | "titruant"
+  if (__endShown) return;
+  __endShown = true;
+
+  freezeAllInputs();
+
+  const myCamp = (myRole === "titruant") ? "titruant" : "tinocent";
+  const iWin = (winnerCamp === myCamp);
+
+  if (endImgEl){
+    endImgEl.src = (winnerCamp === "titruant") ? "./assets/titruant.png" : "./assets/tinocent.png";
+  }
+  if (endTextEl){
+    endTextEl.textContent = iWin ? "VICTOIRE" : "DÉFAITE";
+  }
+  if (endSubEl){
+    endSubEl.textContent = "Retour au menu…";
+  }
+
+  endOverlay.style.display = "flex";
+
+  clearTimeout(__endRedirectTimer);
+  __endRedirectTimer = setTimeout(() => {
+    window.location.href = "./game.html";
+  }, 5500);
+}
+
+// ===================
+// END CONDITIONS
+// - Nocents gagnent si tasksDone >= tasksTotal
+// - Truants gagnent si truantsAlive >= nocentsAlive
+// ===================
+function checkEndConditions(room){
+  if (__endShown) return;
+  if (!room || room.status !== "started") return;
+
+  const done  = (typeof room.tasksDone === "number")  ? room.tasksDone  : 0;
+  const total = (typeof room.tasksTotal === "number") ? room.tasksTotal : TASKS_TOTAL;
+
+  // 1) Win missions
+  if (total > 0 && done >= total){
+    showEndScreen("tinocent");
+    return;
+  }
+
+  // 2) Win imposteurs : truant >= nocent vivants
+  // => on déduit les vivants par playersMap + myRole known via privateRoles
+  let nocentsAlive = 0;
+  let truantsAlive = 0;
+
+  for (const p of playersMap.values()){
+    if (!p || p.isDead) continue;
+
+    // rôle connu seulement pour soi -> donc on ne peut pas compter “vrais” camps juste via myRole
+    // MAIS on peut compter à partir du champ room.truantsCount si tu veux, sinon on fait "fin seulement missions".
+    // Ici: on utilise room.truantsCount si présent ET playersCount pour approx
+  }
+
+  // ✅ Version safe & simple:
+  // Si tu veux la condition “truants >= nocents” fiable, il faut stocker les rôles côté host (par ex dans room.rolesPublic ou room.privateRoles consultable host).
+  // Donc par défaut: on ne déclenche PAS cette fin côté client si on n'a pas la donnée fiable.
+
+  // 👉 Si tu as un champ room.publicAliveCounts = { nocentsAlive, truantsAlive } géré par host -> on l'utilise:
+  const counts = room.publicAliveCounts || null;
+  if (counts && typeof counts.nocentsAlive === "number" && typeof counts.truantsAlive === "number"){
+    if (counts.nocentsAlive <= 0 || counts.truantsAlive >= counts.nocentsAlive){
+      showEndScreen("titruant");
+      return;
+    }
+  }
+}
+
 onAuthStateChanged(auth, async (u) => {
   if (!u) { location.href = "./login.html"; return; }
   if (!roomId){
@@ -2823,7 +2943,7 @@ onAuthStateChanged(auth, async (u) => {
     roomStatusCache = status;
 
     roomChatEnabled = !!room.chatEnabled;
-
+    
     // deadUids persistant
     const deadArr = Array.isArray(room.deadUids) ? room.deadUids : [];
     deadUidsSet = new Set(deadArr);
@@ -2842,7 +2962,13 @@ onAuthStateChanged(auth, async (u) => {
 
     // meeting/report (lock + splash)
     handleMeetingState(room, status);
+// ✅ END SCREEN
+try { checkEndConditions(room); } catch(_) {}
 
+// ✅ si la room est déjà marquée ended (optionnel)
+if (room.status === "ended" && room.winner){
+  showEndScreen(room.winner);
+}
     // modes
     if (status === "starting"){
       if (lastRoomStatus !== "starting"){
