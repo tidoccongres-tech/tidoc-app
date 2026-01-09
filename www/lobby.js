@@ -458,16 +458,16 @@ function startTapOrderMiniGame({ steps = 6 } = {}){
   const order = Array.from({length: steps}, (_,i)=>i+1);
   shuffleCryptoInPlace(order);
 
-  let idx = 0; // index dans order
+  let idx = 0;
+
+  const wrap = document.createElement("div");
+  wrap.style.cssText = `display:flex; flex-wrap:wrap; gap:10px; justify-content:center;`;
 
   function setProgress(){
     const pct = (idx/steps)*100;
     activityBarEl.style.width = `${pct}%`;
     activitySubEl.textContent = `Tape ${order[idx]} sur ${steps}`;
   }
-
-  const wrap = document.createElement("div");
-  wrap.style.cssText = `display:flex; flex-wrap:wrap; gap:10px; justify-content:center;`;
 
   for (let n=1; n<=steps; n++){
     const btn = document.createElement("button");
@@ -502,7 +502,7 @@ function startTapOrderMiniGame({ steps = 6 } = {}){
     wrap.appendChild(btn);
   }
 
-  // mélange l’ordre d’affichage
+  // mélange l’affichage
   const children = Array.from(wrap.children);
   children.sort(() => (cryptoRandInt(2) ? 1 : -1));
   wrap.innerHTML = "";
