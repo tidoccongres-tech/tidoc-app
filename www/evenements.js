@@ -141,8 +141,7 @@ function showForm(show){
 }
 
 function clearForm(){
-  ["eventDate","eventStart","eventEnd","eventTitle","eventPlace","eventDesc","eventCapacity"]
-    .forEach((id)=>{
+  ["eventDate","eventStart","eventEnd","eventTitle","eventPlace","eventDesc","eventCapacity","eventCapacityStaff"]    .forEach((id)=>{
       const el = document.getElementById(id);
       if (el) el.value = "";
     });
@@ -563,13 +562,18 @@ function renderEventCard(id, e){
   const endTxt  = e.endAt?.toDate ? formatTime(e.endAt.toDate()) : "";
   const place   = (e.place || "").trim();
 
-  const capPub   = Number(e.capacity || 0);
-const capStaff = Number(e.capacityStaff || 0);
-const bookedPub= Number(e.bookedCount || 0);
-const bookedStf= Number(e.bookedStaffCount || 0);
+  const capPub    = Number(e.capacity || 0);
+const capStaff  = Number(e.capacityStaff || 0);
+const bookedPub = Number(e.bookedCount || 0);
+const bookedStf = Number(e.bookedStaffCount || 0);
 
 const leftPub   = capPub > 0 ? Math.max(0, capPub - bookedPub) : null;
 const leftStaff = capStaff > 0 ? Math.max(0, capStaff - bookedStf) : null;
+
+// affichage (si cap=0 => illimité)
+const capPubTxt   = capPub > 0 ? String(capPub) : "∞";
+const capStaffTxt = capStaff > 0 ? String(capStaff) : "∞";
+  
   const canDelete = isAdmin();
 
   const card = document.createElement("section");
@@ -601,16 +605,23 @@ const leftStaff = capStaff > 0 ? Math.max(0, capStaff - bookedStf) : null;
 
       ${e.desc ? `<p class="event-desc">${escapeHTML(e.desc)}</p>` : ""}
 
-      <div class="event-meta">
-        <span>🕒 ${timeTxt}${endTxt ? " – " + endTxt : ""}</span>
-        ${cap ? `<span>• 👥 ${booked}/${cap} inscrits • ${left} places restantes</span>` : ""}
-        ${e.type ? `<span>• ${escapeHTML(e.type)}</span>` : ""}
-        ${
-          place
-            ? `<span>• 📍 <a class="event-place" target="_blank" rel="noreferrer" href="${mapsUrl(place)}">${escapeHTML(place)}</a></span>`
-            : ""
-        }
-      </div>
+     <div class="event-meta">
+  <span>🕒 ${timeTxt}${endTxt ? " – " + endTxt : ""}</span>
+
+  ${
+    (capPub > 0 || capStaff > 0)
+      ? `<span>• 👥 Public: ${bookedPub}/${capPubTxt}${leftPub !== null ? ` (${leftPub} restantes)` : ""} • Staff: ${bookedStf}/${capStaffTxt}${leftStaff !== null ? ` (${leftStaff} restantes)` : ""}</span>`
+      : `<span>• 👥 Public: ${bookedPub}/${capPubTxt} • Staff: ${bookedStf}/${capStaffTxt}</span>`
+  }
+
+  ${e.type ? `<span>• ${escapeHTML(e.type)}</span>` : ""}
+
+  ${
+    place
+      ? `<span>• 📍 <a class="event-place" target="_blank" rel="noreferrer" href="${mapsUrl(place)}">${escapeHTML(place)}</a></span>`
+      : ""
+  }
+</div>
 
       ${
   !canDelete ? `
