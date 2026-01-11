@@ -588,13 +588,15 @@ function parseMetaFromText(raw = "") {
 
   // pack (inclut workshop/atelier)
   let packKey = "";
- const mp = full.match(/pack\s*(essentiel|standard|premium|workshop|atelier|staffeurs?|staff)/i);    const v = mp[1].toLowerCase();
-    if (v.startsWith("ess")) packKey = "essentiel";
-    else if (v.startsWith("sta")) packKey = "standard";
-    else if (v.startsWith("pre")) packKey = "premium";
-    else if (v.startsWith("wor") || v.startsWith("ate")) packKey = "workshop";
-    else if (v.startsWith("staff")) packKey = "staff";
-  }
+const mp = full.match(/pack\s*(essentiel|standard|premium|workshop|atelier|staffeurs?|staff)/i);
+if (mp && mp[1]) {
+  const v = mp[1].toLowerCase();
+  if (v.startsWith("ess")) packKey = "essentiel";
+  else if (v.startsWith("sta")) packKey = "standard";
+  else if (v.startsWith("pre")) packKey = "premium";
+  else if (v.startsWith("wor") || v.startsWith("ate")) packKey = "workshop";
+  else if (v.startsWith("staff")) packKey = "staff";
+}
 
   // ticket number
   let ticketNumber = "";
