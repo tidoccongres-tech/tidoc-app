@@ -1022,15 +1022,19 @@ async function saveAdminPacks() {
 
   // staff: pas de promo packs
   if (key === "staff") {
-    out[key] = {
-      label: PACKS_FALLBACK[key]?.label || key,
-      conferencesAllowed: Math.max(0, Number(mainEl?.value || 0)),
-      workshopDiscountPacks: 0,
-    };
-    // sécurité
-    if (out[key].conferencesAllowed <= 0) out[key].conferencesAllowed = 999;
-    continue;
-  }
+  const wsdEl = document.querySelector(`[data-pack-wsd="${CSS.escape(key)}"]`);
+
+  out[key] = {
+    label: PACKS_FALLBACK[key]?.label || key,
+    conferencesAllowed: Math.max(0, Number(mainEl?.value || 0)),
+    workshopDiscountPacks: Math.max(0, Number(wsdEl?.value || 0)),
+  };
+
+  if (out[key].conferencesAllowed <= 0) out[key].conferencesAllowed = 999;
+  if (out[key].workshopDiscountPacks <= 0) out[key].workshopDiscountPacks = 999;
+
+  continue;
+}
 
   // autres packs: conf + packs remisés
   const wsdEl = document.querySelector(`[data-pack-wsd="${CSS.escape(key)}"]`);
