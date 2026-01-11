@@ -317,16 +317,25 @@ async function registerToEvent(eventId){
     if (!evSnap.exists()) throw new Error("Évènement introuvable.");
 
     const ev = evSnap.data() || {};
-    const cap    = Number(ev.capacity || 0);
-    const booked = Number(ev.bookedCount || 0);
+
+    const capPublic  = Number(ev.capacity || 0);
+    const capStaff   = Number(ev.capacityStaff || 0);
+    const bookedPub  = Number(ev.bookedCount || 0);
+    const bookedStf  = Number(ev.bookedStaffCount || 0);
 
     const regSnap = await tx.get(regRef);
     if (regSnap.exists()) throw new Error("Tu es déjà inscrit(e).");
 
-    if (cap > 0 && booked >= cap) throw new Error("Plus de places disponibles.");
+    // ✅ place selon staff/public
+    if (rights.isStaff){
+      if (capStaff > 0 && bookedStf >= capStaff) throw new Error("Plus de places STAFF disponibles.");
+    } else {
+      if (capPublic > 0 && bookedPub >= capPublic) throw new Error("Plus de places disponibles.");
+    }
 
     const typeKey = eventTypeKey(ev.type);
 
+    // ✅ quotas (staff inclus si tu veux limiter workshops)
     const uSnap = await tx.get(usageRef);
     const usage = uSnap.exists() ? (uSnap.data() || {}) : {};
     const wsUsed    = Number(usage.workshopUsed || 0);
@@ -344,8 +353,19 @@ async function registerToEvent(eventId){
       tx.set(usageRef, { otherUsed: otherUsed + 1 }, { merge:true });
     }
 
-    tx.set(regRef, { uid, createdAt: serverTimestamp() });
-    tx.update(evRef, { bookedCount: booked + 1 }); // ✅ rules OK (+1)
+    // ✅ registration
+    tx.set(regRef, {
+      uid,
+      isStaff: !!rights.isStaff,
+      createdAt: serverTimestamp()
+    });
+
+    // ✅ incrément bon compteur
+    if (rights.isStaff){
+      tx.update(evRef, { bookedStaffCount: bookedStf + 1 });
+    } else {
+      tx.update(evRef, { bookedCount: bookedPub + 1 });
+    }
   });
 }
 
@@ -364,8 +384,13 @@ async function unregisterFromEvent(eventId){
     const regSnap = await tx.get(regRef);
     if (!regSnap.exists()) throw new Error("Tu n’es pas inscrit(e).");
 
+    const reg = regSnap.data() || {};
+    const wasStaff = !!reg.isStaff;
+
     const ev = evSnap.data() || {};
-    const booked  = Number(ev.bookedCount || 0);
+    const bookedPub  = Number(ev.bookedCount || 0);
+    const bookedStf  = Number(ev.bookedStaffCount || 0);
+
     const typeKey = eventTypeKey(ev.type);
 
     const uSnap = await tx.get(usageRef);
@@ -383,7 +408,12 @@ async function unregisterFromEvent(eventId){
     }
 
     tx.delete(regRef);
-    tx.update(evRef, { bookedCount: Math.max(0, booked - 1) }); // ✅ rules OK (-1)
+
+    if (wasStaff){
+      tx.update(evRef, { bookedStaffCount: Math.max(0, bookedStf - 1) });
+    } else {
+      tx.update(evRef, { bookedCount: Math.max(0, bookedPub - 1) });
+    }
   });
 }
 
@@ -533,10 +563,13 @@ function renderEventCard(id, e){
   const endTxt  = e.endAt?.toDate ? formatTime(e.endAt.toDate()) : "";
   const place   = (e.place || "").trim();
 
-  const cap    = Number(e.capacity || 0);
-  const booked = Number(e.bookedCount || 0);
-  const left   = cap > 0 ? Math.max(0, cap - booked) : null;
+  const capPub   = Number(e.capacity || 0);
+const capStaff = Number(e.capacityStaff || 0);
+const bookedPub= Number(e.bookedCount || 0);
+const bookedStf= Number(e.bookedStaffCount || 0);
 
+const leftPub   = capPub > 0 ? Math.max(0, capPub - bookedPub) : null;
+const leftStaff = capStaff > 0 ? Math.max(0, capStaff - bookedStf) : null;
   const canDelete = isAdmin();
 
   const card = document.createElement("section");
