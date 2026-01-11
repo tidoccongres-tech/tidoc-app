@@ -21,12 +21,16 @@ const db   = AuthMod.db;
 const ADMIN_EMAIL = "tidoc.congres@gmail.com";
 
 /* =========================
-   PACKS (quotas)
+   PACKS (quotas) + STAFF
    ========================= */
 const PACKS_FALLBACK = {
   essentiel: { label:"Essentiel", workshopsAllowed: 1, conferencesAllowed: 2, otherAllowed: 0 },
   standard:  { label:"Standard",  workshopsAllowed: 2, conferencesAllowed: 4, otherAllowed: 0 },
   premium:   { label:"Premium",   workshopsAllowed: 3, conferencesAllowed: 7, otherAllowed: 0 },
+
+  // ✅ Pack staffeurs (quota workshops configurable, conférences quasi illimitées)
+  staff:     { label:"Pack staffeurs", workshopsAllowed: 3, conferencesAllowed: 999, otherAllowed: 0 },
+
   autre:     { label:"Autre",     workshopsAllowed: 0, conferencesAllowed: 0, otherAllowed: 0 },
 };
 
@@ -56,7 +60,15 @@ async function loadPackConfig(){
     }
     const data = snap.data() || {};
     const normalized = normalizePackConfig(data);
-    PACKS = Object.keys(normalized).length ? normalized : { ...PACKS_FALLBACK };
+
+    // ✅ force au minimum les clés attendues
+    PACKS = {
+      ...PACKS_FALLBACK,
+      ...(Object.keys(normalized).length ? normalized : {}),
+    };
+
+    // ✅ label figé
+    PACKS.staff.label = "Pack staffeurs";
   } catch (e){
     console.log("loadPackConfig error:", e);
     PACKS = { ...PACKS_FALLBACK };
@@ -153,7 +165,11 @@ async function getMyRights(){
   const tSnap = await getDoc(doc(db, "userTickets", uid));
   if (!tSnap.exists()) return { ok:false, reason:"noticket" };
 
-  const packKey = String(tSnap.data()?.packKey || "").toLowerCase();
+  const packKeyRaw = String(tSnap.data()?.packKey || "").toLowerCase();
+
+  // ✅ accepte "staffeurs" ou "staff" (au cas où)
+  const packKey = packKeyRaw.includes("staff") ? "staff" : packKeyRaw;
+
   const pack = PACKS[packKey];
   if (!pack) return { ok:false, reason:"badpack" };
 
@@ -167,10 +183,13 @@ async function getMyRights(){
   return {
     ok:true,
     packKey,
+    isStaff: packKey === "staff",
+
     wsUsed, confUsed, otherUsed,
     wsAllowed: pack.workshopsAllowed,
     confAllowed: pack.conferencesAllowed,
     otherAllowed: pack.otherAllowed,
+
     wsLeft: Math.max(0, pack.workshopsAllowed - wsUsed),
     confLeft: Math.max(0, pack.conferencesAllowed - confUsed),
     otherLeft: Math.max(0, pack.otherAllowed - otherUsed),
@@ -204,9 +223,12 @@ async function createEvent(){
     const place = document.getElementById("eventPlace")?.value?.trim() || "";
     const type  = document.getElementById("eventType")?.value || "Autre";
     const desc  = document.getElementById("eventDesc")?.value?.trim() || "";
-    const capacity = Number(document.getElementById("eventCapacity")?.value || 0);
 
-    if (capacity < 1) { showMsg("Ajoute un nombre de places (>=1)."); return; }
+    const capacity      = Number(document.getElementById("eventCapacity")?.value || 0);        // public
+    const capacityStaff = Number(document.getElementById("eventCapacityStaff")?.value || 0);  // ✅ staff
+
+    if (capacity < 0 || capacityStaff < 0) { showMsg("Les places doivent être >= 0."); return; }
+    if ((capacity + capacityStaff) < 1) { showMsg("Ajoute au moins 1 place (public + staff)."); return; }
     if (!d || !title) { showMsg("Il faut au minimum une date + un titre."); return; }
 
     const startHHMM = start || "00:00";
@@ -226,8 +248,14 @@ async function createEvent(){
     await addDoc(collection(db, "events"), {
       title, desc, place, type,
       startAt, endAt,
-      capacity,
+
+      // ✅ capacités séparées
+      capacity: Math.max(0, capacity),
+      capacityStaff: Math.max(0, capacityStaff),
+
       bookedCount: 0,
+      bookedStaffCount: 0,
+
       createdAt: serverTimestamp(),
       createdBy: auth.currentUser?.uid || "",
     });
