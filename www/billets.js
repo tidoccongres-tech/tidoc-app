@@ -1275,7 +1275,11 @@ deleteBtn?.addEventListener("click", deleteMyTicketAndUnclaim);
 // Admin buttons visibility
 // =====================
 function updateAdminButtonsVisibility(){
-  const ok = isAdmin();
+  const u = auth.currentUser;
+  const ok = u && String(u.email || "").toLowerCase() === ADMIN_EMAIL.toLowerCase();
+
+  console.log("ADMIN CHECK:", ok, u?.email);
+
   if (adminBtn) adminBtn.style.display = ok ? "inline-flex" : "none";
   if (promoBtn) promoBtn.style.display = ok ? "inline-flex" : "none";
 }
@@ -1283,7 +1287,7 @@ function updateAdminButtonsVisibility(){
 // =====================
 // INIT
 // =====================
-onAuthStateChanged(auth, async () => {
+onAuthStateChanged(auth, async (user) => {
   try {
     await loadPackConfig();
     await loadPromoPools();
