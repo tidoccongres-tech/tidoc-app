@@ -120,7 +120,7 @@ const PACKS_FALLBACK = {
   workshop:  { label: "Workshop",  conferencesAllowed: 1, workshopDiscountPacks: 0 },
 
   // ✅ Pack staffeurs : pas de promo workshops, et confAllowed = “info” (pas utilisé pour quotas ici)
-  staff:     { label: "Pack staffeurs", conferencesAllowed: 999, workshopDiscountPacks: 0 },
+  staff:     { label: "Pack staffeurs", conferencesAllowed: 999, workshopDiscountPacks: 999 },
 };
 
 let PACKS = { ...PACKS_FALLBACK };
@@ -173,7 +173,7 @@ if (!Number.isFinite(PACKS.staff.conferencesAllowed) || PACKS.staff.conferencesA
   PACKS.staff.conferencesAllowed = 999;
 }
 if (!Number.isFinite(PACKS.staff.workshopDiscountPacks) || PACKS.staff.workshopDiscountPacks < 0) {
-  PACKS.staff.workshopDiscountPacks = 0;
+  PACKS.staff.workshopDiscountPacks = 999;
 }
   } catch (e) {
     console.log("loadPackConfig error:", e);
