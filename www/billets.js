@@ -596,7 +596,7 @@ if (mp && mp[1]) {
   else if (v.startsWith("pre")) packKey = "premium";
   else if (v.startsWith("wor") || v.startsWith("ate")) packKey = "workshop";
   else if (v.startsWith("staff")) packKey = "staff";
-}
+} 
 
   // ticket number
   let ticketNumber = "";
