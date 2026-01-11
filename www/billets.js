@@ -149,22 +149,32 @@ async function loadPackConfig() {
 
     const normalized = normalizePackConfig(snap.data() || {});
     PACKS = {
-      premium:   { ...PACKS_FALLBACK.premium,   ...(normalized.premium   || {}) },
-      standard:  { ...PACKS_FALLBACK.standard,  ...(normalized.standard  || {}) },
-      essentiel: { ...PACKS_FALLBACK.essentiel, ...(normalized.essentiel || {}) },
-      workshop:  { ...PACKS_FALLBACK.workshop,  ...(normalized.workshop  || {}) },
-    };
+  premium:   { ...PACKS_FALLBACK.premium,   ...(normalized.premium   || {}) },
+  standard:  { ...PACKS_FALLBACK.standard,  ...(normalized.standard  || {}) },
+  essentiel: { ...PACKS_FALLBACK.essentiel, ...(normalized.essentiel || {}) },
+  workshop:  { ...PACKS_FALLBACK.workshop,  ...(normalized.workshop  || {}) },
+  staff:     { ...PACKS_FALLBACK.staff,     ...(normalized.staff     || {}) }, // ✅
+};
 
-    // labels figés
-    PACKS.premium.label   = PACKS_FALLBACK.premium.label;
-    PACKS.standard.label  = PACKS_FALLBACK.standard.label;
-    PACKS.essentiel.label = PACKS_FALLBACK.essentiel.label;
-    PACKS.workshop.label  = PACKS_FALLBACK.workshop.label;
+// labels figés
+PACKS.premium.label   = PACKS_FALLBACK.premium.label;
+PACKS.standard.label  = PACKS_FALLBACK.standard.label;
+PACKS.essentiel.label = PACKS_FALLBACK.essentiel.label;
+PACKS.workshop.label  = PACKS_FALLBACK.workshop.label;
+PACKS.staff.label     = PACKS_FALLBACK.staff.label; // ✅
 
-    // défaut workshop=1
-    if (!Number.isFinite(PACKS.workshop.conferencesAllowed) || PACKS.workshop.conferencesAllowed <= 0) {
-      PACKS.workshop.conferencesAllowed = 1;
-    }
+// défaut workshop=1
+if (!Number.isFinite(PACKS.workshop.conferencesAllowed) || PACKS.workshop.conferencesAllowed <= 0) {
+  PACKS.workshop.conferencesAllowed = 1;
+}
+
+// staff: valeur safe (si jamais)
+if (!Number.isFinite(PACKS.staff.conferencesAllowed) || PACKS.staff.conferencesAllowed < 0) {
+  PACKS.staff.conferencesAllowed = 999;
+}
+if (!Number.isFinite(PACKS.staff.workshopDiscountPacks) || PACKS.staff.workshopDiscountPacks < 0) {
+  PACKS.staff.workshopDiscountPacks = 0;
+}
   } catch (e) {
     console.log("loadPackConfig error:", e);
     PACKS = { ...PACKS_FALLBACK };
@@ -920,6 +930,7 @@ function ensureDefaultPacks(packs) {
     standard:  { ...PACKS_FALLBACK.standard,  ...(base.standard  || {}) },
     essentiel: { ...PACKS_FALLBACK.essentiel, ...(base.essentiel || {}) },
     workshop:  { ...PACKS_FALLBACK.workshop,  ...(base.workshop  || {}) },
+    staff:     { ...PACKS_FALLBACK.staff,     ...(base.staff     || {}) }, // ✅
   };
 }
 
@@ -935,6 +946,7 @@ function renderAdminPacksEditor() {
     row.style.cssText = "border:1px solid #eee; border-radius:14px; padding:12px;";
 
     const isWs = key === "workshop";
+    const isStaff = key === "staff";
     const labelPack = escapeHTML(PACKS_FALLBACK[key]?.label || key);
 
     row.innerHTML = `
