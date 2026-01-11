@@ -118,6 +118,9 @@ const PACKS_FALLBACK = {
   standard:  { label: "Standard",  conferencesAllowed: 4, workshopDiscountPacks: 2 },
   essentiel: { label: "Essentiel", conferencesAllowed: 2, workshopDiscountPacks: 1 },
   workshop:  { label: "Workshop",  conferencesAllowed: 1, workshopDiscountPacks: 0 },
+
+  // ✅ Pack staffeurs : pas de promo workshops, et confAllowed = “info” (pas utilisé pour quotas ici)
+  staff:     { label: "Pack staffeurs", conferencesAllowed: 999, workshopDiscountPacks: 0 },
 };
 
 let PACKS = { ...PACKS_FALLBACK };
@@ -576,13 +579,13 @@ function parseMetaFromText(raw = "") {
 
   // pack (inclut workshop/atelier)
   let packKey = "";
-  const mp = full.match(/pack\s*(essentiel|standard|premium|workshop|atelier)/i);
-  if (mp) {
+  const mp = full.match(/pack\s*(essentiel|standard|premium|workshop|atelier|staff|staffeurs)/i);  if (mp) {
     const v = mp[1].toLowerCase();
     if (v.startsWith("ess")) packKey = "essentiel";
     else if (v.startsWith("sta")) packKey = "standard";
     else if (v.startsWith("pre")) packKey = "premium";
     else if (v.startsWith("wor") || v.startsWith("ate")) packKey = "workshop";
+    else if (v.startsWith("staff")) packKey = "staff";
   }
 
   // ticket number
