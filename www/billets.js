@@ -962,18 +962,18 @@ function renderAdminPacksEditor() {
                  style="width:110px; padding:8px 10px; border:1px solid #ddd; border-radius:10px;">
         </label>
 
-        ${
-          isWs
-            ? ""
-            : `
-              <label style="display:flex; gap:8px; align-items:center;">
-                <span style="width:170px; font-weight:800;">Packs Workshop remisés</span>
-                <input data-pack-wsd="${escapeHTML(key)}" type="number" min="0"
-                       value="${Number(p.workshopDiscountPacks ?? 0)}"
-                       style="width:110px; padding:8px 10px; border:1px solid #ddd; border-radius:10px;">
-              </label>
-            `
-        }
+       ${
+  (isWs || isStaff)
+    ? ""
+    : `
+      <label style="display:flex; gap:8px; align-items:center;">
+        <span style="width:170px; font-weight:800;">Packs Workshop remisés</span>
+        <input data-pack-wsd="${escapeHTML(key)}" type="number" min="0"
+               value="${Number(p.workshopDiscountPacks ?? 0)}"
+               style="width:110px; padding:8px 10px; border:1px solid #ddd; border-radius:10px;">
+      </label>
+    `
+}
       </div>
     `;
 
