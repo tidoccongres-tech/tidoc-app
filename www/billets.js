@@ -119,8 +119,8 @@ const PACKS_FALLBACK = {
   essentiel: { label: "Essentiel", conferencesAllowed: 2, workshopDiscountPacks: 1 },
   workshop:  { label: "Workshop",  conferencesAllowed: 1, workshopDiscountPacks: 0 },
 
-  // ✅ Pack staffeurs : pas de promo workshops, et confAllowed = “info” (pas utilisé pour quotas ici)
-  staff: { label: "Pack Staffeurs", conferencesAllowed: 999, workshopDiscountPacks: 999 },
+  staff:     { label: "Pack Staffeurs", conferencesAllowed: 999, workshopDiscountPacks: 999 },
+};
 
 let PACKS = { ...PACKS_FALLBACK };
 
@@ -588,8 +588,7 @@ function parseMetaFromText(raw = "") {
 
   // pack (inclut workshop/atelier)
   let packKey = "";
-  const mp = full.match(/pack\s*(essentiel|standard|premium|workshop|atelier|staff|staffeurs)/i);  if (mp) {
-    const v = mp[1].toLowerCase();
+ const mp = full.match(/pack\s*(essentiel|standard|premium|workshop|atelier|staffeurs?|staff)/i);    const v = mp[1].toLowerCase();
     if (v.startsWith("ess")) packKey = "essentiel";
     else if (v.startsWith("sta")) packKey = "standard";
     else if (v.startsWith("pre")) packKey = "premium";
@@ -604,8 +603,7 @@ function parseMetaFromText(raw = "") {
 
   // holder name = ligne au-dessus de "Pack ..."
   let holderName = "";
-  const idxPack = lines.findIndex(l => /pack\s*(essentiel|standard|premium|workshop|atelier)/i.test(l));
-  if (idxPack > 0) {
+  const idxPack = lines.findIndex(l => /pack\s*(essentiel|standard|premium|workshop|atelier|staffeurs?|staff)/i.test(l));  if (idxPack > 0) {
     for (let j = idxPack - 1; j >= 0; j--) {
       const c = lines[j];
       const bad =
@@ -623,7 +621,7 @@ function parseMetaFromText(raw = "") {
 
   // fallback (si OCR colle tout)
   if (!holderName && idxPack >= 0) {
-    const mSame = lines[idxPack].match(/^(.*?)\s+pack\s*(essentiel|standard|premium|workshop|atelier)/i);
+    const mSame = lines[idxPack].match(/^(.*?)\s+pack\s*(essentiel|standard|premium|workshop|atelier|staffeurs?|staff)/i);
     if (mSame) holderName = mSame[1].trim();
   }
 
