@@ -1530,21 +1530,16 @@ async function playSpinThenReveal(finalRole){
 
   let flip = false;
   let delay = 45;
-  const timeoutMs = 6000; // 6 secondes max
+  const timeoutMs = 6000;
   const deadline = performance.now() + timeoutMs;
 
-  console.log("[ROLE] Début spin, attente du rôle...");
-
-  // spin jusqu'à l'arrivée du rôle OU jusqu'au timeout
   while (performance.now() < deadline && !finalRole){
     flip = !flip;
     setOverlayFace(flip ? "titruant" : "tinocent");
     await sleep(delay);
   }
 
-  // si aucun rôle reçu → stop proprement
   if (!finalRole){
-    console.warn("[ROLE] Aucun rôle reçu → Timeout !");
     roleTitle.textContent = "Erreur";
     roleSub.textContent = "Aucun rôle reçu";
     setOverlayFace("tinocent");
@@ -1554,23 +1549,6 @@ async function playSpinThenReveal(finalRole){
     return;
   }
 
-  // révélation normale du rôle
-  setOverlayFinal(finalRole);
-  await sleep(900);
-  hideRoleOverlay();
-  spinRunning = false;
-}
-
-  const slowStart = performance.now();
-  while (performance.now() - slowStart < 1200 && spinRunning){
-    flip = !flip;
-    setOverlayFace(flip ? "titruant" : "tinocent");
-    const t = (performance.now() - slowStart) / 1200;
-    delay = 60 + t * 190;
-    await sleep(delay);
-  }
-
-  if (!spinRunning) return;
   setOverlayFinal(finalRole);
   await sleep(900);
   hideRoleOverlay();
