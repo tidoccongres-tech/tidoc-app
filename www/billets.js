@@ -733,8 +733,12 @@ function renderResult({ qrText, packKey, holderName, ticketNumber, promoCode, wo
         <div><b>N° billet :</b> ${escapeHTML(ticketNumber || "—")}</div>
         <div style="margin-top:8px;"><b>Pack :</b> ${escapeHTML(packLabel)}</div>
         <div><b>${key === "workshop" ? "Workshops" : "Conférences"} :</b> ${escapeHTML(String(conf))}</div>
-        ${key !== "workshop" ? `<div><b>Workshops (importés / remisés) :</b> ${escapeHTML(String(wsLine))}</div>` : ""}
-      </div>
+        ${key !== "workshop" && key !== "staff"
+  ? `<div><b>Workshops (importés / remisés) :</b> ${escapeHTML(String(wsLine))}</div>`
+  : key === "staff"
+    ? `<div><b>Workshops :</b> Illimités</div>`
+    : ""
+}
 
       ${showPromo ? `
         <div style="border:1px solid rgba(23,140,168,.22); border-radius:14px; padding:12px; background:rgba(23,140,168,.06);">
