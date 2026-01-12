@@ -1519,6 +1519,9 @@ function setOverlayFinal(role){
   if (roleSub) roleSub.textContent = isTruant ? "Tu es Ti’Truant 😈" : "Tu es Ti’Nocent 😇";
   setOverlayFace(isTruant ? "titruant" : "tinocent");
 }
+// =========================
+// PATCH anti spin infini
+// =========================
 async function playSpinThenReveal(finalRole){
   if (!roleOverlay) return;
 
@@ -1527,12 +1530,34 @@ async function playSpinThenReveal(finalRole){
 
   let flip = false;
   let delay = 45;
-  const startT = performance.now();
-  while (performance.now() - startT < 900 && spinRunning){
+  const timeoutMs = 6000; // 6 secondes max
+  const deadline = performance.now() + timeoutMs;
+
+  console.log("[ROLE] Début spin, attente du rôle...");
+
+  while (performance.now() < deadline && !finalRole){
     flip = !flip;
     setOverlayFace(flip ? "titruant" : "tinocent");
     await sleep(delay);
   }
+
+  // si après 6 secondes, toujours pas de rôle → erreur contrôlée
+  if (!finalRole){
+    console.warn("[ROLE] Aucun rôle reçu → Timeout !");
+    roleTitle.textContent = "Erreur";
+    roleSub.textContent = "Aucun rôle reçu";
+    setOverlayFace("tinocent");
+    await sleep(1200);
+    hideRoleOverlay();
+    return;
+  }
+
+  // suite normale : révélation du rôle
+  setOverlayFinal(finalRole);
+  await sleep(900);
+  hideRoleOverlay();
+  spinRunning = false;
+}
 
   const slowStart = performance.now();
   while (performance.now() - slowStart < 1200 && spinRunning){
