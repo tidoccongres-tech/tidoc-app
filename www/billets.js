@@ -502,8 +502,12 @@ async function deleteMyTicketAndUnclaim() {
     // ======================
     // 8️⃣ Nettoyage interface
     // ======================
-    if (boxEl) boxEl.textContent = "Aucun billet importé pour l’instant.";
-    setStatus("✅ Billet totalement supprimé !");
+if (boxEl) boxEl.textContent = "Aucun billet importé pour l’instant.";
+
+// 🔥 Rafraîchir l’écran pour virer les workshops affichés
+await loadSavedTicket();
+
+setStatus("✅ Billet totalement supprimé !");
   }
   catch (e) {
     console.error("deleteMyTicketAndUnclaim error:", e);
