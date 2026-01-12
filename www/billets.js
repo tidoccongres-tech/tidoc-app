@@ -424,48 +424,90 @@ async function deleteMyTicketAndUnclaim() {
   if (!u) { setStatus("🔒 Connecte-toi."); return; }
 
   const ok = confirm(
-    "Supprimer ce billet ?\n\n" +
-    "• Le billet sera retiré de ton compte\n" +
-    "• Tu pourras l’importer à nouveau plus tard\n" +
-    "• Cela n’annule PAS ton achat HelloAsso\n\n" +
-    "Confirmer la suppression ?"
+    "Supprimer complètement ton billet ?\n\n" +
+    "• Billet principal supprimé\n" +
+    "• Tous les billets workshop supprimés\n" +
+    "• Toutes tes inscriptions aux événements supprimées\n" +
+    "• Quotas réinitialisés\n" +
+    "• QR Code libéré\n\n" +
+    "Continuer ?"
   );
   if (!ok) return;
 
-  setStatus("⏳ Suppression…");
+  setStatus("⏳ Suppression complète…");
 
-  const ticketRef = doc(db, "userTickets", u.uid);
+  const userId = u.uid;
 
   try {
+    // ======================
+    // 1️⃣ Lire le billet principal pour récupérer le qrHash
+    // ======================
+    const ticketRef = doc(db, "userTickets", userId);
     const snap = await getDoc(ticketRef);
-    const t = snap.exists() ? (snap.data() || {}) : {};
-    const qrHash = t.qrHash || "";
+    const data = snap.exists() ? snap.data() : {};
+    const qrHash = data.qrHash || null;
 
+    // ======================
+    // 2️⃣ Supprimer billet principal
+    // ======================
     await deleteDoc(ticketRef);
 
+    // ======================
+    // 3️⃣ Supprimer billets workshop
+    // ======================
+    const wsQ = query(collection(db, "userWorkshopTickets"), where("uid", "==", userId));
+    const wsSnap = await getDocs(wsQ);
+
+    const wsDeletes = wsSnap.docs.map(d => deleteDoc(d.ref));
+    await Promise.all(wsDeletes);
+
+    // ======================
+    // 4️⃣ Supprimer toutes les inscriptions événements
+    // ======================
+    const eventsSnap = await getDocs(collection(db, "events"));
+    const deleteRegs = [];
+
+    eventsSnap.forEach(ev => {
+      const regRef = doc(db, "events", ev.id, "registrations", userId);
+      deleteRegs.push(deleteDoc(regRef).catch(()=>{}));
+    });
+
+    await Promise.all(deleteRegs);
+
+    // ======================
+    // 5️⃣ Supprimer document usage (quotas)
+    // ======================
+    await deleteDoc(doc(db, "userUsage", userId)).catch(()=>{});
+
+    // ======================
+    // 6️⃣ Libérer QR claim (si existait)
+    // ======================
     if (qrHash) {
       const claimRef = doc(db, "qrClaims", qrHash);
       await runTransaction(db, async (tx) => {
         const cs = await tx.get(claimRef);
         if (!cs.exists()) return;
-        const c = cs.data() || {};
-        if (c.uid === u.uid) tx.delete(claimRef);
+        if (cs.data()?.uid === userId) tx.delete(claimRef);
       });
     }
 
-    // ✅ Nettoyage du nom billet SEULEMENT si la suppression a réussi
-    try {
-      await setDoc(doc(db, "users", u.uid), {
-        ticketHolderName: "",
-        ticketUpdatedAt: serverTimestamp()
-      }, { merge: true });
-    } catch(_) {}
+    // ======================
+    // 7️⃣ Effacer le nom associé au billet
+    // ======================
+    await setDoc(doc(db, "users", userId), {
+      ticketHolderName: "",
+      ticketUpdatedAt: serverTimestamp()
+    }, { merge: true });
 
+    // ======================
+    // 8️⃣ Nettoyage interface
+    // ======================
     if (boxEl) boxEl.textContent = "Aucun billet importé pour l’instant.";
-    setStatus("✅ Billet supprimé");
-  } catch (e) {
-    console.log("delete ticket error:", e);
-    setStatus("❌ " + (e?.message || String(e)));
+    setStatus("✅ Billet totalement supprimé !");
+  }
+  catch (e) {
+    console.error("deleteMyTicketAndUnclaim error:", e);
+    setStatus("❌ " + (e?.message || "Erreur inconnue"));
   }
 }
 
