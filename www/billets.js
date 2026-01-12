@@ -949,32 +949,36 @@ function renderAdminPacksEditor() {
     const labelPack = escapeHTML(PACKS_FALLBACK[key]?.label || key);
 
     row.innerHTML = `
-      <div style="display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap;">
-        <div style="font-weight:950;">Pack : ${labelPack}</div>
-      </div>
+  <div style="display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap;">
+    <div style="font-weight:950;">Pack : ${labelPack}</div>
+  </div>
 
-      <div style="margin-top:10px; display:flex; gap:10px; flex-wrap:wrap;">
+  <div style="margin-top:10px; display:flex; gap:10px; flex-wrap:wrap;">
+    
+    <!-- Conférences / Workshops -->
+    <label style="display:flex; gap:8px; align-items:center;">
+      <span style="width:170px; font-weight:800;">${isWs ? "Workshops" : "Conférences"}</span>
+      <input data-pack-main="${escapeHTML(key)}"
+             type="number" min="0"
+             value="${Number(p.conferencesAllowed ?? 0)}"
+             style="width:110px; padding:8px 10px; border:1px solid #ddd; border-radius:10px;">
+    </label>
+
+    <!-- Packs Workshop remisés SAUF workshop -->
+    ${
+      isWs
+        ? ""
+        : `
         <label style="display:flex; gap:8px; align-items:center;">
-          <span style="width:170px; font-weight:800;">${isWs ? "Workshops" : "Conférences"}</span>
-          <input data-pack-main="${escapeHTML(key)}" type="number" min="0"
-                 value="${Number(p.conferencesAllowed ?? 0)}"
+          <span style="width:170px; font-weight:800;">Workshops</span>
+          <input data-pack-wsd="${escapeHTML(key)}"
+                 type="number" min="0"
+                 value="${Number(p.workshopDiscountPacks ?? 0)}"
                  style="width:110px; padding:8px 10px; border:1px solid #ddd; border-radius:10px;">
-        </label>
-
-       ${
-  (isWs || isStaff)
-    ? ""
-    : `
-      <label style="display:flex; gap:8px; align-items:center;">
-        <span style="width:170px; font-weight:800;">Packs Workshop remisés</span>
-        <input data-pack-wsd="${escapeHTML(key)}" type="number" min="0"
-               value="${Number(p.workshopDiscountPacks ?? 0)}"
-               style="width:110px; padding:8px 10px; border:1px solid #ddd; border-radius:10px;">
-      </label>
-    `
-}
-      </div>
-    `;
+        </label>`
+    }
+  </div>
+`;
 
     adminForm.appendChild(row);
   });
