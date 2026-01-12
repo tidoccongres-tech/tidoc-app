@@ -340,6 +340,12 @@ async function claimQrOrThrow(qrText) {
     }
 
     const existing = snap.data() || {};
+
+    // 🟢 Correction MAJEURE :
+    // si c’est le même utilisateur → on ne bloque PAS
+    if (existing.uid === u.uid) return;
+
+    // 🔴 on bloque UNIQUEMENT quand c’est un autre utilisateur
     if (existing.uid && existing.uid !== u.uid) {
       throw new Error("Ce billet est déjà lié à un autre compte (QR déjà utilisé).");
     }
