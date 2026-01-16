@@ -2575,23 +2575,10 @@ if (room.status === "ended" && room.winner){
       if (!startTriggeredLocal){
         startTriggeredLocal = true;
 
-        showRoleOverlayBase();
-        spinRunning = true;
-
-        (async ()=>{
-          let flip = false;
-          while (spinRunning && !myRole){
-            flip = !flip;
-            setOverlayFace(flip ? "titruant" : "tinocent");
-            await sleep(55);
-          }
-          if (myRole){
-            await playSpinThenReveal(myRole);
-          } else {
-            hideRoleOverlay();
-            spinRunning = false;
-          }
-        })();
+        if (!startTriggeredLocal){
+  startTriggeredLocal = true;
+  playSpinThenReveal(myRole);
+}
       }
 
     } else if (status === "started"){
