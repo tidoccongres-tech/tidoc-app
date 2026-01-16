@@ -2572,9 +2572,6 @@ if (room.status === "ended" && room.winner){
         startTriggeredLocal = false;
       }
 
-      if (!startTriggeredLocal){
-        startTriggeredLocal = true;
-
         if (!startTriggeredLocal){
   startTriggeredLocal = true;
   playSpinThenReveal(myRole);
