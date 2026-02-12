@@ -765,6 +765,7 @@ function renderResult({ qrText, packKey, holderName, ticketNumber, promoCode, wo
 
   const promo = String(promoCode || "").trim();
   const showPromo = promo && ["premium", "standard", "essentiel"].includes(key);
+  const shouldHavePromo = ["premium", "standard", "essentiel"].includes(key);
 
   boxEl.innerHTML = `
     <div style="position:relative; display:flex; flex-direction:column; gap:12px;">
@@ -814,7 +815,15 @@ function renderResult({ qrText, packKey, holderName, ticketNumber, promoCode, wo
           <div id="copyPromoMsg" style="margin-top:8px; font-size:12px; font-weight:800; color:rgba(31,75,86,.75);"></div>
         </div>
       ` : ""}
-
+      ` : (shouldHavePromo ? `
+        <div style="border:1px solid rgba(255,0,0,.18); border-radius:14px; padding:12px; background:rgba(255,0,0,.05);">
+          <div style="font-weight:900;">🎟️ Code promo</div>
+          <div style="margin-top:6px; font-size:13px; font-weight:800;">
+            Aucun code promo disponible pour le moment (pool vide ou attribution bloquée).<br>
+            Contacte l’admin Ti’Doc.
+          </div>
+        </div>
+      ` : "")}
       <div id="workshopsListBox"></div>
     </div>
   `;
@@ -923,8 +932,21 @@ async function loadSavedTicket() {
     return;
   }
 
-  const t = snap.data() || {};
+    let t = snap.data() || {};
   setStatus("✅ Billet chargé");
+
+  // ✅ FIX PROMO : si pack premium/standard/essentiel et promoCode vide,
+  // on tente d’attribuer automatiquement puis on recharge le ticket.
+  const key = String(t.packKey || "").toLowerCase();
+  if (!String(t.promoCode || "").trim() && ["premium","standard","essentiel"].includes(key)) {
+    try {
+      await assignPromoCodeIfNeeded(key);
+      const snap2 = await getDoc(doc(db, "userTickets", u.uid));
+      if (snap2.exists()) t = snap2.data() || t;
+    } catch (e) {
+      console.log("assign promo on load error:", e);
+    }
+  }
 
   renderResult({
     qrText: t.qrText || "",
