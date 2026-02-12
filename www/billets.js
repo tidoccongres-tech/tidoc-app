@@ -251,13 +251,12 @@ async function assignPromoCodeIfNeeded(packKey) {
   const poolsRef = doc(db, "config", "promoPools");
 
   const res = await runTransaction(db, async (tx) => {
-    // 1) si user a déjà un code -> on ne change rien
-    const userSnap = await tx.get(userRef);
-    const userData = userSnap.exists() ? (userSnap.data() || {}) : {};
-    const existing = String(userData?.promoCode || "").trim();
+    // ✅ READS d'abord
+    const userSnap  = await tx.get(userRef);
+    const userData  = userSnap.exists() ? (userSnap.data() || {}) : {};
+    const existing  = String(userData?.promoCode || "").trim();
     if (existing) return { code: existing, already: true };
 
-    // 2) lire le pool
     const poolsSnap = await tx.get(poolsRef);
     const poolsData = poolsSnap.exists() ? (poolsSnap.data() || {}) : {};
     const list = normalizeCodes(poolsData[tier]);
@@ -266,22 +265,19 @@ async function assignPromoCodeIfNeeded(packKey) {
     const code = list[0];
     const rest = list.slice(1);
 
-    // 3) écrire pool mis à jour (retire le code)
+    const codeId  = String(code).toLowerCase();
+    const codeRef = doc(db, "promoCodes", codeId);
+    const codeSnap = await tx.get(codeRef); // ✅ read avant write
+
+    // ✅ WRITES ensuite
     tx.set(poolsRef, { ...poolsData, [tier]: rest, updatedAt: serverTimestamp() }, { merge: true });
 
-    // 4) écrire dans userTickets
     tx.set(userRef, {
       promoCode: code,
       promoTier: tier,
       promoAssignedAt: serverTimestamp()
     }, { merge: true });
 
-    // 5) écrire registre admin promoCodes/{codeLower}
-    const codeId = String(code).toLowerCase();
-    const codeRef = doc(db, "promoCodes", codeId);
-
-    // sécurité anti-collision (normalement impossible si pool propre)
-    const codeSnap = await tx.get(codeRef);
     if (!codeSnap.exists()) {
       tx.set(codeRef, {
         code,
