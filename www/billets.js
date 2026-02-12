@@ -796,13 +796,9 @@ function renderResult({ qrText, packKey, holderName, ticketNumber, promoCode, wo
 
   const wsLine =
     key === "workshop"
-      ? `${conf}` // pour un billet workshop, "conférencesAllowed" = nb workshops
+      ? `${conf}`
       : (discount > 0 ? `${imported} / ${discount}` : `${imported}`);
 
-  const promo = String(promoCode || "").trim();
-const showPromo = false;
-const shouldHavePromo = ["premium", "standard", "essentiel"].includes(key);
- 
   boxEl.innerHTML = `
     <div style="position:relative; display:flex; flex-direction:column; gap:12px;">
 
@@ -828,51 +824,27 @@ const shouldHavePromo = ["premium", "standard", "essentiel"].includes(key);
         <div><b>N° billet :</b> ${escapeHTML(ticketNumber || "—")}</div>
         <div style="margin-top:8px;"><b>Pack :</b> ${escapeHTML(packLabel)}</div>
         <div><b>${key === "workshop" ? "Workshops" : "Conférences"} :</b> ${escapeHTML(String(conf))}</div>
-        ${key !== "workshop" && key !== "staff"
-  ? `<div><b>Workshops (importés / remisés) :</b> ${escapeHTML(String(wsLine))}</div>`
-  : key === "staff"
-    ? `<div><b>Workshops :</b> Illimités</div>`
-    : ""
-}
 
-  // delete inline
+        ${
+          key !== "workshop" && key !== "staff"
+            ? `<div><b>Workshops (importés / remisés) :</b> ${escapeHTML(String(wsLine))}</div>`
+            : (key === "staff" ? `<div><b>Workshops :</b> Illimités</div>` : "")
+        }
+      </div>
+
+      <div id="workshopsListBox"></div>
+    </div>
+  `;
+
   boxEl.querySelector("#deleteTicketInlineBtn")
     ?.addEventListener("click", deleteMyTicketAndUnclaim);
 
-  // render QR
   const host = boxEl.querySelector("#qrRender");
   if (host && window.QRCode && qrText) {
     host.innerHTML = "";
     new window.QRCode(host, { text: qrText, width: 220, height: 220 });
   }
-
-  // copy promo
-    // copy promo
-    // copy promo
-  const copyBtn = boxEl.querySelector("#copyPromoBtn");
-  if (copyBtn && promo) {
-    copyBtn.addEventListener("click", async () => {
-      const msg = boxEl.querySelector("#copyPromoMsg");
-      try {
-        await navigator.clipboard.writeText(promo);
-
-        // ✅ marquer "copié" dans le registre admin
-        try {
-          const codeId = String(promo).toLowerCase();
-          await setDoc(doc(db, "promoCodes", codeId), {
-            copiedAt: serverTimestamp()
-          }, { merge: true });
-        } catch (e) {
-          console.log("mark copiedAt error:", e);
-        }
-
-        if (msg) msg.textContent = "✅ Copié";
-      } catch {
-        if (msg) msg.textContent = "❌ Impossible de copier (copie manuelle).";
-      }
-    });
-  }
-} // ✅ <<< CETTE accolade manquait : fin de renderResult()
+}
 
 function renderWorkshopsList(workshops = []) {
   const listBox = document.getElementById("workshopsListBox");
