@@ -455,11 +455,18 @@ async function saveWorkshopTicket({ qrText, packKey, holderName, ticketNumber, w
 
   const qrHash = await sha256Hex(qrText);
   const id = `${u.uid}_${qrHash}`;
+  const ref = doc(db, "userWorkshopTickets", id);
+
+  // ✅ évite un update (interdit par rules)
+  const existing = await getDoc(ref);
+  if (existing.exists()) {
+    return { already: true };
+  }
 
   const title = String(workshopTitle || "").trim();
   const key = title ? normalizeKey(title) : "";
 
-  await setDoc(doc(db, "userWorkshopTickets", id), {
+  await setDoc(ref, {
     uid: u.uid,
     qrText, qrHash,
     packKey: packKey || "workshop",
@@ -468,7 +475,8 @@ async function saveWorkshopTicket({ qrText, packKey, holderName, ticketNumber, w
     workshopTitle: title || "",
     workshopKey: key || "",
     createdAt: serverTimestamp()
-  }, { merge: true });
+  }); // ✅ pas de merge
+  return { already: false };
 }
 
 // =====================
@@ -994,12 +1002,12 @@ async function handleFile(file) {
     // Workshop = multi billets
     const p = String(packKey || "").toLowerCase();
     if (p === "workshop") {
-      await saveWorkshopTicket({ qrText, packKey, holderName, ticketNumber, workshopTitle });
-      await syncNameFromTicket(holderName);
-      await loadSavedTicket();
-      setStatus("✅ Billet workshop importé");
-      return;
-    }
+  const r = await saveWorkshopTicket({ qrText, packKey, holderName, ticketNumber, workshopTitle });
+  await syncNameFromTicket(holderName);
+  await loadSavedTicket();
+  setStatus(r.already ? "ℹ️ Billet workshop déjà importé" : "✅ Billet workshop importé");
+  return;
+}
 
    // billet principal
 await saveTicketToFirestore({ qrText, packKey, holderName, ticketNumber });
