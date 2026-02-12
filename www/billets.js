@@ -303,16 +303,20 @@ async function assignPromoCodeIfNeeded(packKey) {
     }, { merge: true });
 
     // ✅ 5) créer le verrou promoClaims/{qrHash}
-    tx.create(claimRef, {
-  qrHash,
-  tier,
-  code,
-  assignedTo: u.uid,
-  assignedEmail: String(u.email || "").toLowerCase(),
-  holderName: String(userData?.holderName || "").trim(),
-  ticketNumber: String(userData?.ticketNumber || "").trim(),
-  assignedAt: serverTimestamp()
-});
+    const existingClaim = await tx.get(claimRef);
+
+if (!existingClaim.exists()) {
+  tx.set(claimRef, {
+    qrHash,
+    tier,
+    code,
+    assignedTo: u.uid,
+    assignedEmail: String(u.email || "").toLowerCase(),
+    holderName: String(userData?.holderName || "").trim(),
+    ticketNumber: String(userData?.ticketNumber || "").trim(),
+    assignedAt: serverTimestamp()
+  });
+}
 
     // (optionnel) registre admin promoCodes/{codeLower} comme tu as déjà
     const codeId = String(code).toLowerCase();
