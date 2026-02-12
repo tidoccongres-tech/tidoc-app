@@ -668,28 +668,28 @@ async function assignPromoCodeToUserIfNeeded(uid, tier){
     if (!qrHash) return { code:"" };
 
     const claimRef  = doc(db, "promoClaims", qrHash);
-    const claimSnap = await tx.get(claimRef);
+const claimSnap = await tx.get(claimRef);
 
-    const poolsSnap = await tx.get(poolsRef); // ✅ read aussi ici, même si claim existe
+// ✅ READ pools AVANT tout WRITE (même si claim existe)
+const poolsSnap = await tx.get(poolsRef);
 
-    // --- Si claim existe déjà, on écrit userTickets (après tous les reads) ---
-    if (claimSnap.exists()){
-      const claim = claimSnap.data() || {};
-      const code = String(claim.code || "").trim();
-      const claimTier = String(claim.tier || tier).toLowerCase();
+if (claimSnap.exists()){
+  const claim = claimSnap.data() || {};
+  const code = String(claim.code || "").trim();
+  const claimTier = String(claim.tier || tier).toLowerCase();
 
-      if (code){
-        tx.set(userRef, {
-          promoCode: code,
-          promoTier: claimTier,
-          promoAssignedAt: claim.assignedAt || serverTimestamp(),
-        }, { merge:true });
-      }
-      return { code };
-    }
+  if (code){
+    tx.set(userRef, {
+      promoCode: code,
+      promoTier: claimTier,
+      promoAssignedAt: claim.assignedAt || serverTimestamp(),
+    }, { merge:true });
+  }
+  return { code };
+}
 
-    // --- Sinon: on consomme dans le pool ---
-    const poolsData = poolsSnap.exists() ? (poolsSnap.data() || {}) : {};
+// puis seulement ici tu utilises poolsSnap
+const poolsData = poolsSnap.exists() ? (poolsSnap.data() || {}) : {};
     const list = Array.isArray(poolsData[tier])
       ? poolsData[tier].map(x=>String(x||"").trim()).filter(Boolean)
       : [];
@@ -708,10 +708,10 @@ async function assignPromoCodeToUserIfNeeded(uid, tier){
     tx.set(poolsRef, { [tier]: rest, updatedAt: serverTimestamp() }, { merge:true });
 
     tx.set(userRef, {
-      promoCode: code,
-      promoTier: tier,
-      promoAssignedAt: serverTimestamp(),
-    }, { merge:true });
+  promoCode: code,
+  promoTier: tier,
+  promoAssignedAt: serverTimestamp(),
+}, { merge:true });
 
     tx.set(claimRef, { qrHash, tier, code, assignedTo: uid, assignedAt: serverTimestamp() });
 
