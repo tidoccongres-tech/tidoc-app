@@ -683,21 +683,19 @@ async function broadcastWorkshopPromo(audience, eventId){
 
   // Notification : on met lien + (si dispo) code promo stocké sur userTicket
   const title =
-    audience === "premium"
-      ? `🎟️ Premium — ${String(ev.title || "Workshop")}`
-      : `🎟️ Workshops — ${String(ev.title || "Workshop")}`;
+  audience === "premium"
+    ? `🎟️ Codes promo workshops (Premium)`
+    : `🎟️ Codes promo workshops`;
 
-  await Promise.all(recipients.map(u => {
-    const code = String(u.promoCode || "").trim();
-    const promoLine = code ? `Code promo : ${code}` : `Code promo : (à renseigner)`;
-    return sendNotif(u.uid, {
-      type: "workshop_promo",
-      title,
-      text: `Inscription sur HelloAsso. ${promoLine}`,
-      linkLabel: "Ouvrir HelloAsso",
-      linkUrl: hello
-    });
-  }));
+await Promise.all(recipients.map(u => {
+  return sendNotif(u.uid, {
+    type: "workshop_promo",
+    title,
+    text: `Ton code promo est disponible dans l’onglet Billets (il s’affiche automatiquement après import).`,
+    linkLabel: "Ouvrir HelloAsso",
+    linkUrl: hello
+  });
+}));
 
   alert(`✅ Envoyé à ${recipients.length} utilisateur(s).`);
 }
