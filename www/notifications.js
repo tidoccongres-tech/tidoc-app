@@ -1,4 +1,4 @@
-// notifications.js (MODULE)
+// notifications.js (MODULE) — Clean + Admin-only newsletter create + Cloudinary image+logo
 import { auth, db, requireAuthOrRedirect, isAdminUser } from "./auth.js";
 import {
   collection,
@@ -46,28 +46,28 @@ async function uploadToCloudinary(file, folder = "tidoc/newsletter") {
 requireAuthOrRedirect("./login.html");
 
 const root = document.getElementById("notifRoot");
-const adminTools = document.getElementById("adminTools");
+const adminTools = document.getElementById("adminTools"); // (si tu l’as quelque part)
 const btnAddNewsletter = document.getElementById("btnAddNewsletter");
 
 // =========================
 // Helpers
 // =========================
-function escapeHTML(s=""){
+function escapeHTML(s = "") {
   return String(s)
-    .replaceAll("&","&amp;")
-    .replaceAll("<","&lt;")
-    .replaceAll(">","&gt;")
-    .replaceAll('"',"&quot;")
-    .replaceAll("'","&#039;");
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#039;");
 }
 
-async function markRead(notifId){
+async function markRead(notifId) {
   const uid = auth.currentUser?.uid;
   if (!uid) return;
   await updateDoc(doc(db, "notifications", uid, "items", notifId), { read: true });
 }
 
-async function deleteNotif(notifId){
+async function deleteNotif(notifId) {
   const uid = auth.currentUser?.uid;
   if (!uid) return;
   await deleteDoc(doc(db, "notifications", uid, "items", notifId));
@@ -76,7 +76,7 @@ async function deleteNotif(notifId){
 // =========================
 // LOAD NOTIFS
 // =========================
-async function loadNotifs(){
+async function loadNotifs() {
   const uid = auth.currentUser?.uid;
   if (!uid) return;
 
@@ -90,11 +90,11 @@ async function loadNotifs(){
 
   const snap = await getDocs(qy);
 
-  // ✅ Auto-mark read (quand on ouvre la page, tout devient lu)
-  const unreadDocs = snap.docs.filter(d => (d.data()?.read === false));
+  // ✅ Auto-mark read
+  const unreadDocs = snap.docs.filter(d => d.data()?.read === false);
   await Promise.all(unreadDocs.map(d => markRead(d.id)));
-  
-  if (snap.empty){
+
+  if (snap.empty) {
     root.innerHTML = `<section class="card"><p>Aucune notification.</p></section>`;
     return;
   }
@@ -103,7 +103,7 @@ async function loadNotifs(){
 
   const admin = isAdminUser(auth.currentUser);
 
-  snap.forEach((d)=>{
+  snap.forEach((d) => {
     const n = d.data() || {};
     const card = document.createElement("section");
     card.className = "card";
@@ -111,17 +111,18 @@ async function loadNotifs(){
     card.style.position = "relative";
     card.style.cursor = "pointer";
 
-    // ✅ supprimer seulement les newsletters et seulement admin
+    // ✅ supprimer seulement newsletters + seulement admin
     const canDeleteNewsletter = admin && (n.type === "newsletter");
 
     card.innerHTML = `
       ${n.logoUrl ? `
-  <div style="margin-top:10px;display:flex;align-items:center;gap:10px;">
-    <img src="${n.logoUrl}" alt="logo"
-      style="width:28px;height:28px;border-radius:8px;object-fit:cover">
-    <span style="font-size:12px;color:var(--muted);font-weight:800">Ti’Doc</span>
-  </div>
-` : ""}
+        <div style="margin-top:10px;display:flex;align-items:center;gap:10px;">
+          <img src="${n.logoUrl}" alt="logo"
+            style="width:28px;height:28px;border-radius:8px;object-fit:cover">
+          <span style="font-size:12px;color:var(--muted);font-weight:800">Ti’Doc</span>
+        </div>
+      ` : ""}
+
       ${canDeleteNewsletter ? `
         <button
           type="button"
@@ -145,7 +146,7 @@ async function loadNotifs(){
       </div>
     `;
 
-    // clic supprimer (ne doit pas marquer lu)
+    // clic supprimer (ne doit pas markRead)
     const delBtn = card.querySelector(`[data-del="${d.id}"]`);
     delBtn?.addEventListener("click", async (e) => {
       e.preventDefault();
@@ -155,7 +156,7 @@ async function loadNotifs(){
 
       try {
         await deleteNotif(d.id);
-        card.remove(); // UI instant
+        card.remove();
       } catch (err) {
         alert("Impossible de supprimer (permissions).");
         console.log(err);
@@ -172,9 +173,15 @@ async function loadNotifs(){
 }
 
 // =========================
-// NEWSLETTER MODAL
+// NEWSLETTER MODAL (ADMIN)
 // =========================
-function openNewsletterModal(){
+function openNewsletterModal() {
+  // ✅ Sécurité : si jamais le bouton apparaît par bug côté UI
+  if (!isAdminUser(auth.currentUser)) {
+    alert("Accès refusé.");
+    return;
+  }
+
   let imageUrl = "";
   let logoUrl = "";
 
@@ -186,7 +193,9 @@ function openNewsletterModal(){
       <div class="modal-head">
         <div>
           <h2 style="margin:0;color:var(--tidoc)">Nouvelle newsletter</h2>
-          <div style="font-size:13px;color:var(--muted);margin-top:4px">Envoi en notification à tous les utilisateurs</div>
+          <div style="font-size:13px;color:var(--muted);margin-top:4px">
+            Envoi en notification à tous les utilisateurs
+          </div>
         </div>
         <button class="btn-outline" type="button" id="nlClose">Fermer</button>
       </div>
@@ -206,7 +215,7 @@ function openNewsletterModal(){
         <div class="modal-grid">
           <div class="modal-field">
             <label>Texte du bouton (optionnel)</label>
-            <input id="nlLinkLabel" placeholder="Ex : Shop now" />
+            <input id="nlLinkLabel" placeholder="Ex : Voir le lien" />
           </div>
 
           <div class="modal-field">
@@ -219,6 +228,7 @@ function openNewsletterModal(){
           <button class="btn-outline" type="button" id="pickImage">Choisir image</button>
           <button class="btn-outline" type="button" id="pickLogo">Choisir logo</button>
           <div id="nlPicked" style="font-size:13px;color:var(--muted)"></div>
+
           <input id="nlPickImageFile" type="file" accept="image/*" style="display:none" />
           <input id="nlPickLogoFile"  type="file" accept="image/*" style="display:none" />
         </div>
@@ -250,7 +260,7 @@ function openNewsletterModal(){
 
   const close = () => overlay.remove();
   overlay.querySelector("#nlClose").onclick = close;
-  overlay.addEventListener("click", (e)=>{ if (e.target === overlay) close(); });
+  overlay.addEventListener("click", (e) => { if (e.target === overlay) close(); });
 
   const titleEl = overlay.querySelector("#nlTitle");
   const textEl  = overlay.querySelector("#nlText");
@@ -264,7 +274,10 @@ function openNewsletterModal(){
   const prevBtn   = overlay.querySelector("#prevBtn");
   const picked    = overlay.querySelector("#nlPicked");
 
-  function refreshPreview(){
+  const btnPickImage = overlay.querySelector("#pickImage");
+  const btnPickLogo  = overlay.querySelector("#pickLogo");
+
+  function refreshPreview() {
     const t = titleEl.value.trim();
     const x = textEl.value.trim();
     const bl = labEl.value.trim();
@@ -273,21 +286,21 @@ function openNewsletterModal(){
     prevTitle.textContent = t || "Aperçu du titre…";
     prevText.textContent  = x || "Aperçu du texte…";
 
-    if (logoUrl){
+    if (logoUrl) {
       prevLogo.src = logoUrl;
       prevLogo.style.display = "";
     } else {
       prevLogo.style.display = "none";
     }
 
-    if (imageUrl){
+    if (imageUrl) {
       prevImg.src = imageUrl;
       prevImg.style.display = "";
     } else {
       prevImg.style.display = "none";
     }
 
-    if (bl && bu){
+    if (bl && bu) {
       prevBtn.textContent = bl;
       prevBtn.href = bu;
       prevBtn.style.display = "inline-block";
@@ -306,48 +319,55 @@ function openNewsletterModal(){
   labEl.addEventListener("input", refreshPreview);
   urlEl.addEventListener("input", refreshPreview);
 
-  const imgInput = overlay.querySelector("#nlPickImageFile");
+  const imgInput  = overlay.querySelector("#nlPickImageFile");
   const logoInput = overlay.querySelector("#nlPickLogoFile");
 
-overlay.querySelector("#pickImage").onclick = () => imgInput.click();
-overlay.querySelector("#pickLogo").onclick = () => logoInput.click();
+  btnPickImage.onclick = () => imgInput.click();
+  btnPickLogo.onclick  = () => logoInput.click();
 
-logoInput.addEventListener("change", async () => {
-  const file = logoInput.files?.[0];
-  if (!file) return;
+  // ✅ IMAGE upload (il manquait dans ton code)
+  imgInput.addEventListener("change", async () => {
+    const file = imgInput.files?.[0];
+    if (!file) return;
 
-  try {
-    picked.textContent = "Upload logo…";
-    overlay.querySelector("#pickImage").disabled = true;
-    overlay.querySelector("#pickLogo").disabled = true;
+    try {
+      picked.textContent = "Upload image…";
+      btnPickImage.disabled = true;
+      btnPickLogo.disabled = true;
 
-    const up = await uploadToCloudinary(file, "tidoc/newsletter/logo");
-    logoUrl = up.secureUrl;
-    refreshPreview();
-  } catch (e) {
-    alert(e?.message || e);
-  } finally {
-    overlay.querySelector("#pickImage").disabled = false;
-    overlay.querySelector("#pickLogo").disabled = false;
-    logoInput.value = "";
-  }
-});
+      const up = await uploadToCloudinary(file, "tidoc/newsletter/image");
+      imageUrl = up.secureUrl;
+      refreshPreview();
+    } catch (e) {
+      alert(e?.message || e);
+    } finally {
+      btnPickImage.disabled = false;
+      btnPickLogo.disabled = false;
+      imgInput.value = "";
+    }
+  });
 
-logoInput.addEventListener("change", async () => {
-  const file = logoInput.files?.[0];
-  if (!file) return;
+  // ✅ LOGO upload (doublon supprimé : il n’y a PLUS qu’un seul listener)
+  logoInput.addEventListener("change", async () => {
+    const file = logoInput.files?.[0];
+    if (!file) return;
 
-  try {
-    picked.textContent = "Upload logo…";
-    const up = await uploadToCloudinary(file, "tidoc/newsletter/logo");
-    logoUrl = up.secureUrl;
-    refreshPreview();
-  } catch (e) {
-    alert(e?.message || e);
-  } finally {
-    logoInput.value = "";
-  }
-});
+    try {
+      picked.textContent = "Upload logo…";
+      btnPickImage.disabled = true;
+      btnPickLogo.disabled = true;
+
+      const up = await uploadToCloudinary(file, "tidoc/newsletter/logo");
+      logoUrl = up.secureUrl;
+      refreshPreview();
+    } catch (e) {
+      alert(e?.message || e);
+    } finally {
+      btnPickImage.disabled = false;
+      btnPickLogo.disabled = false;
+      logoInput.value = "";
+    }
+  });
 
   overlay.querySelector("#nlSend").onclick = async () => {
     const nlMsg = overlay.querySelector("#nlMsg");
@@ -357,18 +377,20 @@ logoInput.addEventListener("change", async () => {
     const linkLabel = labEl.value.trim();
     const linkUrl = urlEl.value.trim();
 
-    if (!title || !text){ nlMsg.textContent = "❌ Titre + texte requis."; return; }
-    if ((linkLabel && !linkUrl) || (!linkLabel && linkUrl)){
+    if (!title || !text) { nlMsg.textContent = "❌ Titre + texte requis."; return; }
+    if ((linkLabel && !linkUrl) || (!linkLabel && linkUrl)) {
       nlMsg.textContent = "❌ Bouton: il faut texte + lien.";
       return;
     }
 
-    try{
+    try {
       nlMsg.textContent = "Envoi…";
-      await broadcastNewsletter({ title, text, linkLabel, linkUrl, imageUrl, logoUrl });
+      await broadcastNewsletterToAll({
+        title, text, linkLabel, linkUrl, imageUrl, logoUrl
+      });
       nlMsg.textContent = "✅ Envoyé !";
       setTimeout(close, 500);
-    }catch(e){
+    } catch (e) {
       console.log(e);
       nlMsg.textContent = "Erreur: " + (e?.message || e);
     }
@@ -378,9 +400,14 @@ logoInput.addEventListener("change", async () => {
 }
 
 // =========================
-// BROADCAST
+// BROADCAST (ADMIN)
 // =========================
-async function broadcastNewsletter(payload){
+async function broadcastNewsletterToAll(payload) {
+  // Rules: notifications create = admin only
+  if (!isAdminUser(auth.currentUser)) {
+    throw new Error("Accès refusé (admin).");
+  }
+
   const usersSnap = await getDocs(collection(db, "users"));
 
   const fromUid = auth.currentUser.uid;
@@ -418,14 +445,13 @@ async function broadcastNewsletter(payload){
 // =========================
 // BOOT
 // =========================
-onAuthStateChanged(auth, (u)=>{
+onAuthStateChanged(auth, (u) => {
   if (!u) return;
 
   loadNotifs();
 
   const admin = isAdminUser(u);
 
-  // (optionnel) si tu gardes adminTools dans le HTML
   if (adminTools) adminTools.style.display = admin ? "" : "none";
 
   // ✅ bouton newsletter visible uniquement admin
