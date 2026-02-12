@@ -160,6 +160,44 @@ function normalizeKey(v = "") {
     .replaceAll(" ", "-");
 }
 
+function isWorkshopEvent(evType=""){
+  const t = String(evType).toLowerCase();
+  return t.includes("workshop");
+}
+
+function getEventWorkshopKey(e){
+  const explicit = String(e.workshopKey || "").trim();
+  if (explicit) return explicit;
+  return normalizeKey(String(e.title || ""));
+}
+
+async function updateWorkshopMeta(eventId, { helloAssoUrl, workshopKey } = {}){
+  if (!isAdmin()) return alert("Réservé à l’admin Ti’Doc.");
+
+  const evRef = doc(db, "events", eventId);
+
+  const payload = {};
+  if (typeof helloAssoUrl === "string") payload.helloAssoUrl = helloAssoUrl.trim();
+  if (typeof workshopKey === "string") payload.workshopKey = workshopKey.trim();
+
+  // mini garde-fous
+  if ("helloAssoUrl" in payload && payload.helloAssoUrl && !/^https?:\/\//i.test(payload.helloAssoUrl)){
+    alert("Le lien HelloAsso doit commencer par http(s)://");
+    return;
+  }
+  if ("workshopKey" in payload){
+    // on normalise une clé “propre”
+    payload.workshopKey = normalizeKey(payload.workshopKey);
+  }
+
+  try{
+    await setDoc(evRef, { ...payload, updatedAt: serverTimestamp() }, { merge:true });
+  } catch(e){
+    console.log("updateWorkshopMeta error:", e);
+    alert("Impossible de modifier (rules ?).");
+  }
+}
+
 /* =========================
    RIGHTS / TICKET
    ========================= */
@@ -752,23 +790,21 @@ function renderEventCard(id, e, opts){
                 Liste participants
               </button>
 
-              ${
-                isWorkshop ? `
-                  <button class="btn-premium btn-premium-outline" type="button" data-prem="${id}">
-                    Premium
-                  </button>
-                  <button class="btn-premium btn-premium-outline" type="button" data-other="${id}">
-                    Autre
-                  </button>
-                ` : ``
-              }
+              ${ isWorkshop ? `
+  <button class="btn-premium btn-premium-outline" type="button" data-edit-ha="${id}">
+    HelloAsso
+  </button>
+  <button class="btn-premium btn-premium-outline" type="button" data-edit-wk="${id}">
+    Key
+  </button>
 
-              <button class="icon-danger" type="button" data-del="${id}" aria-label="Supprimer">
-                ${TRASH_SVG}
-              </button>
-            </div>
-          ` : ""
-        }
+  <button class="btn-premium btn-premium-outline" type="button" data-prem="${id}">
+    Premium
+  </button>
+  <button class="btn-premium btn-premium-outline" type="button" data-other="${id}">
+    Autre
+  </button>
+` : `` }
       </div>
 
       ${e.desc ? `<p class="event-desc">${escapeHTML(e.desc)}</p>` : ""}
@@ -807,6 +843,11 @@ function renderEventCard(id, e, opts){
           </div>
         ` : "")
       }
+    ${canDelete && isWorkshop ? `
+  <div style="margin-top:8px; font-size:12px; font-weight:850; color:rgba(15,35,42,.7);">
+    HelloAsso: ${e.helloAssoUrl ? "✅" : "❌"} • Key: <span style="font-family:ui-monospace;">${escapeHTML(getEventWorkshopKey(e))}</span>
+  </div>
+` : ""}
     </div>
   `;
 
@@ -818,6 +859,24 @@ function renderEventCard(id, e, opts){
     // ✅ admin promo buttons workshops
     card.querySelector(`[data-prem="${id}"]`)?.addEventListener("click", ()=> broadcastWorkshopPromo("premium", id));
     card.querySelector(`[data-other="${id}"]`)?.addEventListener("click", ()=> broadcastWorkshopPromo("other", id));
+
+// ✅ admin edit HelloAsso URL
+card.querySelector(`[data-edit-ha="${id}"]`)?.addEventListener("click", async ()=>{
+  const current = String(e.helloAssoUrl || "").trim();
+  const next = prompt("Lien HelloAsso pour ce workshop :", current);
+  if (next === null) return; // cancel
+  await updateWorkshopMeta(id, { helloAssoUrl: next });
+  await loadEvents();
+});
+
+// ✅ admin edit Workshop Key (sert à matcher les billets workshop)
+card.querySelector(`[data-edit-wk="${id}"]`)?.addEventListener("click", async ()=>{
+  const current = String(e.workshopKey || getEventWorkshopKey(e) || "").trim();
+  const next = prompt("Workshop Key (sert à matcher les billets) :", current);
+  if (next === null) return;
+  await updateWorkshopMeta(id, { workshopKey: next });
+  await loadEvents();
+});
 
     return card;
   }
