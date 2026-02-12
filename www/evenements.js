@@ -226,16 +226,14 @@ return {
   ok:true,
   packKey,
   isStaff: packKey === "staff",
-
   wsUsed,
   confUsed,
-
   wsAllowed: Number(pack.workshopDiscountPacks ?? 0),
   confAllowed: Number(pack.conferencesAllowed ?? 0),
-
   wsLeft: Math.max(0, Number(pack.workshopDiscountPacks ?? 0) - wsUsed),
   confLeft: Math.max(0, Number(pack.conferencesAllowed ?? 0) - confUsed),
 };
+} // ✅ <-- ICI : fin de getMyRights()
 
 async function requireTicketOrRedirect(){
   const r = await getMyRights();
@@ -273,22 +271,6 @@ async function loadMyWorkshopKeys(){
     console.log("loadMyWorkshopKeys error:", e);
   }
   return keys;
-}
-
-function isWorkshopEvent(evType=""){
-  const t = String(evType).toLowerCase();
-  return t.includes("workshop");
-}
-function isConferenceEvent(evType=""){
-  const t = String(evType).toLowerCase();
-  return t.includes("conf");
-}
-
-// clé workshop de l’event (priorité: champ workshopKey, sinon titre)
-function getEventWorkshopKey(e){
-  const explicit = String(e.workshopKey || "").trim();
-  if (explicit) return explicit;
-  return normalizeKey(String(e.title || ""));
 }
 
 /* =========================
@@ -783,29 +765,26 @@ function renderEventCard(id, e, opts){
           ${escapeHTML(e.title || "")}
         </h3>
 
-        ${
-          canDelete ? `
-            <div class="event-actions" style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;">
-              <button class="btn-premium btn-premium-outline" type="button" data-part="${id}">
-                Liste participants
-              </button>
+        ${canDelete ? `
+  <div class="event-actions" style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;">
 
-              ${ isWorkshop ? `
-  <button class="btn-premium btn-premium-outline" type="button" data-edit-ha="${id}">
-    HelloAsso
-  </button>
-  <button class="btn-premium btn-premium-outline" type="button" data-edit-wk="${id}">
-    Key
-  </button>
+    <button class="btn-premium btn-premium-outline" type="button" data-part="${id}">
+      Liste participants
+    </button>
 
-  <button class="btn-premium btn-premium-outline" type="button" data-prem="${id}">
-    Premium
-  </button>
-  <button class="btn-premium btn-premium-outline" type="button" data-other="${id}">
-    Autre
-  </button>
-` : `` }
-      </div>
+    ${isWorkshop ? `
+      <button class="btn-premium btn-premium-outline" type="button" data-edit-ha="${id}">HelloAsso</button>
+      <button class="btn-premium btn-premium-outline" type="button" data-edit-wk="${id}">Key</button>
+      <button class="btn-premium btn-premium-outline" type="button" data-prem="${id}">Premium</button>
+      <button class="btn-premium btn-premium-outline" type="button" data-other="${id}">Autre</button>
+    ` : ""}
+
+    <button class="icon-danger" type="button" data-del="${id}" aria-label="Supprimer">
+      ${TRASH_SVG}
+    </button>
+
+  </div>
+` : ""}
 
       ${e.desc ? `<p class="event-desc">${escapeHTML(e.desc)}</p>` : ""}
 
