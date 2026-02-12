@@ -800,30 +800,29 @@ function renderResult({ qrText, packKey, holderName, ticketNumber, promoCode, wo
 }
 
       ${showPromo ? `
-        <div style="border:1px solid rgba(23,140,168,.22); border-radius:14px; padding:12px; background:rgba(23,140,168,.06);">
-          <div style="font-weight:900; color:#0f4f60;">🎟️ Code promo workshops</div>
-          <div style="margin-top:6px; font-size:13px; font-weight:800; color:rgba(15,35,42,.85);">
-            Utilise ce code sur HelloAsso pour acheter ton <b>Pack Workshop</b> avec la réduction.
-          </div>
-          <div style="margin-top:10px; display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
-            <div style="font-family:ui-monospace, SFMono-Regular, Menlo, monospace; font-weight:900; font-size:14px;
-                        padding:10px 12px; border-radius:12px; background:#fff; border:1px solid rgba(0,0,0,.08);">
-              ${escapeHTML(promo)}
-            </div>
-            <button id="copyPromoBtn" class="btn-outline" type="button" style="height:40px;">Copier</button>
-          </div>
-          <div id="copyPromoMsg" style="margin-top:8px; font-size:12px; font-weight:800; color:rgba(31,75,86,.75);"></div>
-        </div>
-      ` : ""}
-      ` : (shouldHavePromo ? `
-        <div style="border:1px solid rgba(255,0,0,.18); border-radius:14px; padding:12px; background:rgba(255,0,0,.05);">
-          <div style="font-weight:900;">🎟️ Code promo</div>
-          <div style="margin-top:6px; font-size:13px; font-weight:800;">
-            Aucun code promo disponible pour le moment (pool vide ou attribution bloquée).<br>
-            Contacte l’admin Ti’Doc.
-          </div>
-        </div>
-      ` : "")}
+  <div style="border:1px solid rgba(23,140,168,.22); border-radius:14px; padding:12px; background:rgba(23,140,168,.06);">
+    <div style="font-weight:900; color:#0f4f60;">🎟️ Code promo workshops</div>
+    <div style="margin-top:6px; font-size:13px; font-weight:800; color:rgba(15,35,42,.85);">
+      Utilise ce code sur HelloAsso pour acheter ton <b>Pack Workshop</b> avec la réduction.
+    </div>
+    <div style="margin-top:10px; display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+      <div style="font-family:ui-monospace, SFMono-Regular, Menlo, monospace; font-weight:900; font-size:14px;
+                  padding:10px 12px; border-radius:12px; background:#fff; border:1px solid rgba(0,0,0,.08);">
+        ${escapeHTML(promo)}
+      </div>
+      <button id="copyPromoBtn" class="btn-outline" type="button" style="height:40px;">Copier</button>
+    </div>
+    <div id="copyPromoMsg" style="margin-top:8px; font-size:12px; font-weight:800; color:rgba(31,75,86,.75);"></div>
+  </div>
+` : (shouldHavePromo ? `
+  <div style="border:1px solid rgba(255,0,0,.18); border-radius:14px; padding:12px; background:rgba(255,0,0,.05);">
+    <div style="font-weight:900;">🎟️ Code promo</div>
+    <div style="margin-top:6px; font-size:13px; font-weight:800;">
+      Aucun code promo disponible pour le moment (pool vide ou attribution bloquée).<br>
+      Contacte l’admin Ti’Doc.
+    </div>
+  </div>
+` : "")}
       <div id="workshopsListBox"></div>
     </div>
   `;
