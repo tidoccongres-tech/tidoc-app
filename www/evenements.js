@@ -165,6 +165,11 @@ function isWorkshopEvent(evType=""){
   return t.includes("workshop");
 }
 
+function isConferenceEvent(evType = ""){
+  const t = String(evType).toLowerCase();
+  return t.includes("conf");
+}
+
 function getEventWorkshopKey(e){
   const explicit = String(e.workshopKey || "").trim();
   if (explicit) return explicit;
