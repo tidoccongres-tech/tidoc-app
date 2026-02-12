@@ -641,7 +641,7 @@ async function loadParticipants(eventId){
 }
 
 /* =========================
-   ADMIN: NOTIFS (Premium / Autre) pour workshops
+   ADMIN: NOTIFS (Premium / Autre) pour workshops + PROMO GLOBAL
    ========================= */
 async function sendNotif(toUid, payload){
   await addDoc(collection(db, "notifications", toUid, "items"), {
@@ -681,37 +681,22 @@ async function broadcastWorkshopPromo(audience, eventId){
 
   if (!recipients.length) return alert("Aucun destinataire.");
 
-  // Notification : on met lien + (si dispo) code promo stocké sur userTicket
   const title =
-  audience === "premium"
-    ? `🎟️ Codes promo workshops (Premium)`
-    : `🎟️ Codes promo workshops`;
+    audience === "premium"
+      ? `🎟️ Codes promo workshops (Premium)`
+      : `🎟️ Codes promo workshops`;
 
-await Promise.all(recipients.map(u => {
-  return sendNotif(u.uid, {
-    type: "workshop_promo",
-    title,
-    text: `Ton code promo est disponible dans l’onglet Billets (il s’affiche automatiquement après import).`,
-    linkLabel: "Ouvrir HelloAsso",
-    linkUrl: hello
-  });
-}));
+  await Promise.all(recipients.map(u => {
+    return sendNotif(u.uid, {
+      type: "workshop_promo",
+      title,
+      text: `Ton code promo est disponible dans l’onglet Billets (il s’affiche automatiquement après import).`,
+      linkLabel: "Ouvrir HelloAsso",
+      linkUrl: hello
+    });
+  }));
 
   alert(`✅ Envoyé à ${recipients.length} utilisateur(s).`);
-}
-
-/* =========================
-   ADMIN: NOTIFS (utilitaire)
-   ========================= */
-async function sendNotif(toUid, payload){
-  await addDoc(collection(db, "notifications", toUid, "items"), {
-    toUid,
-    fromUid: auth.currentUser?.uid || "",
-    fromEmail: auth.currentUser?.email || "",
-    read: false,
-    createdAt: serverTimestamp(),
-    ...payload
-  });
 }
 
 /* =========================
@@ -884,8 +869,10 @@ async function loadEvents(){
     // ✅ BLOC ADMIN TOUT EN HAUT (codes promo)
     if (isAdmin()){
       const promoZone = document.getElementById("promoTopZone");
-promoZone.innerHTML = "";
-promoZone.appendChild(renderPromoBroadcastCard());
+if (promoZone){
+  promoZone.innerHTML = "";
+  promoZone.appendChild(renderPromoBroadcastCard());
+}
     }
 
     // ✅ ensuite les events
