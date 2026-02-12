@@ -867,8 +867,8 @@ async function broadcastPromoToTier(tier, helloAssoUrl){
     throw new Error("Tier invalide.");
   }
 
-  // 🔎 Liste users depuis userTickets (filtre par packKey = tier)
   const usersSnap = await getDocs(collection(db, "userTickets"));
+
   const recipients = [];
   usersSnap.forEach(d => {
     const data = d.data() || {};
@@ -877,7 +877,6 @@ async function broadcastPromoToTier(tier, helloAssoUrl){
       recipients.push({
         uid: d.id,
         promoCode: String(data.promoCode || "").trim(),
-        holderName: String(data.holderName || "").trim(),
       });
     }
   });
@@ -886,21 +885,27 @@ async function broadcastPromoToTier(tier, helloAssoUrl){
 
   const title = `🎟️ Code promo workshops — ${tier.toUpperCase()}`;
 
-  await Promise.all(recipients.map(u => {
-    const code = u.promoCode;
+  // ✅ 1) attribuer les codes manquants (transaction pool + userTickets + promoClaims + promoCodes)
+  for (const u of recipients) {
+    if (!u.promoCode) {
+      u.promoCode = await assignPromoCodeToUserIfNeeded(u.uid, tier);
+    }
+  }
 
-    // ✅ texte personnalisé (avec code si dispo)
-    const text =
-      code
-        ? `Ton code promo personnel est : ${code}`
-        : `Ton code promo n’a pas encore été attribué. Merci d’importer ton billet dans l’app (ou contacte l’admin).`;
+  // ✅ 2) envoyer notification (avec code si dispo)
+  await Promise.all(recipients.map(u => {
+    const code = String(u.promoCode || "").trim();
+
+    // Si vraiment pool vide → on peut envoyer un message neutre
+    const text = code
+      ? `Ton code promo personnel est : ${code}`
+      : `Codes promo temporairement indisponibles. Contacte l’admin.`;
 
     return sendNotif(u.uid, {
       type: "workshop_promo",
       title,
       text,
-      // ✅ optionnel : on met le code aussi en champ séparé pour affichage UI plus joli
-      promoCode: code || "",
+      promoCode: code,
       linkLabel: "Ouvrir HelloAsso",
       linkUrl: String(helloAssoUrl || "").trim()
     });
