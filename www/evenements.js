@@ -656,7 +656,8 @@ async function assignPromoCodeToUserIfNeeded(uid, tier){
   const poolsRef = doc(db, "config", "promoPools");
 
   const res = await runTransaction(db, async (tx) => {
-    const userSnap = await tx.get(userRef);
+    // ✅ TOUS les READS d'abord (peu importe les branches)
+    const userSnap  = await tx.get(userRef);
     if (!userSnap.exists()) return { code:"" };
 
     const userData = userSnap.data() || {};
@@ -666,23 +667,68 @@ async function assignPromoCodeToUserIfNeeded(uid, tier){
     const qrHash = String(userData.qrHash || "").trim();
     if (!qrHash) return { code:"" };
 
-    // verrou anti-double : promoClaims/{qrHash}
-    const claimRef = doc(db, "promoClaims", qrHash);
+    const claimRef  = doc(db, "promoClaims", qrHash);
     const claimSnap = await tx.get(claimRef);
 
+    const poolsSnap = await tx.get(poolsRef); // ✅ read aussi ici, même si claim existe
+
+    // --- Si claim existe déjà, on écrit userTickets (après tous les reads) ---
     if (claimSnap.exists()){
       const claim = claimSnap.data() || {};
       const code = String(claim.code || "").trim();
       const claimTier = String(claim.tier || tier).toLowerCase();
+
       if (code){
         tx.set(userRef, {
-  promoCode: code,
-  promoTier: tier,
-  promoAssignedAt: serverTimestamp(),
-}, { merge:true });
+          promoCode: code,
+          promoTier: claimTier,
+          promoAssignedAt: claim.assignedAt || serverTimestamp(),
+        }, { merge:true });
       }
       return { code };
     }
+
+    // --- Sinon: on consomme dans le pool ---
+    const poolsData = poolsSnap.exists() ? (poolsSnap.data() || {}) : {};
+    const list = Array.isArray(poolsData[tier])
+      ? poolsData[tier].map(x=>String(x||"").trim()).filter(Boolean)
+      : [];
+
+    if (!list.length) return { code:"" };
+
+    const code = list[0];
+    const rest = list.slice(1);
+
+    // ✅ READ promoCodes avant tout WRITE (et seulement maintenant qu'on connaît le code)
+    const codeId  = String(code).toLowerCase();
+    const codeRef = doc(db, "promoCodes", codeId);
+    const codeSnap = await tx.get(codeRef);
+
+    // ✅ WRITES (après tous les reads)
+    tx.set(poolsRef, { [tier]: rest, updatedAt: serverTimestamp() }, { merge:true });
+
+    tx.set(userRef, {
+      promoCode: code,
+      promoTier: tier,
+      promoAssignedAt: serverTimestamp(),
+    }, { merge:true });
+
+    tx.set(claimRef, { qrHash, tier, code, assignedTo: uid, assignedAt: serverTimestamp() });
+
+    if (!codeSnap.exists()){
+      tx.set(codeRef, {
+        code, tier, assignedTo: uid,
+        assignedAt: serverTimestamp(),
+        copiedAt: null,
+        redeemedAt: null
+      }, { merge:false });
+    }
+
+    return { code };
+  });
+
+  return String(res?.code || "").trim();
+}
 
     // consommer dans pool
    const poolsSnap = await tx.get(poolsRef);
