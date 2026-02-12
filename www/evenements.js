@@ -20,6 +20,9 @@ const db   = AuthMod.db;
 
 const ADMIN_EMAIL = "tidoc.congres@gmail.com";
 
+const __boot = document.getElementById("eventsList") || document.body;
+__boot.innerHTML = `<section class="card"><p>🟡 evenements.js chargé…</p></section>`;
+
 /* =========================
    PACKS (quotas) + STAFF
    ========================= */
@@ -1177,8 +1180,10 @@ document.addEventListener("DOMContentLoaded", () => {
     applyAdminUI();
     await loadPackConfig();
     await loadEvents();
+    showMsg("🟢 DOM ready");
   });
 
   // fallback
   loadEvents();
+  eventsList.innerHTML = `<section class="card"><p>⏳ Chargement… (loadEvents lancé)</p></section>`;
 });
