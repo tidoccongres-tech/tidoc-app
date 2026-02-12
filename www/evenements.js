@@ -1,17 +1,17 @@
-// evenements.js (MODULE) — ✅ ton fichier + modifications workshops HelloAsso + priorité affichage + admin Premium/Autre notifs
-// - Packs dynamiques (config/packs)
-// - Quotas affichés
-// - ✅ Admin: bouton "Liste participants" sur chaque event (+ modal simple)
-// - ✅ Admin: suppression event
-// - ✅ User: inscription/désinscription transaction + update bookedCount
-// - ✅ Workshops: plus d’inscription app, seulement HelloAsso + “INSCRIT” si billet workshop détecté
-// - ✅ Tri: inscrits/éligibles en haut + titre plus visible
+  // evenements.js (MODULE) — VERSION COMPLETE STABLE
+// ✅ Packs dynamiques (config/packs) + STAFF
+// ✅ Admin: créer / supprimer event
+// ✅ Admin: liste participants (modal) + édition HelloAsso + workshopKey
+// ✅ User: inscription/désinscription (transactions) UNIQUEMENT pour conférences/autres
+// ✅ Workshops: pas d’inscription app, bouton HelloAsso + “✅ INSCRIT” si billet workshop détecté
+// ✅ Tri: inscrits/éligibles en haut
+// ✅ Debug: erreurs visibles dans la page
 
 import * as AuthMod from "./auth.js";
 import {
   collection, addDoc, getDocs, getDoc, doc, deleteDoc,
   runTransaction, serverTimestamp, query, orderBy, Timestamp, limit,
-  setDoc, writeBatch, where
+  setDoc, where
 } from "https://www.gstatic.com/firebasejs/10.12.4/firebase-firestore.js";
 import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.4/firebase-auth.js";
 
@@ -20,17 +20,31 @@ const db   = AuthMod.db;
 
 const ADMIN_EMAIL = "tidoc.congres@gmail.com";
 
-const __boot = document.getElementById("eventsList") || document.body;
-__boot.innerHTML = `<section class="card"><p>🟡 evenements.js chargé…</p></section>`;
+// =====================
+// DOM
+// =====================
+const openEventForm = document.getElementById("openEventForm");
+const eventForm     = document.getElementById("eventForm");
+const cancelEvent   = document.getElementById("cancelEvent");
+const publishEvent  = document.getElementById("publishEvent");
+const eventsList    = document.getElementById("eventsList");
+const eventMsg      = document.getElementById("eventMsg");
 
-/* =========================
-   PACKS (quotas) + STAFF
-   ========================= */
+function showMsg(t=""){ if (eventMsg) eventMsg.textContent = t; }
+
+// ✅ petit indicateur debug (ne remplace pas le body)
+if (eventsList) {
+  eventsList.innerHTML = `<section class="card"><p>🟡 evenements.js chargé…</p></section>`;
+}
+
+// =====================
+// PACKS (quotas) + STAFF
+// =====================
 const PACKS_FALLBACK = {
   premium:   { label:"Premium",   conferencesAllowed: 7, workshopDiscountPacks: 3 },
   standard:  { label:"Standard",  conferencesAllowed: 4, workshopDiscountPacks: 2 },
   essentiel: { label:"Essentiel", conferencesAllowed: 2, workshopDiscountPacks: 1 },
-  workshop:  { label:"Workshop",  conferencesAllowed: 0, workshopDiscountPacks: 0 }, 
+  workshop:  { label:"Workshop",  conferencesAllowed: 0, workshopDiscountPacks: 0 },
   staff:     { label:"Pack staffeurs", conferencesAllowed: 999, workshopDiscountPacks: 999 },
 };
 
@@ -57,24 +71,28 @@ async function loadPackConfig(){
       PACKS = { ...PACKS_FALLBACK };
       return;
     }
-    const data = snap.data() || {};
-    const normalized = normalizePackConfig(data);
-
+    const normalized = normalizePackConfig(snap.data() || {});
     PACKS = {
       ...PACKS_FALLBACK,
       ...(Object.keys(normalized).length ? normalized : {}),
     };
 
-    PACKS.staff.label = "Pack staffeurs";
+    // labels figés (sécurité)
+    PACKS.premium.label   = PACKS_FALLBACK.premium.label;
+    PACKS.standard.label  = PACKS_FALLBACK.standard.label;
+    PACKS.essentiel.label = PACKS_FALLBACK.essentiel.label;
+    PACKS.workshop.label  = PACKS_FALLBACK.workshop.label;
+    PACKS.staff.label     = "Pack staffeurs";
+
   } catch (e){
     console.log("loadPackConfig error:", e);
     PACKS = { ...PACKS_FALLBACK };
   }
 }
 
-/* =========================
-   ICONS
-   ========================= */
+// =====================
+// ICONS
+// =====================
 const TRASH_SVG = `
 <svg class="trash-ico" viewBox="0 0 408.483 408.483" aria-hidden="true" focusable="false">
   <path d="M87.748,388.784c0.461,11.01,9.521,19.699,20.539,19.699h191.911c11.018,0,20.078-8.689,20.539-19.699l13.705-289.316
@@ -87,26 +105,14 @@ const TRASH_SVG = `
     c-7.125,0-12.9,5.776-12.9,12.901V74.47h304.451V33.944C356.467,26.819,350.692,21.043,343.567,21.043z"/>
 </svg>`;
 
-/* =========================
-   DOM
-   ========================= */
-const openEventForm = document.getElementById("openEventForm");
-const eventForm     = document.getElementById("eventForm");
-const cancelEvent   = document.getElementById("cancelEvent");
-const publishEvent  = document.getElementById("publishEvent");
-const eventsList    = document.getElementById("eventsList");
-const eventMsg      = document.getElementById("eventMsg");
-
-/* =========================
-   HELPERS
-   ========================= */
+// =====================
+// HELPERS
+// =====================
 function isAdmin(){
   if (window.TIDOC_AUTH?.isAdmin) return true;
   const email = (auth.currentUser?.email || "").toLowerCase();
   return email === ADMIN_EMAIL.toLowerCase();
 }
-
-function showMsg(t=""){ if (eventMsg) eventMsg.textContent = t; }
 
 function escapeHTML(s=""){
   return String(s)
@@ -152,9 +158,9 @@ function applyAdminUI(){
   if (!admin) showForm(false);
 }
 
-// Normalisation workshopKey
+// workshopKey normalisation
 function normalizeKey(v = "") {
-  return v
+  return String(v || "")
     .trim()
     .toLowerCase()
     .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
@@ -164,19 +170,12 @@ function normalizeKey(v = "") {
 }
 
 function isWorkshopEvent(evType=""){
-  const t = String(evType).toLowerCase();
-  return t.includes("workshop");
-}
-
-function isConferenceEvent(evType = ""){
-  const t = String(evType).toLowerCase();
-  return t.includes("conf");
+  return String(evType).toLowerCase().includes("workshop");
 }
 
 function getEventWorkshopKey(e){
   const explicit = String(e.workshopKey || "").trim();
-  if (explicit) return explicit;
-  return normalizeKey(String(e.title || ""));
+  return explicit ? explicit : normalizeKey(String(e.title || ""));
 }
 
 async function updateWorkshopMeta(eventId, { helloAssoUrl, workshopKey } = {}){
@@ -188,13 +187,11 @@ async function updateWorkshopMeta(eventId, { helloAssoUrl, workshopKey } = {}){
   if (typeof helloAssoUrl === "string") payload.helloAssoUrl = helloAssoUrl.trim();
   if (typeof workshopKey === "string") payload.workshopKey = workshopKey.trim();
 
-  // mini garde-fous
   if ("helloAssoUrl" in payload && payload.helloAssoUrl && !/^https?:\/\//i.test(payload.helloAssoUrl)){
     alert("Le lien HelloAsso doit commencer par http(s)://");
     return;
   }
   if ("workshopKey" in payload){
-    // on normalise une clé “propre”
     payload.workshopKey = normalizeKey(payload.workshopKey);
   }
 
@@ -206,9 +203,9 @@ async function updateWorkshopMeta(eventId, { helloAssoUrl, workshopKey } = {}){
   }
 }
 
-/* =========================
-   RIGHTS / TICKET
-   ========================= */
+// =====================
+// RIGHTS / TICKET
+// =====================
 async function getMyRights(){
   const uid = auth.currentUser?.uid;
   if (!uid) return { ok:false, reason:"nologin" };
@@ -226,22 +223,30 @@ async function getMyRights(){
   const usage = uSnap.exists() ? (uSnap.data() || {}) : {};
 
   const confUsed = Number(usage.conferenceUsed || 0);
+  const wsUsed   = Number(usage.workshopUsed || 0);
+  const otherUsed = Number(usage.otherUsed || 0);
 
-// ici "wsUsed" = nb de packs workshop remisés déjà consommés via l’app (si tu veux garder ce compteur)
-const wsUsed = Number(usage.workshopUsed || 0);
+  // ✅ IMPORTANT: otherAllowed exist (sinon crash sur events type "Autre")
+  const otherAllowed = 9999;
 
-return {
-  ok:true,
-  packKey,
-  isStaff: packKey === "staff",
-  wsUsed,
-  confUsed,
-  wsAllowed: Number(pack.workshopDiscountPacks ?? 0),
-  confAllowed: Number(pack.conferencesAllowed ?? 0),
-  wsLeft: Math.max(0, Number(pack.workshopDiscountPacks ?? 0) - wsUsed),
-  confLeft: Math.max(0, Number(pack.conferencesAllowed ?? 0) - confUsed),
-};
-} // ✅ <-- ICI : fin de getMyRights()
+  return {
+    ok:true,
+    packKey,
+    isStaff: packKey === "staff",
+
+    confUsed,
+    wsUsed,
+    otherUsed,
+
+    wsAllowed: Number(pack.workshopDiscountPacks ?? 0),
+    confAllowed: Number(pack.conferencesAllowed ?? 0),
+    otherAllowed,
+
+    wsLeft: Math.max(0, Number(pack.workshopDiscountPacks ?? 0) - wsUsed),
+    confLeft: Math.max(0, Number(pack.conferencesAllowed ?? 0) - confUsed),
+    otherLeft: Math.max(0, otherAllowed - otherUsed),
+  };
+}
 
 async function requireTicketOrRedirect(){
   const r = await getMyRights();
@@ -256,14 +261,13 @@ async function requireTicketOrRedirect(){
   return null;
 }
 
-/* =========================
-   WORKSHOP ACCESS (tickets)
-   ========================= */
+// =====================
+// WORKSHOP ACCESS (tickets)
+// =====================
 async function loadMyWorkshopKeys(){
   const uid = auth.currentUser?.uid;
   if (!uid) return new Set();
 
-  // On query uniquement les tickets de l’utilisateur
   const keys = new Set();
   try{
     const qy = query(collection(db, "userWorkshopTickets"), where("uid", "==", uid), limit(500));
@@ -281,9 +285,9 @@ async function loadMyWorkshopKeys(){
   return keys;
 }
 
-/* =========================
-   CRUD EVENTS (ADMIN)
-   ========================= */
+// =====================
+// CRUD EVENTS (ADMIN)
+// =====================
 async function createEvent(){
   if (!isAdmin()) { alert("Réservé à l’admin Ti’Doc."); return; }
 
@@ -331,11 +335,8 @@ async function createEvent(){
       createdBy: auth.currentUser?.uid || "",
     };
 
-    // Bonus: si c’est un workshop, on prépare workshopKey automatiquement
     if (isWorkshopEvent(type)){
       base.workshopKey = normalizeKey(title);
-      // helloAssoUrl sera rempli plus tard via édition (ou tu l’ajoutes dans le form ensuite)
-      // base.helloAssoUrl = ""
     }
 
     await addDoc(collection(db, "events"), base);
@@ -343,6 +344,7 @@ async function createEvent(){
     clearForm();
     showForm(false);
     await loadEvents();
+
   } catch(e){
     console.log("createEvent error:", e);
     alert("Impossible de publier l’évènement (Rules Firestore ?)");
@@ -368,9 +370,9 @@ async function deleteEvent(eventId){
   }
 }
 
-/* =========================
-   REGISTRATION (JOIN / LEAVE) — CONFÉRENCES uniquement (workshops: HelloAsso)
-   ========================= */
+// =====================
+// REGISTRATION (JOIN / LEAVE) — Conf/Autre uniquement
+// =====================
 function eventTypeKey(evType=""){
   const t = String(evType).toLowerCase();
   if (t.includes("workshop")) return "ws";
@@ -382,7 +384,7 @@ async function registerToEvent(eventId){
   const uid = auth.currentUser?.uid;
   if (!uid) { location.href="./login.html"; return; }
 
-  // On empêche l’inscription app sur workshops
+  // block workshops in-app
   const evSnapPeek = await getDoc(doc(db, "events", eventId));
   if (evSnapPeek.exists()){
     const evPeek = evSnapPeek.data() || {};
@@ -404,11 +406,7 @@ async function registerToEvent(eventId){
     if (!evSnap.exists()) throw new Error("Évènement introuvable.");
 
     const ev = evSnap.data() || {};
-
-    // Double sécurité
-    if (isWorkshopEvent(ev.type)){
-      throw new Error("Les workshops se font uniquement via HelloAsso.");
-    }
+    if (isWorkshopEvent(ev.type)) throw new Error("Les workshops se font uniquement via HelloAsso.");
 
     const capPublic  = Number(ev.capacity || 0);
     const capStaff   = Number(ev.capacityStaff || 0);
@@ -432,13 +430,11 @@ async function registerToEvent(eventId){
     const confUsed  = Number(usage.conferenceUsed || 0);
     const otherUsed = Number(usage.otherUsed || 0);
 
-    if (typeKey === "ws"){
-      if (wsUsed >= rights.wsAllowed) throw new Error("Tu n’as plus de workshop disponible.");
-      tx.set(usageRef, { workshopUsed: wsUsed + 1 }, { merge:true });
-    } else if (typeKey === "conf"){
+    if (typeKey === "conf"){
       if (confUsed >= rights.confAllowed) throw new Error("Tu n’as plus de conférence disponible.");
       tx.set(usageRef, { conferenceUsed: confUsed + 1 }, { merge:true });
     } else {
+      // other
       if (otherUsed >= rights.otherAllowed) throw new Error("Tu n’as plus de quota “Autre” disponible.");
       tx.set(usageRef, { otherUsed: otherUsed + 1 }, { merge:true });
     }
@@ -461,7 +457,7 @@ async function unregisterFromEvent(eventId){
   const uid = auth.currentUser?.uid;
   if (!uid) { location.href="./login.html"; return; }
 
-  // Workshops: pas de désinscription app
+  // block workshops in-app
   const evSnapPeek = await getDoc(doc(db, "events", eventId));
   if (evSnapPeek.exists()){
     const evPeek = evSnapPeek.data() || {};
@@ -480,9 +476,7 @@ async function unregisterFromEvent(eventId){
     if (!evSnap.exists()) throw new Error("Évènement introuvable.");
 
     const ev = evSnap.data() || {};
-    if (isWorkshopEvent(ev.type)){
-      throw new Error("Les workshops se gèrent sur HelloAsso.");
-    }
+    if (isWorkshopEvent(ev.type)) throw new Error("Les workshops se gèrent sur HelloAsso.");
 
     const regSnap = await tx.get(regRef);
     if (!regSnap.exists()) throw new Error("Tu n’es pas inscrit(e).");
@@ -497,13 +491,10 @@ async function unregisterFromEvent(eventId){
 
     const uSnap = await tx.get(usageRef);
     const usage = uSnap.exists() ? (uSnap.data() || {}) : {};
-    const wsUsed    = Number(usage.workshopUsed || 0);
     const confUsed  = Number(usage.conferenceUsed || 0);
     const otherUsed = Number(usage.otherUsed || 0);
 
-    if (typeKey === "ws"){
-      tx.set(usageRef, { workshopUsed: Math.max(0, wsUsed - 1) }, { merge:true });
-    } else if (typeKey === "conf"){
+    if (typeKey === "conf"){
       tx.set(usageRef, { conferenceUsed: Math.max(0, confUsed - 1) }, { merge:true });
     } else {
       tx.set(usageRef, { otherUsed: Math.max(0, otherUsed - 1) }, { merge:true });
@@ -519,9 +510,9 @@ async function unregisterFromEvent(eventId){
   });
 }
 
-/* =========================
-   ADMIN: LISTE PARTICIPANTS
-   ========================= */
+// =====================
+// ADMIN: LISTE PARTICIPANTS
+// =====================
 function ensureParticipantsModal(){
   let modal = document.getElementById("participantsModal");
   if (modal) return modal;
@@ -568,7 +559,6 @@ function ensureParticipantsModal(){
   document.body.appendChild(modal);
 
   const close = () => { modal.style.display = "none"; };
-
   modal.addEventListener("click", (e)=>{ if (e.target === modal) close(); });
   modal.querySelector("#participantsCloseBtn")?.addEventListener("click", close);
 
@@ -630,7 +620,7 @@ async function loadParticipants(eventId){
         await navigator.clipboard.writeText(text);
         copyBtn.textContent = "✅ Copié";
         setTimeout(()=>{ copyBtn.textContent = "Copier la liste"; }, 1200);
-      } catch(e){
+      } catch(_){
         alert("Copie impossible sur cet appareil. Sélectionne le texte et copie manuellement.");
       }
     }, { once:true });
@@ -643,9 +633,10 @@ async function loadParticipants(eventId){
   }
 }
 
-/* =========================
-   ADMIN: NOTIFS (Premium / Autre) pour workshops + PROMO GLOBAL
-   ========================= */
+// =====================
+// PROMO GLOBAL (ADMIN) — UI + NOTIFS
+// (tu as déjà la logique, ici on garde le rendu top-zone)
+// =====================
 async function sendNotif(toUid, payload){
   await addDoc(collection(db, "notifications", toUid, "items"), {
     toUid,
@@ -670,7 +661,6 @@ async function broadcastWorkshopPromo(audience, eventId){
   const hello = String(ev.helloAssoUrl || "").trim();
   if (!hello) return alert("Ajoute d’abord helloAssoUrl sur ce workshop.");
 
-  // Liste utilisateurs (userTickets) => packKey
   const usersSnap = await getDocs(collection(db, "userTickets"));
   const users = [];
   usersSnap.forEach(d => users.push({ uid: d.id, ...(d.data() || {}) }));
@@ -702,9 +692,126 @@ async function broadcastWorkshopPromo(audience, eventId){
   alert(`✅ Envoyé à ${recipients.length} utilisateur(s).`);
 }
 
-/* =========================
-   ADMIN: PROMO CODES (GLOBAL UI + NOTIFS)
-   ========================= */
+async function assignPromoCodeToUserIfNeeded(uid, tier){
+  tier = String(tier || "").toLowerCase();
+  if (!["premium","standard","essentiel"].includes(tier)) return "";
+
+  const userRef  = doc(db, "userTickets", uid);
+  const poolsRef = doc(db, "config", "promoPools");
+
+  const res = await runTransaction(db, async (tx) => {
+    const userSnap = await tx.get(userRef);
+    if (!userSnap.exists()) return { code:"" };
+
+    const userData = userSnap.data() || {};
+    const existing = String(userData.promoCode || "").trim();
+    if (existing) return { code: existing, already:true };
+
+    const qrHash = String(userData.qrHash || "").trim();
+    if (!qrHash) return { code:"" };
+
+    // verrou anti-double : promoClaims/{qrHash}
+    const claimRef = doc(db, "promoClaims", qrHash);
+    const claimSnap = await tx.get(claimRef);
+
+    if (claimSnap.exists()){
+      const claim = claimSnap.data() || {};
+      const code = String(claim.code || "").trim();
+      const claimTier = String(claim.tier || tier).toLowerCase();
+      if (code){
+        tx.set(userRef, {
+          promoCode: code,
+          promoTier: claimTier,
+          promoAssignedAt: claim.assignedAt || serverTimestamp(),
+        }, { merge:true });
+      }
+      return { code };
+    }
+
+    // consommer dans pool
+    const poolsSnap = await tx.get(poolsRef);
+    const poolsData = poolsSnap.exists() ? (poolsSnap.data() || {}) : {};
+    const list = Array.isArray(poolsData[tier])
+      ? poolsData[tier].map(x=>String(x||"").trim()).filter(Boolean)
+      : [];
+
+    if (!list.length) return { code:"" };
+
+    const code = list[0];
+    const rest = list.slice(1);
+
+    tx.set(poolsRef, { [tier]: rest, updatedAt: serverTimestamp() }, { merge:true });
+
+    tx.set(userRef, {
+      promoCode: code,
+      promoTier: tier,
+      promoAssignedAt: serverTimestamp(),
+      promoSentAt: serverTimestamp(),
+    }, { merge:true });
+
+    tx.set(claimRef, { qrHash, tier, code, assignedTo: uid, assignedAt: serverTimestamp() });
+
+    // registre admin promoCodes/{codeLower} (optionnel)
+    const codeId = String(code).toLowerCase();
+    const codeRef = doc(db, "promoCodes", codeId);
+    const codeSnap = await tx.get(codeRef);
+    if (!codeSnap.exists()){
+      tx.set(codeRef, {
+        code, tier, assignedTo: uid,
+        assignedAt: serverTimestamp(),
+        copiedAt: null,
+        redeemedAt: null
+      }, { merge:false });
+    }
+
+    return { code };
+  });
+
+  return String(res?.code || "").trim();
+}
+
+async function broadcastPromoToTier(tier, helloAssoUrl){
+  if (!isAdmin()) throw new Error("Réservé à l’admin Ti’Doc.");
+  tier = String(tier || "").toLowerCase();
+  if (!["premium","standard","essentiel"].includes(tier)) throw new Error("Tier invalide.");
+
+  const usersSnap = await getDocs(collection(db, "userTickets"));
+  const recipients = [];
+  usersSnap.forEach(d => {
+    const data = d.data() || {};
+    const pk = String(data.packKey || "").toLowerCase();
+    if (pk === tier) {
+      recipients.push({ uid: d.id, promoCode: String(data.promoCode || "").trim() });
+    }
+  });
+
+  if (!recipients.length) return 0;
+
+  const title = `🎟️ Code promo workshops — ${tier.toUpperCase()}`;
+
+  for (const u of recipients){
+    if (!u.promoCode){
+      u.promoCode = await assignPromoCodeToUserIfNeeded(u.uid, tier);
+    }
+  }
+
+  await Promise.all(recipients.map(u => {
+    const code = String(u.promoCode || "").trim();
+    const text = code ? `Ton code promo personnel est : ${code}` : `Codes promo temporairement indisponibles. Contacte l’admin.`;
+
+    return sendNotif(u.uid, {
+      type: "workshop_promo",
+      title,
+      text,
+      promoCode: code,
+      linkLabel: "Ouvrir HelloAsso",
+      linkUrl: String(helloAssoUrl || "").trim()
+    });
+  }));
+
+  return recipients.length;
+}
+
 function renderPromoBroadcastCard(){
   const wrap = document.createElement("section");
   wrap.className = "event-card";
@@ -715,9 +822,7 @@ function renderPromoBroadcastCard(){
 
   wrap.innerHTML = `
     <div style="display:flex; flex-direction:column; gap:10px;">
-      <div style="font-weight:950; color:#0e5f71; font-size:16px;">
-        🎟️ Envoi codes promo (workshops)
-      </div>
+      <div style="font-weight:950; color:#0e5f71; font-size:16px;">🎟️ Envoi codes promo (workshops)</div>
 
       <label style="display:flex; flex-direction:column; gap:6px;">
         <span style="font-weight:900;">Lien HelloAsso (global)</span>
@@ -726,15 +831,9 @@ function renderPromoBroadcastCard(){
       </label>
 
       <div style="display:flex; gap:10px; flex-wrap:wrap;">
-        <button class="btn-premium btn-premium-outline" type="button" data-send-tier="premium">
-          Envoyer → Premium
-        </button>
-        <button class="btn-premium btn-premium-outline" type="button" data-send-tier="standard">
-          Envoyer → Standard
-        </button>
-        <button class="btn-premium btn-premium-outline" type="button" data-send-tier="essentiel">
-          Envoyer → Essentiel
-        </button>
+        <button class="btn-premium btn-premium-outline" type="button" data-send-tier="premium">Envoyer → Premium</button>
+        <button class="btn-premium btn-premium-outline" type="button" data-send-tier="standard">Envoyer → Standard</button>
+        <button class="btn-premium btn-premium-outline" type="button" data-send-tier="essentiel">Envoyer → Essentiel</button>
       </div>
 
       <div id="promoBroadcastMsg" style="font-size:12px; font-weight:900; color:rgba(15,35,42,.65);"></div>
@@ -757,9 +856,7 @@ function renderPromoBroadcastCard(){
       try{
         btn.disabled = true;
         if (msg) msg.textContent = "⏳ Envoi…";
-
         const n = await broadcastPromoToTier(tier, hello);
-
         if (msg) msg.textContent = `✅ Envoyé à ${n} utilisateur(s) (${tier}).`;
       } catch(e){
         console.log("broadcastPromoToTier error:", e);
@@ -774,154 +871,9 @@ function renderPromoBroadcastCard(){
   return wrap;
 }
 
-
-async function assignPromoCodeToUserIfNeeded(uid, tier){
-  tier = String(tier || "").toLowerCase();
-  if (!["premium","standard","essentiel"].includes(tier)) return "";
-
-  const userRef  = doc(db, "userTickets", uid);
-  const poolsRef = doc(db, "config", "promoPools");
-
-  const res = await runTransaction(db, async (tx) => {
-    const userSnap = await tx.get(userRef);
-    if (!userSnap.exists()) return { code:"" };
-
-    const userData = userSnap.data() || {};
-    const existing = String(userData.promoCode || "").trim();
-    if (existing) return { code: existing, already:true };
-
-    const qrHash = String(userData.qrHash || "").trim();
-    if (!qrHash) return { code:"" };
-
-    // verrou anti-double : promoClaims/{qrHash}
-    const claimRef = doc(db, "promoClaims", qrHash);
-    const claimSnap = await tx.get(claimRef);
-   if (claimSnap.exists()){
-  const claim = claimSnap.data() || {};
-  const code = String(claim.code || "").trim();
-  const claimTier = String(claim.tier || tier).toLowerCase();
-
-  if (code){
-    tx.set(userRef, {
-      promoCode: code,
-      promoTier: claimTier,
-      promoAssignedAt: claim.assignedAt || serverTimestamp(),
-    }, { merge:true });
-  }
-  return { code };
-}
-
-    // consommer dans pool
-    const poolsSnap = await tx.get(poolsRef);
-    const poolsData = poolsSnap.exists() ? (poolsSnap.data() || {}) : {};
-    const list = Array.isArray(poolsData[tier]) ? poolsData[tier].map(x=>String(x||"").trim()).filter(Boolean) : [];
-    if (!list.length) return { code:"", empty:true };
-
-    const code = list[0];
-    const rest = list.slice(1);
-
-    tx.set(poolsRef, { [tier]: rest, updatedAt: serverTimestamp() }, { merge:true });
-
-    tx.set(userRef, {
-      promoCode: code,
-      promoTier: tier,
-      promoAssignedAt: serverTimestamp(),
-      promoSentAt: serverTimestamp(), // optionnel (trace)
-    }, { merge:true });
-
-    const claimSnap = await tx.get(claimRef);
-if (!claimSnap.exists()) {
-  tx.set(claimRef, {
-    qrHash,
-    tier,
-    code,
-    assignedTo: uid,
-    assignedAt: serverTimestamp()
-  });
-}
-
-    // registre admin promoCodes/{codeLower} (optionnel mais utile)
-    const codeId = String(code).toLowerCase();
-    const codeRef = doc(db, "promoCodes", codeId);
-    const codeSnap = await tx.get(codeRef);
-    if (!codeSnap.exists()){
-      tx.set(codeRef, {
-        code,
-        tier,
-        assignedTo: uid,
-        assignedAt: serverTimestamp(),
-        copiedAt: null,
-        redeemedAt: null
-      }, { merge:false });
-    }
-
-    return { code };
-  });
-
-  return String(res?.code || "").trim();
-}
-
-async function getPackKeyOfUser(uid){
-  const snap = await getDoc(doc(db, "userTickets", uid));
-  if (!snap.exists()) return "";
-  return String(snap.data()?.packKey || "").toLowerCase();
-}
-
-async function broadcastPromoToTier(tier, helloAssoUrl){
-  if (!isAdmin()) throw new Error("Réservé à l’admin Ti’Doc.");
-
-  tier = String(tier || "").toLowerCase();
-  if (!["premium","standard","essentiel"].includes(tier)) {
-    throw new Error("Tier invalide.");
-  }
-
-  const usersSnap = await getDocs(collection(db, "userTickets"));
-
-  const recipients = [];
-  usersSnap.forEach(d => {
-    const data = d.data() || {};
-    const pk = String(data.packKey || "").toLowerCase();
-    if (pk === tier) {
-      recipients.push({
-        uid: d.id,
-        promoCode: String(data.promoCode || "").trim(),
-      });
-    }
-  });
-
-  if (!recipients.length) return 0;
-
-  const title = `🎟️ Code promo workshops — ${tier.toUpperCase()}`;
-
-  // ✅ 1) attribuer les codes manquants (transaction pool + userTickets + promoClaims + promoCodes)
-  for (const u of recipients) {
-    if (!u.promoCode) {
-      u.promoCode = await assignPromoCodeToUserIfNeeded(u.uid, tier);
-    }
-  }
-
-  // ✅ 2) envoyer notification (avec code si dispo)
-  await Promise.all(recipients.map(u => {
-    const code = String(u.promoCode || "").trim();
-
-    // Si vraiment pool vide → on peut envoyer un message neutre
-    const text = code
-      ? `Ton code promo personnel est : ${code}`
-      : `Codes promo temporairement indisponibles. Contacte l’admin.`;
-
-    return sendNotif(u.uid, {
-      type: "workshop_promo",
-      title,
-      text,
-      promoCode: code,
-      linkLabel: "Ouvrir HelloAsso",
-      linkUrl: String(helloAssoUrl || "").trim()
-    });
-  }));
-
-  return recipients.length;
-}
-
+// =====================
+// RENDER EVENT CARD
+// =====================
 function renderEventCard(eventId, e = {}, { myWorkshopKeys = new Set(), regMap = {} } = {}){
   const start = e.startAt?.toDate ? e.startAt.toDate() : null;
   const end   = e.endAt?.toDate ? e.endAt.toDate() : null;
@@ -959,10 +911,7 @@ function renderEventCard(eventId, e = {}, { myWorkshopKeys = new Set(), regMap =
     <div class="event-content">
       <div class="event-head">
         <h3>${escapeHTML(title)}</h3>
-
-        <div class="event-actions" data-actions>
-          <!-- buttons injected -->
-        </div>
+        <div class="event-actions" data-actions></div>
       </div>
 
       <div class="event-meta">
@@ -984,7 +933,7 @@ function renderEventCard(eventId, e = {}, { myWorkshopKeys = new Set(), regMap =
 
   const actions = sec.querySelector("[data-actions]");
 
-  // --- Boutons ADMIN
+  // ADMIN buttons
   if (admin){
     const btnList = document.createElement("button");
     btnList.className = "pill-btn";
@@ -1002,25 +951,9 @@ function renderEventCard(eventId, e = {}, { myWorkshopKeys = new Set(), regMap =
     actions?.appendChild(btnList);
     actions?.appendChild(btnDel);
 
-    // Admin workshop: mini édition HelloAsso / workshopKey
-    if (isWs){
-      const btnEdit = document.createElement("button");
-      btnEdit.className = "pill-btn";
-      btnEdit.type = "button";
-      btnEdit.textContent = "Éditer HelloAsso";
-      btnEdit.addEventListener("click", async ()=>{
-        const hello = prompt("Lien HelloAsso (http(s)://...)", String(e.helloAssoUrl || ""));
-        if (hello === null) return;
-        const wk = prompt("workshopKey (optionnel)", String(e.workshopKey || wkKey || ""));
-        if (wk === null) return;
-        await updateWorkshopMeta(eventId, { helloAssoUrl: hello, workshopKey: wk });
-        await loadEvents();
-      });
-      actions?.appendChild(btnEdit);
-    }
   }
 
-  // --- Boutons USER (inscription / HelloAsso)
+  // USER button
   const uid = auth.currentUser?.uid;
 
   if (isWs){
@@ -1032,19 +965,21 @@ function renderEventCard(eventId, e = {}, { myWorkshopKeys = new Set(), regMap =
     a.target = "_blank";
     a.rel = "noopener";
     a.textContent = hasWsTicket ? "✅ INSCRIT" : "Ouvrir HelloAsso";
+
     if (!hello){
       a.className = "btn-premium btn-premium-outline";
       a.textContent = admin ? "⚠️ Ajouter HelloAsso" : "Workshop";
       a.addEventListener("click", (ev)=>ev.preventDefault());
     }
+
     actions?.appendChild(a);
 
   } else {
-    // conférences/autre => inscription app
     const btn = document.createElement("button");
     btn.className = isReg ? "btn-premium btn-premium-outline" : "btn-premium btn-premium-primary";
     btn.type = "button";
     btn.textContent = isReg ? "Se désinscrire" : "S’inscrire";
+
     btn.addEventListener("click", async ()=>{
       try{
         if (!uid){ location.href="./login.html"; return; }
@@ -1058,20 +993,21 @@ function renderEventCard(eventId, e = {}, { myWorkshopKeys = new Set(), regMap =
         btn.disabled = false;
       }
     });
+
     actions?.appendChild(btn);
   }
 
   return sec;
 }
 
-/* =========================
-   LOAD EVENTS + TRI
-   ========================= */
+// =====================
+// LOAD EVENTS + TRI
+// =====================
 async function loadEvents(){
   if (!eventsList) return;
 
   try {
-    eventsList.innerHTML = `<section class="card"><p>Chargement…</p></section>`;
+    eventsList.innerHTML = `<section class="card"><p>⏳ Chargement…</p></section>`;
 
     const qy = query(collection(db, "events"), orderBy("startAt", "asc"));
     const snap = await getDocs(qy);
@@ -1081,18 +1017,17 @@ async function loadEvents(){
       return;
     }
 
-    // charge les clés workshop user + inscriptions conf
     const myWorkshopKeys = await loadMyWorkshopKeys();
 
     const uid = auth.currentUser?.uid || "";
     const docs = snap.docs.map(d => ({ id: d.id, data: d.data() || {} }));
 
-    // Map inscription (pour conférences/autre)
+    // Map inscription (conf/autre)
     const regMap = {};
     if (uid){
       await Promise.all(docs.map(async (row)=>{
         const e = row.data || {};
-        if (isWorkshopEvent(e.type)) return; // pas de reg app workshop
+        if (isWorkshopEvent(e.type)) return;
         try{
           const r = await getDoc(doc(db, "events", row.id, "registrations", uid));
           if (r.exists()) regMap[row.id] = true;
@@ -1100,7 +1035,7 @@ async function loadEvents(){
       }));
     }
 
-    // ✅ tri priorité
+    // tri priorité
     const scored = docs.map(row => {
       const e = row.data || {};
       const isWs = isWorkshopEvent(e.type);
@@ -1122,19 +1057,18 @@ async function loadEvents(){
       return da - dbb;
     });
 
-    // ✅ rendu
+    // rendu
     eventsList.innerHTML = "";
 
-    // ✅ BLOC ADMIN TOUT EN HAUT (codes promo)
-    if (isAdmin()){
-      const promoZone = document.getElementById("promoTopZone");
-if (promoZone){
-  promoZone.innerHTML = "";
-  promoZone.appendChild(renderPromoBroadcastCard());
-}
+    // bloc admin promo en haut (si présent dans HTML)
+    const promoZone = document.getElementById("promoTopZone");
+    if (promoZone){
+      promoZone.innerHTML = "";
+      if (isAdmin()){
+        promoZone.appendChild(renderPromoBroadcastCard());
+      }
     }
 
-    // ✅ ensuite les events
     scored.forEach((row)=>{
       const card = renderEventCard(row.id, row.data, { myWorkshopKeys, regMap });
       if (card) eventsList.appendChild(card);
@@ -1146,9 +1080,9 @@ if (promoZone){
   }
 }
 
-/* =========================
-   BOOT
-   ========================= */
+// =====================
+// BOOT (1 seul endroit) ✅
+// =====================
 document.addEventListener("DOMContentLoaded", () => {
   applyAdminUI();
   window.addEventListener("tidoc:auth", applyAdminUI);
@@ -1166,24 +1100,23 @@ document.addEventListener("DOMContentLoaded", () => {
 
   publishEvent?.addEventListener("click", createEvent);
 
-  // debug (optionnel)
+  // erreurs visibles dans l’UI
   window.addEventListener("error", (e) => {
-    const box = document.getElementById("eventsList");
-    if (box) box.innerHTML = `<section class="card"><p>❌ JS error: ${String(e.message)}</p></section>`;
+    if (eventsList) eventsList.innerHTML = `<section class="card"><p>❌ JS error: ${escapeHTML(String(e.message))}</p></section>`;
   });
   window.addEventListener("unhandledrejection", (e) => {
-    const box = document.getElementById("eventsList");
-    if (box) box.innerHTML = `<section class="card"><p>❌ Promise error: ${String(e.reason?.message || e.reason)}</p></section>`;
+    if (eventsList) eventsList.innerHTML = `<section class="card"><p>❌ Promise error: ${escapeHTML(String(e.reason?.message || e.reason))}</p></section>`;
   });
 
   onAuthStateChanged(auth, async () => {
-    applyAdminUI();
-    await loadPackConfig();
-    await loadEvents();
-    showMsg("🟢 DOM ready");
+    try{
+      applyAdminUI();
+      await loadPackConfig();
+      await loadEvents();
+      showMsg("🟢 OK");
+    } catch(e){
+      console.log("boot error:", e);
+      if (eventsList) eventsList.innerHTML = `<section class="card"><p>❌ Boot: ${escapeHTML(e?.message || String(e))}</p></section>`;
+    }
   });
-
-  // fallback
-  loadEvents();
-  eventsList.innerHTML = `<section class="card"><p>⏳ Chargement… (loadEvents lancé)</p></section>`;
 });
