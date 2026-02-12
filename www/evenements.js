@@ -24,14 +24,11 @@ const ADMIN_EMAIL = "tidoc.congres@gmail.com";
    PACKS (quotas) + STAFF
    ========================= */
 const PACKS_FALLBACK = {
-  essentiel: { label:"Essentiel", workshopsAllowed: 1, conferencesAllowed: 2, otherAllowed: 0 },
-  standard:  { label:"Standard",  workshopsAllowed: 2, conferencesAllowed: 4, otherAllowed: 0 },
-  premium:   { label:"Premium",   workshopsAllowed: 3, conferencesAllowed: 7, otherAllowed: 0 },
-
-  // ✅ Pack staffeurs
-  staff:     { label:"Pack staffeurs", workshopsAllowed: 3, conferencesAllowed: 999, otherAllowed: 0 },
-
-  autre:     { label:"Autre",     workshopsAllowed: 0, conferencesAllowed: 0, otherAllowed: 0 },
+  premium:   { label:"Premium",   conferencesAllowed: 7, workshopDiscountPacks: 3 },
+  standard:  { label:"Standard",  conferencesAllowed: 4, workshopDiscountPacks: 2 },
+  essentiel: { label:"Essentiel", conferencesAllowed: 2, workshopDiscountPacks: 1 },
+  workshop:  { label:"Workshop",  conferencesAllowed: 0, workshopDiscountPacks: 0 }, 
+  staff:     { label:"Pack staffeurs", conferencesAllowed: 999, workshopDiscountPacks: 999 },
 };
 
 let PACKS = { ...PACKS_FALLBACK };
@@ -43,9 +40,8 @@ function normalizePackConfig(obj){
     const v = src[k] || {};
     out[String(k).toLowerCase()] = {
       label: String(v.label || k),
-      workshopsAllowed: Number(v.workshopsAllowed ?? 0),
       conferencesAllowed: Number(v.conferencesAllowed ?? 0),
-      otherAllowed: Number(v.otherAllowed ?? 0),
+      workshopDiscountPacks: Number(v.workshopDiscountPacks ?? 0),
     };
   }
   return out;
@@ -183,25 +179,25 @@ async function getMyRights(){
   const uSnap = await getDoc(doc(db, "userUsage", uid));
   const usage = uSnap.exists() ? (uSnap.data() || {}) : {};
 
-  const wsUsed    = Number(usage.workshopUsed || 0);
-  const confUsed  = Number(usage.conferenceUsed || 0);
-  const otherUsed = Number(usage.otherUsed || 0);
+  const confUsed = Number(usage.conferenceUsed || 0);
 
-  return {
-    ok:true,
-    packKey,
-    isStaff: packKey === "staff",
+// ici "wsUsed" = nb de packs workshop remisés déjà consommés via l’app (si tu veux garder ce compteur)
+const wsUsed = Number(usage.workshopUsed || 0);
 
-    wsUsed, confUsed, otherUsed,
-    wsAllowed: pack.workshopsAllowed,
-    confAllowed: pack.conferencesAllowed,
-    otherAllowed: pack.otherAllowed,
+return {
+  ok:true,
+  packKey,
+  isStaff: packKey === "staff",
 
-    wsLeft: Math.max(0, pack.workshopsAllowed - wsUsed),
-    confLeft: Math.max(0, pack.conferencesAllowed - confUsed),
-    otherLeft: Math.max(0, pack.otherAllowed - otherUsed),
-  };
-}
+  wsUsed,
+  confUsed,
+
+  wsAllowed: Number(pack.workshopDiscountPacks ?? 0),
+  confAllowed: Number(pack.conferencesAllowed ?? 0),
+
+  wsLeft: Math.max(0, Number(pack.workshopDiscountPacks ?? 0) - wsUsed),
+  confLeft: Math.max(0, Number(pack.conferencesAllowed ?? 0) - confUsed),
+};
 
 async function requireTicketOrRedirect(){
   const r = await getMyRights();
@@ -847,10 +843,9 @@ function renderEventCard(id, e, opts){
       const r = await getMyRights();
       if (!r.ok) rightsEl.textContent = "Billet requis (importe-le).";
       else {
-        rightsEl.textContent =
-          `Workshops : ${r.wsUsed}/${r.wsAllowed} (reste ${r.wsLeft}) • ` +
-          `Conférences : ${r.confUsed}/${r.confAllowed} (reste ${r.confLeft}) • ` +
-          `Autre : ${r.otherUsed}/${r.otherAllowed} (reste ${r.otherLeft})`;
+       rightsEl.textContent =
+         `Packs Workshop remisés : ${r.wsUsed}/${r.wsAllowed} (reste ${r.wsLeft}) • ` +
+         `Conférences : ${r.confUsed}/${r.confAllowed} (reste ${r.confLeft})`;
       }
     }
 
