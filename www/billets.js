@@ -800,9 +800,9 @@ function renderResult({ qrText, packKey, holderName, ticketNumber, promoCode, wo
       : (discount > 0 ? `${imported} / ${discount}` : `${imported}`);
 
   const promo = String(promoCode || "").trim();
-  const showPromo = promo && ["premium", "standard", "essentiel"].includes(key);
-  const shouldHavePromo = ["premium", "standard", "essentiel"].includes(key);
-
+const showPromo = false;
+const shouldHavePromo = ["premium", "standard", "essentiel"].includes(key);
+ 
   boxEl.innerHTML = `
     <div style="position:relative; display:flex; flex-direction:column; gap:12px;">
 
@@ -970,19 +970,6 @@ async function loadSavedTicket() {
     let t = snap.data() || {};
   setStatus("✅ Billet chargé");
 
-  // ✅ FIX PROMO : si pack premium/standard/essentiel et promoCode vide,
-  // on tente d’attribuer automatiquement puis on recharge le ticket.
-  const key = String(t.packKey || "").toLowerCase();
-  if (!String(t.promoCode || "").trim() && ["premium","standard","essentiel"].includes(key)) {
-    try {
-      await assignPromoCodeIfNeeded(key);
-      const snap2 = await getDoc(doc(db, "userTickets", u.uid));
-      if (snap2.exists()) t = snap2.data() || t;
-    } catch (e) {
-      console.log("assign promo on load error:", e);
-    }
-  }
-
   renderResult({
     qrText: t.qrText || "",
     packKey: t.packKey || "",
@@ -1069,9 +1056,6 @@ async function handleFile(file) {
     // billet principal
     await saveTicketToFirestore({ qrText, packKey, holderName, ticketNumber });
     await syncNameFromTicket(holderName);
-
-    // promo auto si besoin
-    await assignPromoCodeIfNeeded(packKey);
 
     await loadSavedTicket();
     setStatus("✅ Billet importé avec succès");
