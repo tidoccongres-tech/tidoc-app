@@ -45,6 +45,16 @@ function escapeHTML(s = "") {
     .replaceAll('"', "&quot;").replaceAll("'", "&#039;");
 }
 
+function normalizeKey(v = "") {
+  return String(v || "")
+    .trim()
+    .toLowerCase()
+    .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9._ -]/g, "")
+    .replace(/\s+/g, " ")
+    .replaceAll(" ", "-");
+}
+
 // =====================
 // OFFICIAL TICKET INDEX (OPTIONNEL)
 // Si tu ne veux pas de vérif, laisse OFFICIAL_TICKETS_URL = "" (import OK).
@@ -399,12 +409,15 @@ async function saveTicketToFirestore({ qrText, packKey, holderName, ticketNumber
 // =====================
 // Save workshop ticket (multi)
 // =====================
-async function saveWorkshopTicket({ qrText, packKey, holderName, ticketNumber }) {
+async function saveWorkshopTicket({ qrText, packKey, holderName, ticketNumber, workshopTitle }) {
   const u = auth.currentUser;
   if (!u) throw new Error("Connexion requise.");
 
   const qrHash = await sha256Hex(qrText);
   const id = `${u.uid}_${qrHash}`;
+
+  const title = String(workshopTitle || "").trim();
+  const key = title ? normalizeKey(title) : "";
 
   await setDoc(doc(db, "userWorkshopTickets", id), {
     uid: u.uid,
@@ -412,6 +425,8 @@ async function saveWorkshopTicket({ qrText, packKey, holderName, ticketNumber })
     packKey: packKey || "workshop",
     holderName: holderName || "",
     ticketNumber: ticketNumber || "",
+    workshopTitle: title || "",
+    workshopKey: key || "",
     createdAt: serverTimestamp()
   }, { merge: true });
 }
@@ -638,21 +653,20 @@ function parseMetaFromText(raw = "") {
   const lines = String(raw).split(/\r?\n/).map(l => l.replace(/\s+/g, " ").trim()).filter(Boolean);
   const full = lines.join(" ");
 
-  // pack (inclut workshop/atelier)
- // pack (inclut workshop/atelier + staffeurs)
-let packKey = "";
-const mp = full.match(/pack\s*(essentiel|standard|premium|workshop|atelier|staffeurs?|staff)/i);
+  // pack (inclut workshop/atelier + staffeurs)
+  let packKey = "";
+  const mp = full.match(/pack\s*(essentiel|standard|premium|workshop|atelier|staffeurs?|staff)/i);
 
-if (mp && mp[1]) {
-  const v = mp[1].toLowerCase();
+  if (mp && mp[1]) {
+    const v = mp[1].toLowerCase();
 
-  // ordre IMPORTANT : staff AVANT standard
-  if (v.startsWith("staff")) packKey = "staff";
-  else if (v.startsWith("ess")) packKey = "essentiel";
-  else if (v.startsWith("pre")) packKey = "premium";
-  else if (v.startsWith("stand")) packKey = "standard";
-  else if (v.startsWith("wor") || v.startsWith("ate")) packKey = "workshop";
-}
+    // ordre IMPORTANT : staff AVANT standard
+    if (v.startsWith("staff")) packKey = "staff";
+    else if (v.startsWith("ess")) packKey = "essentiel";
+    else if (v.startsWith("pre")) packKey = "premium";
+    else if (v.startsWith("stand")) packKey = "standard";
+    else if (v.startsWith("wor") || v.startsWith("ate")) packKey = "workshop";
+  }
 
   // ticket number
   let ticketNumber = "";
@@ -661,7 +675,8 @@ if (mp && mp[1]) {
 
   // holder name = ligne au-dessus de "Pack ..."
   let holderName = "";
-  const idxPack = lines.findIndex(l => /pack\s*(essentiel|standard|premium|workshop|atelier|staffeurs?|staff)/i.test(l));  if (idxPack > 0) {
+  const idxPack = lines.findIndex(l => /pack\s*(essentiel|standard|premium|workshop|atelier|staffeurs?|staff)/i.test(l));
+  if (idxPack > 0) {
     for (let j = idxPack - 1; j >= 0; j--) {
       const c = lines[j];
       const bad =
@@ -683,7 +698,47 @@ if (mp && mp[1]) {
     if (mSame) holderName = mSame[1].trim();
   }
 
-  return { holderName, packKey, ticketNumber, rawText: raw };
+  // ✅ Workshop title (si packKey === workshop)
+  // On cherche une ligne qui contient "Workshop ..." ou "Atelier ..."
+  // et on extrait le texte après le mot-clé.
+  let workshopTitle = "";
+
+  // 1) d'abord sur les lignes (plus fiable)
+  for (const l of lines) {
+    // exemples acceptés:
+    // "Workshop Échographie", "Atelier Intubation", "Pack Workshop - Échographie"
+    const m1 = l.match(/\b(workshop|atelier)\b\s*[:\-–—]?\s*(.+)$/i);
+    if (m1 && m1[2]) {
+      const tail = String(m1[2]).trim();
+
+      // évite "Pack Workshop" sans nom derrière
+      if (tail && !/^$/.test(tail) && !/^pack\b/i.test(tail)) {
+        workshopTitle = `${m1[1][0].toUpperCase()}${m1[1].slice(1).toLowerCase()} ${tail}`.trim();
+        break;
+      }
+    }
+
+    // cas "Pack Workshop - Échographie"
+    const m2 = l.match(/\bpack\s*(workshop|atelier)\b\s*[:\-–—]?\s*(.+)$/i);
+    if (m2 && m2[2]) {
+      const tail = String(m2[2]).trim();
+      if (tail) {
+        workshopTitle = `${m2[1][0].toUpperCase()}${m2[1].slice(1).toLowerCase()} ${tail}`.trim();
+        break;
+      }
+    }
+  }
+
+  // 2) fallback: cherche dans full si rien trouvé
+  if (!workshopTitle) {
+    const m = full.match(/\b(workshop|atelier)\b\s*[:\-–—]?\s*([A-Za-zÀ-ÖØ-öø-ÿ0-9'’"()\/+ .]{3,})/i);
+    if (m && m[2]) {
+      const tail = String(m[2]).trim();
+      if (tail) workshopTitle = `${m[1][0].toUpperCase()}${m[1].slice(1).toLowerCase()} ${tail}`.trim();
+    }
+  }
+
+  return { holderName, packKey, ticketNumber, workshopTitle, rawText: raw };
 }
 
 // =====================
@@ -814,12 +869,13 @@ function renderWorkshopsList(workshops = []) {
   }
 
   const items = workshops.map(w => `
-    <div style="border:1px solid var(--line); border-radius:14px; padding:12px; background:#fff;">
-      <div style="font-weight:900; color:#0f4f60;">🧪 Pack Workshop</div>
-      <div style="margin-top:6px;"><b>Nom :</b> ${escapeHTML(w.holderName || "—")}</div>
-      <div><b>N° billet :</b> ${escapeHTML(w.ticketNumber || "—")}</div>
-    </div>
-  `).join("");
+  <div style="border:1px solid var(--line); border-radius:14px; padding:12px; background:#fff;">
+    <div style="font-weight:900; color:#0f4f60;">🧪 ${escapeHTML(w.workshopTitle || "Pack Workshop")}</div>
+    <div style="margin-top:6px;"><b>Nom :</b> ${escapeHTML(w.holderName || "—")}</div>
+    <div><b>N° billet :</b> ${escapeHTML(w.ticketNumber || "—")}</div>
+    ${w.workshopKey ? `<div style="opacity:.75;font-weight:800;margin-top:6px;">Key: ${escapeHTML(w.workshopKey)}</div>` : ""}
+  </div>
+`).join("");
 
   listBox.innerHTML = `
     <div style="margin-top:6px; font-weight:900; color:var(--tidoc);">🎫 Billets workshop importés</div>
@@ -903,6 +959,7 @@ async function handleFile(file) {
       packKey = meta?.packKey || "";
       holderName = meta?.holderName || "";
       ticketNumber = meta?.ticketNumber || "";
+      var workshopTitle = meta?.workshopTitle || "";
     }
     // IMAGE
     else if (file.type.startsWith("image/")) {
@@ -919,6 +976,7 @@ async function handleFile(file) {
       packKey = meta.packKey || "";
       holderName = meta.holderName || "";
       ticketNumber = meta.ticketNumber || "";
+      var workshopTitle = meta.workshopTitle || "";
     }
     else {
       throw new Error("Format non supporté (PDF ou image uniquement).");
@@ -936,7 +994,7 @@ async function handleFile(file) {
     // Workshop = multi billets
     const p = String(packKey || "").toLowerCase();
     if (p === "workshop") {
-      await saveWorkshopTicket({ qrText, packKey, holderName, ticketNumber });
+      await saveWorkshopTicket({ qrText, packKey, holderName, ticketNumber, workshopTitle });
       await syncNameFromTicket(holderName);
       await loadSavedTicket();
       setStatus("✅ Billet workshop importé");
