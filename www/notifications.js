@@ -61,6 +61,34 @@ function escapeHTML(s = "") {
     .replaceAll("'", "&#039;");
 }
 
+function renderNotifLinkButton(n = {}) {
+  const url = String(n.linkUrl || "").trim();
+  if (!url) return "";
+
+  const label = String(n.linkLabel || "Ouvrir").trim() || "Ouvrir";
+  const isPremium = String(n.type || "") === "workshop_promo";
+
+  const cls = isPremium ? "btn-helloasso-premium" : "btn-helloasso";
+
+  const icon = `
+    <svg class="ico" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <path d="M14 3h7v7" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+      <path d="M21 3l-9 9" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+      <path d="M10 5H6a3 3 0 0 0-3 3v10a3 3 0 0 0 3 3h10a3 3 0 0 0 3-3v-4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+    </svg>
+  `;
+
+  return `
+    <div style="margin-top:10px;">
+      <a href="${escapeHTML(url)}" target="_blank" rel="noreferrer"
+         class="${cls}" style="text-decoration:none">
+        ${icon}
+        ${escapeHTML(label)}
+      </a>
+    </div>
+  `;
+}
+
 async function markRead(notifId) {
   const uid = auth.currentUser?.uid;
   if (!uid) return;
@@ -138,11 +166,7 @@ async function loadNotifs() {
         <strong>${escapeHTML(n.title || "Notification")}</strong>
         ${n.text ? `<div style="margin-top:4px">${escapeHTML(n.text)}</div>` : ""}
         ${n.imageUrl ? `<img src="${n.imageUrl}" style="margin-top:10px;width:100%;border-radius:12px">` : ""}
-        ${(n.linkUrl && n.linkLabel) ? `
-          <a href="${n.linkUrl}" target="_blank" class="btn-primary"
-             style="margin-top:10px;display:inline-block;text-decoration:none">
-            ${escapeHTML(n.linkLabel)}
-          </a>` : ""}
+        ${renderNotifLinkButton(n)}
       </div>
     `;
 
