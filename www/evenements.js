@@ -771,6 +771,94 @@ function renderPromoBroadcastCard(){
   return wrap;
 }
 
+
+async function assignPromoCodeToUserIfNeeded(uid, tier){
+  tier = String(tier || "").toLowerCase();
+  if (!["premium","standard","essentiel"].includes(tier)) return "";
+
+  const userRef  = doc(db, "userTickets", uid);
+  const poolsRef = doc(db, "config", "promoPools");
+
+  const res = await runTransaction(db, async (tx) => {
+    const userSnap = await tx.get(userRef);
+    if (!userSnap.exists()) return { code:"" };
+
+    const userData = userSnap.data() || {};
+    const existing = String(userData.promoCode || "").trim();
+    if (existing) return { code: existing, already:true };
+
+    const qrHash = String(userData.qrHash || "").trim();
+    if (!qrHash) return { code:"" };
+
+    // verrou anti-double : promoClaims/{qrHash}
+    const claimRef = doc(db, "promoClaims", qrHash);
+    const claimSnap = await tx.get(claimRef);
+    if (claimSnap.exists()){
+      const claim = claimSnap.data() || {};
+      const code = String(claim.code || "").trim();
+      if (code){
+        tx.set(userRef, {
+          promoCode: code,
+          promoTier: String(claim.tier || tier),
+          promoAssignedAt: claim.assignedAt || serverTimestamp()
+        }, { merge:true });
+      }
+      return { code };
+    }
+
+    // consommer dans pool
+    const poolsSnap = await tx.get(poolsRef);
+    const poolsData = poolsSnap.exists() ? (poolsSnap.data() || {}) : {};
+    const list = Array.isArray(poolsData[tier]) ? poolsData[tier].map(x=>String(x||"").trim()).filter(Boolean) : [];
+    if (!list.length) return { code:"", empty:true };
+
+    const code = list[0];
+    const rest = list.slice(1);
+
+    tx.set(poolsRef, { [tier]: rest, updatedAt: serverTimestamp() }, { merge:true });
+
+    tx.set(userRef, {
+      promoCode: code,
+      promoTier: tier,
+      promoAssignedAt: serverTimestamp(),
+      promoSentAt: serverTimestamp(), // optionnel (trace)
+    }, { merge:true });
+
+    tx.create(claimRef, {
+      qrHash,
+      tier,
+      code,
+      assignedTo: uid,
+      assignedAt: serverTimestamp()
+    });
+
+    // registre admin promoCodes/{codeLower} (optionnel mais utile)
+    const codeId = String(code).toLowerCase();
+    const codeRef = doc(db, "promoCodes", codeId);
+    const codeSnap = await tx.get(codeRef);
+    if (!codeSnap.exists()){
+      tx.set(codeRef, {
+        code,
+        tier,
+        assignedTo: uid,
+        assignedAt: serverTimestamp(),
+        copiedAt: null,
+        redeemedAt: null
+      }, { merge:false });
+    }
+
+    return { code };
+  });
+
+  return String(res?.code || "").trim();
+}
+
+async function getPackKeyOfUser(uid){
+  const snap = await getDoc(doc(db, "userTickets", uid));
+  if (!snap.exists()) return "";
+  return String(snap.data()?.packKey || "").toLowerCase();
+}
+
 async function broadcastPromoToTier(tier, helloAssoUrl){
   if (!isAdmin()) throw new Error("Réservé à l’admin Ti’Doc.");
 
@@ -779,7 +867,6 @@ async function broadcastPromoToTier(tier, helloAssoUrl){
     throw new Error("Tier invalide.");
   }
 
-  // 🔎 Liste users depuis userTickets (filtre par packKey = tier)
   const usersSnap = await getDocs(collection(db, "userTickets"));
   const recipients = [];
   usersSnap.forEach(d => {
@@ -791,18 +878,34 @@ async function broadcastPromoToTier(tier, helloAssoUrl){
   if (!recipients.length) return 0;
 
   const title = `🎟️ Codes promo workshops — ${tier.toUpperCase()}`;
+  const hello = String(helloAssoUrl || "").trim();
 
-  await Promise.all(recipients.map(u => {
-    return sendNotif(u.uid, {
+  let sent = 0;
+
+  for (const u of recipients){
+    // 1) attribuer si besoin
+    const code = await assignPromoCodeToUserIfNeeded(u.uid, tier);
+
+    // 2) envoyer notif avec le code
+    const text =
+      code
+        ? `Voici ton code promo workshops : ${code}`
+        : `⚠️ Aucun code disponible pour le moment (pool vide). Contacte l’admin.`;
+
+    await sendNotif(u.uid, {
       type: "workshop_promo",
       title,
-      text: `Ton code promo workshops est disponible dans l’onglet Billets (il s’affiche automatiquement après import).`,
+      text,
+      promoCode: code || "",          // utile si tu veux l’afficher côté notif
+      promoTier: tier,
       linkLabel: "Ouvrir HelloAsso",
-      linkUrl: String(helloAssoUrl || "").trim()
+      linkUrl: hello
     });
-  }));
 
-  return recipients.length;
+    sent++;
+  }
+
+  return sent;
 }
 
 function renderEventCard(eventId, e = {}, { myWorkshopKeys = new Set(), regMap = {} } = {}){
