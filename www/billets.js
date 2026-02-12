@@ -948,6 +948,7 @@ async function handleFile(file) {
     let packKey = "";
     let holderName = "";
     let ticketNumber = "";
+    let workshopTitle = "";
 
     // PDF
     if (file.type === "application/pdf") {
@@ -959,7 +960,7 @@ async function handleFile(file) {
       packKey = meta?.packKey || "";
       holderName = meta?.holderName || "";
       ticketNumber = meta?.ticketNumber || "";
-      var workshopTitle = meta?.workshopTitle || "";
+      workshopTitle = meta?.workshopTitle || "";
     }
     // IMAGE
     else if (file.type.startsWith("image/")) {
@@ -976,7 +977,7 @@ async function handleFile(file) {
       packKey = meta.packKey || "";
       holderName = meta.holderName || "";
       ticketNumber = meta.ticketNumber || "";
-      var workshopTitle = meta.workshopTitle || "";
+      workshopTitle = meta.workshopTitle || "";
     }
     else {
       throw new Error("Format non supporté (PDF ou image uniquement).");
