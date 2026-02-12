@@ -883,7 +883,9 @@ async function loadEvents(){
 
     // ✅ BLOC ADMIN TOUT EN HAUT (codes promo)
     if (isAdmin()){
-      eventsList.appendChild(renderPromoBroadcastCard());
+      const promoZone = document.getElementById("promoTopZone");
+promoZone.innerHTML = "";
+promoZone.appendChild(renderPromoBroadcastCard());
     }
 
     // ✅ ensuite les events
