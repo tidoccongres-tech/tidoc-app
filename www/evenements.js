@@ -648,50 +648,6 @@ async function sendNotif(toUid, payload){
   });
 }
 
-async function broadcastWorkshopPromo(audience, eventId){
-  // audience: "premium" | "other"
-  if (!isAdmin()) return alert("Réservé à l’admin Ti’Doc.");
-
-  const evSnap = await getDoc(doc(db, "events", eventId));
-  if (!evSnap.exists()) return alert("Évènement introuvable.");
-
-  const ev = evSnap.data() || {};
-  if (!isWorkshopEvent(ev.type)) return alert("Ce bouton est uniquement pour les workshops.");
-
-  const hello = String(ev.helloAssoUrl || "").trim();
-  if (!hello) return alert("Ajoute d’abord helloAssoUrl sur ce workshop.");
-
-  const usersSnap = await getDocs(collection(db, "userTickets"));
-  const users = [];
-  usersSnap.forEach(d => users.push({ uid: d.id, ...(d.data() || {}) }));
-
-  const recipients = users.filter(u => {
-    const pk = String(u.packKey || "").toLowerCase();
-    if (!pk) return false;
-    const isPrem = pk === "premium";
-    return audience === "premium" ? isPrem : !isPrem;
-  });
-
-  if (!recipients.length) return alert("Aucun destinataire.");
-
-  const title =
-    audience === "premium"
-      ? `🎟️ Codes promo workshops (Premium)`
-      : `🎟️ Codes promo workshops`;
-
-  await Promise.all(recipients.map(u => {
-    return sendNotif(u.uid, {
-      type: "workshop_promo",
-      title,
-      text: `Ton code promo est disponible dans l’onglet Billets (il s’affiche automatiquement après import).`,
-      linkLabel: "Ouvrir HelloAsso",
-      linkUrl: hello
-    });
-  }));
-
-  alert(`✅ Envoyé à ${recipients.length} utilisateur(s).`);
-}
-
 async function assignPromoCodeToUserIfNeeded(uid, tier){
   tier = String(tier || "").toLowerCase();
   if (!["premium","standard","essentiel"].includes(tier)) return "";
