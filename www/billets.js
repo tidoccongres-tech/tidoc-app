@@ -270,7 +270,7 @@ async function assignPromoCodeIfNeeded(packKey) {
     const codeSnap = await tx.get(codeRef); // ✅ read avant write
 
     // ✅ WRITES ensuite
-    tx.set(poolsRef, { ...poolsData, [tier]: rest, updatedAt: serverTimestamp() }, { merge: true });
+    tx.set(poolsRef, { [tier]: rest, updatedAt: serverTimestamp() }, { merge: true });
 
     tx.set(userRef, {
       promoCode: code,
