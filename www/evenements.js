@@ -867,45 +867,46 @@ async function broadcastPromoToTier(tier, helloAssoUrl){
     throw new Error("Tier invalide.");
   }
 
+  // 🔎 Liste users depuis userTickets (filtre par packKey = tier)
   const usersSnap = await getDocs(collection(db, "userTickets"));
   const recipients = [];
   usersSnap.forEach(d => {
     const data = d.data() || {};
     const pk = String(data.packKey || "").toLowerCase();
-    if (pk === tier) recipients.push({ uid: d.id });
+    if (pk === tier) {
+      recipients.push({
+        uid: d.id,
+        promoCode: String(data.promoCode || "").trim(),
+        holderName: String(data.holderName || "").trim(),
+      });
+    }
   });
 
   if (!recipients.length) return 0;
 
-  const title = `🎟️ Codes promo workshops — ${tier.toUpperCase()}`;
-  const hello = String(helloAssoUrl || "").trim();
+  const title = `🎟️ Code promo workshops — ${tier.toUpperCase()}`;
 
-  let sent = 0;
+  await Promise.all(recipients.map(u => {
+    const code = u.promoCode;
 
-  for (const u of recipients){
-    // 1) attribuer si besoin
-    const code = await assignPromoCodeToUserIfNeeded(u.uid, tier);
-
-    // 2) envoyer notif avec le code
+    // ✅ texte personnalisé (avec code si dispo)
     const text =
       code
-        ? `Voici ton code promo workshops : ${code}`
-        : `⚠️ Aucun code disponible pour le moment (pool vide). Contacte l’admin.`;
+        ? `Ton code promo personnel est : ${code}`
+        : `Ton code promo n’a pas encore été attribué. Merci d’importer ton billet dans l’app (ou contacte l’admin).`;
 
-    await sendNotif(u.uid, {
+    return sendNotif(u.uid, {
       type: "workshop_promo",
       title,
       text,
-      promoCode: code || "",          // utile si tu veux l’afficher côté notif
-      promoTier: tier,
+      // ✅ optionnel : on met le code aussi en champ séparé pour affichage UI plus joli
+      promoCode: code || "",
       linkLabel: "Ouvrir HelloAsso",
-      linkUrl: hello
+      linkUrl: String(helloAssoUrl || "").trim()
     });
+  }));
 
-    sent++;
-  }
-
-  return sent;
+  return recipients.length;
 }
 
 function renderEventCard(eventId, e = {}, { myWorkshopKeys = new Set(), regMap = {} } = {}){
