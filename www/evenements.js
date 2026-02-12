@@ -793,18 +793,20 @@ async function assignPromoCodeToUserIfNeeded(uid, tier){
     // verrou anti-double : promoClaims/{qrHash}
     const claimRef = doc(db, "promoClaims", qrHash);
     const claimSnap = await tx.get(claimRef);
-    if (claimSnap.exists()){
-      const claim = claimSnap.data() || {};
-      const code = String(claim.code || "").trim();
-      if (code){
-        tx.set(userRef, {
-  promoCode: code,
-  promoTier: tier,
-  promoAssignedAt: serverTimestamp(),
-}, { merge:true });
-      }
-      return { code };
-    }
+   if (claimSnap.exists()){
+  const claim = claimSnap.data() || {};
+  const code = String(claim.code || "").trim();
+  const claimTier = String(claim.tier || tier).toLowerCase();
+
+  if (code){
+    tx.set(userRef, {
+      promoCode: code,
+      promoTier: claimTier,
+      promoAssignedAt: claim.assignedAt || serverTimestamp(),
+    }, { merge:true });
+  }
+  return { code };
+}
 
     // consommer dans pool
     const poolsSnap = await tx.get(poolsRef);
