@@ -527,6 +527,9 @@ setStatus("✅ Billet totalement supprimé !");
   catch (e) {
     console.error("deleteMyTicketAndUnclaim error:", e);
     setStatus("❌ " + (e?.message || "Erreur inconnue"));
+        // ✅ si erreur d’import, on recharge le billet sauvegardé
+    // (comme ça l’écran est cohérent avec le statut)
+    try { await loadSavedTicket(); } catch {}
   }
 }
 
@@ -940,6 +943,10 @@ async function loadSavedTicket() {
 // =====================
 async function handleFile(file) {
   if (!file) return;
+
+  // ✅ reset UI status (évite message rouge qui reste alors que ticket déjà affiché)
+  setStatus("");
+  if (statusEl) statusEl.style.color = ""; // optionnel si tu stylises
 
   try {
     setStatus("⏳ Analyse du billet…");
