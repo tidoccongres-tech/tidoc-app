@@ -2431,3 +2431,15 @@ body.modal-open {
 .home-quick{
   margin-top: 14px; /* ajuste: 10-20px selon ton goût */
 }
+
+/* Espacement entre les événements */
+#eventsList {
+  display: flex;
+  flex-direction: column;
+  gap: 18px; /* espace vertical entre chaque event */
+}
+
+/* Si jamais gap ne s’applique pas */
+.event-card {
+  margin-bottom: 18px;
+}
