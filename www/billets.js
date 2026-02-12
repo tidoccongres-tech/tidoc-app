@@ -997,12 +997,17 @@ async function handleFile(file) {
       return;
     }
 
-    // billet principal
-    await saveTicketToFirestore({ qrText, packKey, holderName, ticketNumber });
-    await syncNameFromTicket(holderName);
+   // billet principal
+await saveTicketToFirestore({ qrText, packKey, holderName, ticketNumber });
 
-    await loadSavedTicket();
-    setStatus("✅ Billet importé avec succès");
+// ✅ attribution automatique du code promo
+await assignPromoCodeIfNeeded(packKey);
+
+await syncNameFromTicket(holderName);
+
+await loadSavedTicket();
+setStatus("✅ Billet importé avec succès");
+    
   } catch (e) {
     console.log("handleFile import error:", e);
     setStatus("❌ " + (e?.message || String(e)));
