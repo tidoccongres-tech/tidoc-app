@@ -2426,3 +2426,8 @@ body.modal-open {
 }
 
 #eventsList .event-card::after{ content:none !important; }
+
+/* HOME — espace sous "Nous contacter" */
+.home-quick{
+  margin-top: 14px; /* ajuste: 10-20px selon ton goût */
+}
