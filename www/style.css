@@ -2424,3 +2424,5 @@ body.modal-open {
   }
   #eventsList .event-date .month{ margin-top:0; }
 }
+
+#eventsList .event-card::after{ content:none !important; }
