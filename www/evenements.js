@@ -805,6 +805,148 @@ async function broadcastPromoToTier(tier, helloAssoUrl){
   return recipients.length;
 }
 
+function renderEventCard(eventId, e = {}, { myWorkshopKeys = new Set(), regMap = {} } = {}){
+  const start = e.startAt?.toDate ? e.startAt.toDate() : null;
+  const end   = e.endAt?.toDate ? e.endAt.toDate() : null;
+
+  const { day, month } = start ? formatDayMonth(start) : { day:"—", month:"—" };
+  const timeStr = start ? formatTime(start) : "";
+  const endStr  = end ? formatTime(end) : "";
+
+  const title = String(e.title || "Évènement");
+  const place = String(e.place || "");
+  const type  = String(e.type || "Autre");
+  const desc  = String(e.desc || "");
+
+  const isWs = isWorkshopEvent(type);
+  const wkKey = isWs ? getEventWorkshopKey(e) : "";
+  const hasWsTicket = isWs && myWorkshopKeys.has(wkKey);
+
+  const isReg = !!regMap[eventId];
+  const admin = isAdmin();
+
+  const capPub  = Number(e.capacity || 0);
+  const capStf  = Number(e.capacityStaff || 0);
+  const bookedP = Number(e.bookedCount || 0);
+  const bookedS = Number(e.bookedStaffCount || 0);
+
+  const sec = document.createElement("section");
+  sec.className = "event-card";
+
+  sec.innerHTML = `
+    <div class="event-date">
+      <div class="day">${escapeHTML(day)}</div>
+      <div class="month">${escapeHTML(month)}</div>
+    </div>
+
+    <div class="event-content">
+      <div class="event-head">
+        <h3>${escapeHTML(title)}</h3>
+
+        <div class="event-actions" data-actions>
+          <!-- buttons injected -->
+        </div>
+      </div>
+
+      <div class="event-meta">
+        ${timeStr ? `🕒 ${escapeHTML(timeStr)}${endStr ? "–" + escapeHTML(endStr) : ""}` : ""}
+        ${place ? ` • 📍 <a href="${mapsUrl(place)}" target="_blank" rel="noopener">${escapeHTML(place)}</a>` : ""}
+        ${type ? ` • 🏷️ ${escapeHTML(type)}` : ""}
+      </div>
+
+      ${desc ? `<div class="event-desc">${escapeHTML(desc)}</div>` : ""}
+
+      <div class="event-meta" style="margin-top:10px;">
+        ${capPub ? `Public: ${Math.max(0, capPub - bookedP)}/${capPub}` : `Public: ∞`}
+        ${capStf ? ` • Staff: ${Math.max(0, capStf - bookedS)}/${capStf}` : ``}
+        ${isWs ? ` • WorkshopKey: ${escapeHTML(wkKey || "—")}` : ``}
+        ${hasWsTicket ? ` • ✅ INSCRIT (billet détecté)` : ``}
+      </div>
+    </div>
+  `;
+
+  const actions = sec.querySelector("[data-actions]");
+
+  // --- Boutons ADMIN
+  if (admin){
+    const btnList = document.createElement("button");
+    btnList.className = "pill-btn";
+    btnList.type = "button";
+    btnList.textContent = "Liste participants";
+    btnList.addEventListener("click", () => loadParticipants(eventId));
+
+    const btnDel = document.createElement("button");
+    btnDel.className = "icon-danger";
+    btnDel.type = "button";
+    btnDel.innerHTML = TRASH_SVG;
+    btnDel.title = "Supprimer";
+    btnDel.addEventListener("click", () => deleteEvent(eventId));
+
+    actions?.appendChild(btnList);
+    actions?.appendChild(btnDel);
+
+    // Admin workshop: mini édition HelloAsso / workshopKey
+    if (isWs){
+      const btnEdit = document.createElement("button");
+      btnEdit.className = "pill-btn";
+      btnEdit.type = "button";
+      btnEdit.textContent = "Éditer HelloAsso";
+      btnEdit.addEventListener("click", async ()=>{
+        const hello = prompt("Lien HelloAsso (http(s)://...)", String(e.helloAssoUrl || ""));
+        if (hello === null) return;
+        const wk = prompt("workshopKey (optionnel)", String(e.workshopKey || wkKey || ""));
+        if (wk === null) return;
+        await updateWorkshopMeta(eventId, { helloAssoUrl: hello, workshopKey: wk });
+        await loadEvents();
+      });
+      actions?.appendChild(btnEdit);
+    }
+  }
+
+  // --- Boutons USER (inscription / HelloAsso)
+  const uid = auth.currentUser?.uid;
+
+  if (isWs){
+    const hello = String(e.helloAssoUrl || "").trim();
+
+    const a = document.createElement("a");
+    a.className = "btn-premium btn-premium-primary";
+    a.href = hello || "#";
+    a.target = "_blank";
+    a.rel = "noopener";
+    a.textContent = hasWsTicket ? "✅ INSCRIT" : "Ouvrir HelloAsso";
+    if (!hello){
+      a.className = "btn-premium btn-premium-outline";
+      a.textContent = admin ? "⚠️ Ajouter HelloAsso" : "Workshop";
+      a.addEventListener("click", (ev)=>ev.preventDefault());
+    }
+    actions?.appendChild(a);
+
+  } else {
+    // conférences/autre => inscription app
+    const btn = document.createElement("button");
+    btn.className = isReg ? "btn-premium btn-premium-outline" : "btn-premium btn-premium-primary";
+    btn.type = "button";
+    btn.textContent = isReg ? "Se désinscrire" : "S’inscrire";
+    btn.addEventListener("click", async ()=>{
+      try{
+        if (!uid){ location.href="./login.html"; return; }
+        btn.disabled = true;
+        if (isReg) await unregisterFromEvent(eventId);
+        else await registerToEvent(eventId);
+        await loadEvents();
+      } catch(err){
+        alert(err?.message || String(err));
+      } finally {
+        btn.disabled = false;
+      }
+    });
+    actions?.appendChild(btn);
+  }
+
+  return sec;
+}
+
 /* =========================
    LOAD EVENTS + TRI
    ========================= */
