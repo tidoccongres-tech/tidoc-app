@@ -701,6 +701,20 @@ await Promise.all(recipients.map(u => {
 }
 
 /* =========================
+   ADMIN: NOTIFS (utilitaire)
+   ========================= */
+async function sendNotif(toUid, payload){
+  await addDoc(collection(db, "notifications", toUid, "items"), {
+    toUid,
+    fromUid: auth.currentUser?.uid || "",
+    fromEmail: auth.currentUser?.email || "",
+    read: false,
+    createdAt: serverTimestamp(),
+    ...payload
+  });
+}
+
+/* =========================
    ADMIN: PROMO CODES (GLOBAL UI + NOTIFS)
    ========================= */
 function renderPromoBroadcastCard(){
@@ -780,7 +794,7 @@ async function broadcastPromoToTier(tier, helloAssoUrl){
     throw new Error("Tier invalide.");
   }
 
-  // 🔎 Liste users depuis userTickets
+  // 🔎 Liste users depuis userTickets (filtre par packKey = tier)
   const usersSnap = await getDocs(collection(db, "userTickets"));
   const recipients = [];
   usersSnap.forEach(d => {
@@ -804,244 +818,6 @@ async function broadcastPromoToTier(tier, helloAssoUrl){
   }));
 
   return recipients.length;
-}
-
-/* =========================
-   RENDER
-   ========================= */
-async function userIsRegistered(eventId, uid){
-  if (!uid) return false;
-  const snap = await getDoc(doc(db, "events", eventId, "registrations", uid));
-  return snap.exists();
-}
-
-function renderEventCard(id, e, opts){
-  const { myWorkshopKeys, regMap } = opts || {};
-  const startAtDate = e.startAt?.toDate ? e.startAt.toDate() : null;
-  if (!startAtDate) return null;
-
-  const { day, month } = formatDayMonth(startAtDate);
-  const timeTxt = formatTime(startAtDate);
-  const endTxt  = e.endAt?.toDate ? formatTime(e.endAt.toDate()) : "";
-  const place   = (e.place || "").trim();
-
-  const capPub    = Number(e.capacity || 0);
-  const capStaff  = Number(e.capacityStaff || 0);
-  const bookedPub = Number(e.bookedCount || 0);
-  const bookedStf = Number(e.bookedStaffCount || 0);
-
-  const leftPub   = capPub > 0 ? Math.max(0, capPub - bookedPub) : null;
-  const leftStaff = capStaff > 0 ? Math.max(0, capStaff - bookedStf) : null;
-
-  const capPubTxt   = capPub > 0 ? String(capPub) : "∞";
-  const capStaffTxt = capStaff > 0 ? String(capStaff) : "∞";
-
-  const canDelete = isAdmin();
-
-  // ✅ nouveau : statut “inscrit/éligible”
-  const uid = auth.currentUser?.uid;
-  const isWorkshop = isWorkshopEvent(e.type);
-  const isConf = isConferenceEvent(e.type);
-
-  const workshopKey = isWorkshop ? getEventWorkshopKey(e) : "";
-  const hasWorkshopTicket = !!(isWorkshop && myWorkshopKeys && myWorkshopKeys.has(workshopKey));
-
-  const isIn = !!(uid && regMap && regMap[id]); // uniquement conf/autre (pas workshops)
-
-  const isEmph = hasWorkshopTicket || isIn;
-
-  const hello = String(e.helloAssoUrl || "").trim();
-
-  const card = document.createElement("section");
-  card.className = "event-card";
-
-  // ✅ rendu plus visible si inscrit
-  if (isEmph){
-    card.style.border = "2px solid rgba(23,140,168,.35)";
-    card.style.boxShadow = "0 22px 46px rgba(23,140,168,.16)";
-    card.style.background = "linear-gradient(135deg, rgba(23,140,168,.12), rgba(255,255,255,.86))";
-  }
-
-  card.innerHTML = `
-    <div class="event-date">
-      <span class="day">${day}</span>
-      <span class="month">${month}</span>
-    </div>
-
-    <div class="event-content">
-      <div class="event-head" style="display:flex;align-items:center;justify-content:space-between;gap:10px;">
-        <h3 style="margin:0;font-weight:${isEmph ? "950" : "900"};color:${isEmph ? "#0e5f71" : "#0e5f71"};">
-          ${escapeHTML(e.title || "")}
-        </h3>
-
-        ${canDelete ? `
-  <div class="event-actions" style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;">
-
-    <button class="btn-premium btn-premium-outline" type="button" data-part="${id}">
-      Liste participants
-    </button>
-
-    ${isWorkshop ? `
-      <button class="btn-premium btn-premium-outline" type="button" data-edit-ha="${id}">HelloAsso</button>
-      <button class="btn-premium btn-premium-outline" type="button" data-edit-wk="${id}">Key</button>
-      <button class="btn-premium btn-premium-outline" type="button" data-prem="${id}">Premium</button>
-      <button class="btn-premium btn-premium-outline" type="button" data-other="${id}">Autre</button>
-    ` : ""}
-
-    <button class="icon-danger" type="button" data-del="${id}" aria-label="Supprimer">
-      ${TRASH_SVG}
-    </button>
-
-  </div>
-` : ""}
-
-      ${e.desc ? `<p class="event-desc">${escapeHTML(e.desc)}</p>` : ""}
-
-      <div class="event-meta">
-        <span>🕒 ${timeTxt}${endTxt ? " – " + endTxt : ""}</span>
-
-        ${
-          (capPub > 0 || capStaff > 0)
-            ? `<span>• 👥 Public: ${bookedPub}/${capPubTxt}${leftPub !== null ? ` (${leftPub} restantes)` : ""} • Staff: ${bookedStf}/${capStaffTxt}${leftStaff !== null ? ` (${leftStaff} restantes)` : ""}</span>`
-            : `<span>• 👥 Public: ${bookedPub}/${capPubTxt} • Staff: ${bookedStf}/${capStaffTxt}</span>`
-        }
-
-        ${e.type ? `<span>• ${escapeHTML(e.type)}</span>` : ""}
-
-        ${
-          place
-            ? `<span>• 📍 <a class="event-place" target="_blank" rel="noreferrer" href="${mapsUrl(place)}">${escapeHTML(place)}</a></span>`
-            : ""
-        }
-      </div>
-
-      ${
-        !canDelete ? `
-          <div class="event-actions">
-            <button class="btn-premium ${isWorkshop ? "btn-premium-primary" : "btn-premium-primary"}" type="button" data-toggle="${id}">
-              …
-            </button>
-            <span class="event-status" data-status="${id}"></span>
-          </div>
-
-          <div class="event-rights" data-rights="${id}"></div>
-        ` : (isEmph ? `
-          <div class="event-rights" style="margin-top:10px;font-weight:950;color:#0e5f71;">
-            ${hasWorkshopTicket ? "✅ INSCRIT (billet workshop détecté)" : (isIn ? "✅ INSCRIT" : "")}
-          </div>
-        ` : "")
-      }
-    ${canDelete && isWorkshop ? `
-  <div style="margin-top:8px; font-size:12px; font-weight:850; color:rgba(15,35,42,.7);">
-    HelloAsso: ${e.helloAssoUrl ? "✅" : "❌"} • Key: <span style="font-family:ui-monospace;">${escapeHTML(getEventWorkshopKey(e))}</span>
-  </div>
-` : ""}
-    </div>
-  `;
-
-  // admin binds
-  if (canDelete){
-    card.querySelector(`[data-del="${id}"]`)?.addEventListener("click", ()=> deleteEvent(id));
-    card.querySelector(`[data-part="${id}"]`)?.addEventListener("click", ()=> loadParticipants(id));
-
-    // ✅ admin promo buttons workshops
-    card.querySelector(`[data-prem="${id}"]`)?.addEventListener("click", ()=> broadcastWorkshopPromo("premium", id));
-    card.querySelector(`[data-other="${id}"]`)?.addEventListener("click", ()=> broadcastWorkshopPromo("other", id));
-
-// ✅ admin edit HelloAsso URL
-card.querySelector(`[data-edit-ha="${id}"]`)?.addEventListener("click", async ()=>{
-  const current = String(e.helloAssoUrl || "").trim();
-  const next = prompt("Lien HelloAsso pour ce workshop :", current);
-  if (next === null) return; // cancel
-  await updateWorkshopMeta(id, { helloAssoUrl: next });
-  await loadEvents();
-});
-
-// ✅ admin edit Workshop Key (sert à matcher les billets workshop)
-card.querySelector(`[data-edit-wk="${id}"]`)?.addEventListener("click", async ()=>{
-  const current = String(e.workshopKey || getEventWorkshopKey(e) || "").trim();
-  const next = prompt("Workshop Key (sert à matcher les billets) :", current);
-  if (next === null) return;
-  await updateWorkshopMeta(id, { workshopKey: next });
-  await loadEvents();
-});
-
-    return card;
-  }
-
-  // user binds
-  (async ()=>{
-    const uid = auth.currentUser?.uid;
-
-    const btn      = card.querySelector(`[data-toggle="${id}"]`);
-    const status   = card.querySelector(`[data-status="${id}"]`);
-    const rightsEl = card.querySelector(`[data-rights="${id}"]`);
-    if (!btn) return;
-
-    if (!uid){
-      btn.textContent = "Se connecter";
-      btn.addEventListener("click", ()=> location.href="./login.html");
-      if (rightsEl) rightsEl.textContent = "Connecte-toi pour voir tes accès.";
-      return;
-    }
-
-    // quotas (toujours affichés)
-    if (rightsEl){
-      const r = await getMyRights();
-      if (!r.ok) rightsEl.textContent = "Billet requis (importe-le).";
-      else {
-       rightsEl.textContent =
-         `Packs Workshop remisés : ${r.wsUsed}/${r.wsAllowed} (reste ${r.wsLeft}) • ` +
-         `Conférences : ${r.confUsed}/${r.confAllowed} (reste ${r.confLeft})`;
-      }
-    }
-
-    // ✅ workshops => pas d’inscription app
-    if (isWorkshop){
-      if (hasWorkshopTicket){
-        if (status) status.textContent = "✅ Inscrit(e)";
-        btn.textContent = hello ? "Ouvrir HelloAsso" : "HelloAsso à venir";
-        btn.disabled = !hello;
-        btn.addEventListener("click", ()=>{
-          if (!hello) return;
-          window.open(hello, "_blank", "noopener,noreferrer");
-        });
-      } else {
-        if (status) status.textContent = "🔒 Pas le bon billet";
-        btn.textContent = "Réservé";
-        btn.disabled = true;
-      }
-      return;
-    }
-
-    // ✅ conférences/autre => inscription app (inchangé)
-    const isAlready = isIn;
-
-    btn.textContent = isAlready ? "Se désinscrire" : "S’inscrire";
-    if (status) status.textContent = isAlready ? "✅ Inscrit(e)" : "";
-
-    btn.addEventListener("click", async ()=>{
-      try{
-        if (btn.disabled) return;
-        btn.disabled = true;
-
-        if (isAlready){
-          await unregisterFromEvent(id);
-          alert("✅ Désinscription validée !");
-        } else {
-          await registerToEvent(id);
-          alert("✅ Inscription validée !");
-        }
-
-        await loadEvents();
-      } catch(err){
-        alert("❌ " + (err?.message || String(err)));
-        btn.disabled = false;
-      }
-    });
-  })();
-
-  return card;
 }
 
 /* =========================
