@@ -247,37 +247,77 @@ async function assignPromoCodeIfNeeded(packKey) {
   const tier = String(packKey || "").toLowerCase();
   if (!["premium", "standard", "essentiel"].includes(tier)) return { code: "" };
 
-  const userRef  = doc(db, "userTickets", u.uid);
-  const poolsRef = doc(db, "config", "promoPools");
+  const userRef   = doc(db, "userTickets", u.uid);
+  const poolsRef  = doc(db, "config", "promoPools");
 
   const res = await runTransaction(db, async (tx) => {
-    // ✅ READS d'abord
-    const userSnap  = await tx.get(userRef);
-    const userData  = userSnap.exists() ? (userSnap.data() || {}) : {};
-    const existing  = String(userData?.promoCode || "").trim();
+    // ✅ 1) lire userTickets
+    const userSnap = await tx.get(userRef);
+    const userData = userSnap.exists() ? (userSnap.data() || {}) : {};
+
+    const existing = String(userData?.promoCode || "").trim();
     if (existing) return { code: existing, already: true };
 
+    const qrHash = String(userData?.qrHash || "").trim();
+    if (!qrHash) return { code: "", error: "missing_qrHash" };
+
+    // ✅ 2) vérifier si ce billet a déjà reçu un code (verrou)
+    const claimRef = doc(db, "promoClaims", qrHash);
+    const claimSnap = await tx.get(claimRef);
+
+    if (claimSnap.exists()) {
+      const claim = claimSnap.data() || {};
+      const code = String(claim.code || "").trim();
+
+      // On remet le même code sur le compte (si jamais)
+      if (code) {
+        tx.set(userRef, {
+          promoCode: code,
+          promoTier: String(claim.tier || tier),
+          promoAssignedAt: claim.assignedAt || serverTimestamp()
+        }, { merge: true });
+
+        return { code, reused: true };
+      }
+      return { code: "", reused: true };
+    }
+
+    // ✅ 3) sinon: consommer 1 code du pool
     const poolsSnap = await tx.get(poolsRef);
     const poolsData = poolsSnap.exists() ? (poolsSnap.data() || {}) : {};
+
     const list = normalizeCodes(poolsData[tier]);
     if (!list.length) return { code: "", empty: true };
 
     const code = list[0];
     const rest = list.slice(1);
 
-    const codeId  = String(code).toLowerCase();
-    const codeRef = doc(db, "promoCodes", codeId);
-    const codeSnap = await tx.get(codeRef); // ✅ read avant write
-
-    // ✅ WRITES ensuite
+    // ✅ IMPORTANT: write uniquement tier + updatedAt (comme tes rules)
     tx.set(poolsRef, { [tier]: rest, updatedAt: serverTimestamp() }, { merge: true });
 
+    // ✅ 4) écrire le code sur userTickets
     tx.set(userRef, {
       promoCode: code,
       promoTier: tier,
       promoAssignedAt: serverTimestamp()
     }, { merge: true });
 
+    // ✅ 5) créer le verrou promoClaims/{qrHash}
+    tx.set(claimRef, {
+      qrHash,
+      tier,
+      code,
+      assignedTo: u.uid,
+      assignedEmail: String(u.email || "").toLowerCase(),
+      holderName: String(userData?.holderName || "").trim(),      // nom billet
+      ticketNumber: String(userData?.ticketNumber || "").trim(),  // optionnel
+      assignedAt: serverTimestamp()
+    }, { merge: false });
+
+    // (optionnel) registre admin promoCodes/{codeLower} comme tu as déjà
+    const codeId = String(code).toLowerCase();
+    const codeRef = doc(db, "promoCodes", codeId);
+    const codeSnap = await tx.get(codeRef);
     if (!codeSnap.exists()) {
       tx.set(codeRef, {
         code,
