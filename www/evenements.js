@@ -826,13 +826,13 @@ async function assignPromoCodeToUserIfNeeded(uid, tier){
       promoSentAt: serverTimestamp(), // optionnel (trace)
     }, { merge:true });
 
-    tx.create(claimRef, {
-      qrHash,
-      tier,
-      code,
-      assignedTo: uid,
-      assignedAt: serverTimestamp()
-    });
+    tx.set(claimRef, {
+  qrHash,
+  tier,
+  code,
+  assignedTo: uid,
+  assignedAt: serverTimestamp()
+});
 
     // registre admin promoCodes/{codeLower} (optionnel mais utile)
     const codeId = String(code).toLowerCase();
