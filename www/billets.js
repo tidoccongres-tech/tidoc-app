@@ -948,7 +948,7 @@ async function handleFile(file) {
     let packKey = "";
     let holderName = "";
     let ticketNumber = "";
-    let workshopTitle = "";
+    let workshopTitle = ""; 
 
     // PDF
     if (file.type === "application/pdf") {
