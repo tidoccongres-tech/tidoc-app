@@ -798,10 +798,10 @@ async function assignPromoCodeToUserIfNeeded(uid, tier){
       const code = String(claim.code || "").trim();
       if (code){
         tx.set(userRef, {
-          promoCode: code,
-          promoTier: String(claim.tier || tier),
-          promoAssignedAt: claim.assignedAt || serverTimestamp()
-        }, { merge:true });
+  promoCode: code,
+  promoTier: tier,
+  promoAssignedAt: serverTimestamp(),
+}, { merge:true });
       }
       return { code };
     }
