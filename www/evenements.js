@@ -701,6 +701,112 @@ await Promise.all(recipients.map(u => {
 }
 
 /* =========================
+   ADMIN: PROMO CODES (GLOBAL UI + NOTIFS)
+   ========================= */
+function renderPromoBroadcastCard(){
+  const wrap = document.createElement("section");
+  wrap.className = "event-card";
+  wrap.style.border = "2px dashed rgba(23,140,168,.35)";
+  wrap.style.padding = "14px";
+  wrap.style.marginBottom = "14px";
+  wrap.style.background = "rgba(23,140,168,.04)";
+
+  wrap.innerHTML = `
+    <div style="display:flex; flex-direction:column; gap:10px;">
+      <div style="font-weight:950; color:#0e5f71; font-size:16px;">
+        🎟️ Envoi codes promo (workshops)
+      </div>
+
+      <label style="display:flex; flex-direction:column; gap:6px;">
+        <span style="font-weight:900;">Lien HelloAsso (global)</span>
+        <input id="promoGlobalHelloAsso" type="text" placeholder="https://..."
+          style="padding:10px 12px; border-radius:12px; border:1px solid rgba(0,0,0,.15);">
+      </label>
+
+      <div style="display:flex; gap:10px; flex-wrap:wrap;">
+        <button class="btn-premium btn-premium-outline" type="button" data-send-tier="premium">
+          Envoyer → Premium
+        </button>
+        <button class="btn-premium btn-premium-outline" type="button" data-send-tier="standard">
+          Envoyer → Standard
+        </button>
+        <button class="btn-premium btn-premium-outline" type="button" data-send-tier="essentiel">
+          Envoyer → Essentiel
+        </button>
+      </div>
+
+      <div id="promoBroadcastMsg" style="font-size:12px; font-weight:900; color:rgba(15,35,42,.65);"></div>
+    </div>
+  `;
+
+  const input = wrap.querySelector("#promoGlobalHelloAsso");
+  const msg   = wrap.querySelector("#promoBroadcastMsg");
+
+  wrap.querySelectorAll("button[data-send-tier]").forEach(btn => {
+    btn.addEventListener("click", async ()=>{
+      const tier  = String(btn.getAttribute("data-send-tier") || "").toLowerCase();
+      const hello = String(input?.value || "").trim();
+
+      if (!/^https?:\/\//i.test(hello)) {
+        alert("Mets un lien HelloAsso valide (http(s)://...)");
+        return;
+      }
+
+      try{
+        btn.disabled = true;
+        if (msg) msg.textContent = "⏳ Envoi…";
+
+        const n = await broadcastPromoToTier(tier, hello);
+
+        if (msg) msg.textContent = `✅ Envoyé à ${n} utilisateur(s) (${tier}).`;
+      } catch(e){
+        console.log("broadcastPromoToTier error:", e);
+        if (msg) msg.textContent = "❌ " + (e?.message || String(e));
+        alert("❌ " + (e?.message || String(e)));
+      } finally {
+        btn.disabled = false;
+      }
+    });
+  });
+
+  return wrap;
+}
+
+async function broadcastPromoToTier(tier, helloAssoUrl){
+  if (!isAdmin()) throw new Error("Réservé à l’admin Ti’Doc.");
+
+  tier = String(tier || "").toLowerCase();
+  if (!["premium","standard","essentiel"].includes(tier)) {
+    throw new Error("Tier invalide.");
+  }
+
+  // 🔎 Liste users depuis userTickets
+  const usersSnap = await getDocs(collection(db, "userTickets"));
+  const recipients = [];
+  usersSnap.forEach(d => {
+    const data = d.data() || {};
+    const pk = String(data.packKey || "").toLowerCase();
+    if (pk === tier) recipients.push({ uid: d.id });
+  });
+
+  if (!recipients.length) return 0;
+
+  const title = `🎟️ Codes promo workshops — ${tier.toUpperCase()}`;
+
+  await Promise.all(recipients.map(u => {
+    return sendNotif(u.uid, {
+      type: "workshop_promo",
+      title,
+      text: `Ton code promo workshops est disponible dans l’onglet Billets (il s’affiche automatiquement après import).`,
+      linkLabel: "Ouvrir HelloAsso",
+      linkUrl: String(helloAssoUrl || "").trim()
+    });
+  }));
+
+  return recipients.length;
+}
+
+/* =========================
    RENDER
    ========================= */
 async function userIsRegistered(eventId, uid){
@@ -975,9 +1081,6 @@ async function loadEvents(){
     }
 
     // ✅ tri priorité
-    // score élevé si:
-    // - workshop avec ticket
-    // - conf/autre inscrit
     const scored = docs.map(row => {
       const e = row.data || {};
       const isWs = isWorkshopEvent(e.type);
@@ -994,13 +1097,20 @@ async function loadEvents(){
 
     scored.sort((a, b) => {
       if (b.score !== a.score) return b.score - a.score;
-      // sinon: date asc (déjà tri initial, mais on garde)
       const da = a.data?.startAt?.toMillis ? a.data.startAt.toMillis() : 0;
       const dbb = b.data?.startAt?.toMillis ? b.data.startAt.toMillis() : 0;
       return da - dbb;
     });
 
+    // ✅ rendu
     eventsList.innerHTML = "";
+
+    // ✅ BLOC ADMIN TOUT EN HAUT (codes promo)
+    if (isAdmin()){
+      eventsList.appendChild(renderPromoBroadcastCard());
+    }
+
+    // ✅ ensuite les events
     scored.forEach((row)=>{
       const card = renderEventCard(row.id, row.data, { myWorkshopKeys, regMap });
       if (card) eventsList.appendChild(card);
