@@ -318,20 +318,20 @@ if (!existingClaim.exists()) {
   });
 }
 
-    // (optionnel) registre admin promoCodes/{codeLower} comme tu as déjà
+        // (optionnel) registre admin promoCodes/{codeLower}
+    // ⚠️ IMPORTANT: pas de READ ici (sinon permission-denied car read admin-only)
     const codeId = String(code).toLowerCase();
     const codeRef = doc(db, "promoCodes", codeId);
-    const codeSnap = await tx.get(codeRef);
-    if (!codeSnap.exists()) {
-      tx.set(codeRef, {
-        code,
-        tier,
-        assignedTo: u.uid,
-        assignedEmail: String(u.email || "").toLowerCase(),
-        assignedAt: serverTimestamp(),
-        copiedAt: null,
-        redeemedAt: null
-      }, { merge: false });
+
+    tx.set(codeRef, {
+      code,
+      tier,
+      assignedTo: u.uid,
+      assignedEmail: String(u.email || "").toLowerCase(),
+      assignedAt: serverTimestamp(),
+      copiedAt: null,
+      redeemedAt: null
+    }, { merge: true });
     }
 
     return { code, already: false };
