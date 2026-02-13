@@ -1,4 +1,4 @@
-  // evenements.js (MODULE) — VERSION COMPLETE STABLE
+// evenements.js (MODULE) — VERSION COMPLETE STABLE
 // ✅ Packs dynamiques (config/packs) + STAFF
 // ✅ Admin: créer / supprimer event
 // ✅ Admin: liste participants (modal) + édition HelloAsso + workshopKey
