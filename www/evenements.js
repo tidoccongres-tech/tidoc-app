@@ -671,35 +671,34 @@ async function assignPromoCodeToUserIfNeeded(uid, tier){
   const poolsRef = doc(db, "config", "promoPools");
 
   const res = await runTransaction(db, async (tx) => {
-    // ✅ READS d'abord (toutes branches confondues)
-    const usersSnap = await tx.get(userRef);
-    if (!usersSnap.exists()) return { code:"" };
+    // ✅ READ 1: userTickets
+    const userSnap = await tx.get(userRef);
+    if (!userSnap.exists()) return { code:"" };
 
     const userData = userSnap.data() || {};
 
-    // ✅ le tier réel vient du packKey du user (évite mismatch rules)
+    // ✅ tier réel dérivé du packKey (évite mismatch rules)
     const realTier = tierFromPackKey(userData.packKey);
     if (!["premium","standard","essentiel"].includes(realTier)) return { code:"" };
 
+    // déjà un code
     const existing = String(userData.promoCode || "").trim();
     if (existing) return { code: existing, already:true };
-    
-    // on utilise realTier partout ensuite
-    
+
     const qrHash = String(userData.qrHash || "").trim();
     if (!qrHash) return { code:"" };
 
     const claimRef  = doc(db, "promoClaims", qrHash);
     const claimSnap = await tx.get(claimRef);
 
-    // ✅ IMPORTANT: lire pools AVANT tout write (même si claim existe)
+    // ✅ READ 2: pools
     const poolsSnap = await tx.get(poolsRef);
 
-    // --- si déjà claim : on réapplique ---
+    // --- déjà claim => réapplique sur userTickets ---
     if (claimSnap.exists()){
       const claim = claimSnap.data() || {};
       const code = String(claim.code || "").trim();
-      const claimTier = String(claim.tier || tier).toLowerCase();
+      const claimTier = tierFromPackKey(claim.tier || realTier) || realTier;
 
       if (code){
         tx.set(userRef, {
@@ -711,10 +710,10 @@ async function assignPromoCodeToUserIfNeeded(uid, tier){
       return { code };
     }
 
-    // --- sinon consommer pool ---
+    // --- consommer pool ---
     const poolsData = poolsSnap.exists() ? (poolsSnap.data() || {}) : {};
-    const list = Array.isArray(poolsData[realTier]) ? ... : [];
-      ? poolsData[tier].map(x=>String(x||"").trim()).filter(Boolean)
+    const list = Array.isArray(poolsData[realTier])
+      ? poolsData[realTier].map(x=>String(x||"").trim()).filter(Boolean)
       : [];
 
     if (!list.length) return { code:"" };
@@ -722,24 +721,33 @@ async function assignPromoCodeToUserIfNeeded(uid, tier){
     const code = list[0];
     const rest = list.slice(1);
 
-    // ✅ READ promoCodes avant WRITE
+    // ✅ READ 3: promoCodes registre
     const codeId  = String(code).toLowerCase();
     const codeRef = doc(db, "promoCodes", codeId);
     const codeSnap = await tx.get(codeRef);
 
     // ✅ WRITES (après tous les reads)
-    tx.set(poolsRef, { [tier]: rest, updatedAt: serverTimestamp() }, { merge:true });
+    tx.set(poolsRef, { [realTier]: rest, updatedAt: serverTimestamp() }, { merge:true });
 
     tx.set(userRef, {
-  promoCode: code,
-  promoTier: realTier,
-  promoAssignedAt: serverTimestamp(),
-}, { merge:true });
+      promoCode: code,
+      promoTier: realTier,
+      promoAssignedAt: serverTimestamp(),
+    }, { merge:true });
 
-    tx.set(claimRef, { qrHash, tier: realTier, code, assignedTo: uid, assignedAt: serverTimestamp() });
+    tx.set(claimRef, {
+      qrHash,
+      tier: realTier,
+      code,
+      assignedTo: uid,
+      assignedAt: serverTimestamp()
+    });
 
     if (!codeSnap.exists()){
-      tx.set(codeRef, { code, tier: realTier, assignedTo: uid,
+      tx.set(codeRef, {
+        code,
+        tier: realTier,
+        assignedTo: uid,
         assignedAt: serverTimestamp(),
         copiedAt: null,
         redeemedAt: null
@@ -758,11 +766,11 @@ async function broadcastPromoToTier(tier, helloAssoUrl){
   if (!["premium","standard","essentiel"].includes(tier)) throw new Error("Tier invalide.");
 
     const usersSnap = await getDocs(collection(db, "userTickets"));
-  const recipients = [];
-  usersSnap.forEach(d => {
+    const recipients = [];
+    usersSnap.forEach(d => {
     const data = d.data() || {};
-    const pkTier = tierFromPackKey(data.packKey);
-    if (pkTier === tier) {
+    const pkTier = tierFromPackKey(data.packKey || "");
+    if (pkTier && pkTier === tier) {
       recipients.push({
         uid: d.id,
         promoCode: String(data.promoCode || "").trim()
