@@ -731,50 +731,6 @@ async function assignPromoCodeToUserIfNeeded(uid, tier){
   return String(res?.code || "").trim();
 }
 
-    // consommer dans pool
-   const poolsSnap = await tx.get(poolsRef);
-const poolsData = poolsSnap.exists() ? (poolsSnap.data() || {}) : {};
-const list = Array.isArray(poolsData[tier])
-  ? poolsData[tier].map(x=>String(x||"").trim()).filter(Boolean)
-  : [];
-
-if (!list.length) return { code:"" };
-
-const code = list[0];
-const rest = list.slice(1);
-
-// ✅ READ AVANT WRITE (promoCodes)
-const codeId  = String(code).toLowerCase();
-const codeRef = doc(db, "promoCodes", codeId);
-const codeSnap = await tx.get(codeRef); // ✅ déplacé ici
-
-// ✅ WRITES (après tous les reads)
-tx.set(poolsRef, { [tier]: rest, updatedAt: serverTimestamp() }, { merge:true });
-
-tx.set(userRef, {
-  promoCode: code,
-  promoTier: tier,
-  promoAssignedAt: serverTimestamp(),
-  promoSentAt: serverTimestamp(),
-}, { merge:true });
-
-tx.set(claimRef, { qrHash, tier, code, assignedTo: uid, assignedAt: serverTimestamp() });
-
-if (!codeSnap.exists()){
-  tx.set(codeRef, {
-    code, tier, assignedTo: uid,
-    assignedAt: serverTimestamp(),
-    copiedAt: null,
-    redeemedAt: null
-  }, { merge:false });
-}
-
-return { code };
-  });
-
-  return String(res?.code || "").trim();
-}
-
 async function broadcastPromoToTier(tier, helloAssoUrl){
   if (!isAdmin()) throw new Error("Réservé à l’admin Ti’Doc.");
   tier = String(tier || "").toLowerCase();
