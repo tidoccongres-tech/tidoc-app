@@ -108,6 +108,21 @@ const TRASH_SVG = `
 // =====================
 // HELPERS
 // =====================
+// ---- TIER NORMALISATION (robuste) ----
+function tierFromPackKey(pk = "") {
+  const s = String(pk || "")
+    .replaceAll("\u00A0", " ")
+    .trim()
+    .toLowerCase();
+
+  // accepte anciennes valeurs / variantes
+  if (s.includes("premium") || s.includes("prem")) return "premium";
+  if (s.includes("standard") || s.includes("stand")) return "standard";
+  if (s.includes("essentiel") || s.includes("essent") || s.includes("essential")) return "essentiel";
+
+  return ""; // pas un tier promo
+}
+
 function isAdmin(){
   if (window.TIDOC_AUTH?.isAdmin) return true;
   const email = (auth.currentUser?.email || "").toLowerCase();
@@ -657,13 +672,20 @@ async function assignPromoCodeToUserIfNeeded(uid, tier){
 
   const res = await runTransaction(db, async (tx) => {
     // ✅ READS d'abord (toutes branches confondues)
-    const userSnap = await tx.get(userRef);
-    if (!userSnap.exists()) return { code:"" };
+    const usersSnap = await tx.get(userRef);
+    if (!usersSnap.exists()) return { code:"" };
 
     const userData = userSnap.data() || {};
+
+    // ✅ le tier réel vient du packKey du user (évite mismatch rules)
+    const realTier = tierFromPackKey(userData.packKey);
+    if (!["premium","standard","essentiel"].includes(realTier)) return { code:"" };
+
     const existing = String(userData.promoCode || "").trim();
     if (existing) return { code: existing, already:true };
-
+    
+    // on utilise realTier partout ensuite
+    
     const qrHash = String(userData.qrHash || "").trim();
     if (!qrHash) return { code:"" };
 
@@ -691,7 +713,7 @@ async function assignPromoCodeToUserIfNeeded(uid, tier){
 
     // --- sinon consommer pool ---
     const poolsData = poolsSnap.exists() ? (poolsSnap.data() || {}) : {};
-    const list = Array.isArray(poolsData[tier])
+    const list = Array.isArray(poolsData[realTier]) ? ... : [];
       ? poolsData[tier].map(x=>String(x||"").trim()).filter(Boolean)
       : [];
 
@@ -709,16 +731,15 @@ async function assignPromoCodeToUserIfNeeded(uid, tier){
     tx.set(poolsRef, { [tier]: rest, updatedAt: serverTimestamp() }, { merge:true });
 
     tx.set(userRef, {
-      promoCode: code,
-      promoTier: tier,
-      promoAssignedAt: serverTimestamp(),
-    }, { merge:true });
+  promoCode: code,
+  promoTier: realTier,
+  promoAssignedAt: serverTimestamp(),
+}, { merge:true });
 
-    tx.set(claimRef, { qrHash, tier, code, assignedTo: uid, assignedAt: serverTimestamp() });
+    tx.set(claimRef, { qrHash, tier: realTier, code, assignedTo: uid, assignedAt: serverTimestamp() });
 
     if (!codeSnap.exists()){
-      tx.set(codeRef, {
-        code, tier, assignedTo: uid,
+      tx.set(codeRef, { code, tier: realTier, assignedTo: uid,
         assignedAt: serverTimestamp(),
         copiedAt: null,
         redeemedAt: null
@@ -736,13 +757,16 @@ async function broadcastPromoToTier(tier, helloAssoUrl){
   tier = String(tier || "").toLowerCase();
   if (!["premium","standard","essentiel"].includes(tier)) throw new Error("Tier invalide.");
 
-  const usersSnap = await getDocs(collection(db, "userTickets"));
+    const usersSnap = await getDocs(collection(db, "userTickets"));
   const recipients = [];
   usersSnap.forEach(d => {
     const data = d.data() || {};
-    const pk = String(data.packKey || "").toLowerCase();
-    if (pk === tier) {
-      recipients.push({ uid: d.id, promoCode: String(data.promoCode || "").trim() });
+    const pkTier = tierFromPackKey(data.packKey);
+    if (pkTier === tier) {
+      recipients.push({
+        uid: d.id,
+        promoCode: String(data.promoCode || "").trim()
+      });
     }
   });
 
@@ -750,9 +774,15 @@ async function broadcastPromoToTier(tier, helloAssoUrl){
 
   const title = `🎟️ Code promo workshops — ${tier.toUpperCase()}`;
 
+    const failed = [];
   for (const u of recipients){
-    if (!u.promoCode){
+    if (u.promoCode) continue;
+
+    try {
       u.promoCode = await assignPromoCodeToUserIfNeeded(u.uid, tier);
+    } catch (e) {
+      console.log("assignPromoCodeToUserIfNeeded failed for", u.uid, e);
+      failed.push(u.uid);
     }
   }
 
