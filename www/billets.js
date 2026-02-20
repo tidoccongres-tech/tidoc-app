@@ -858,20 +858,12 @@ const showGetPromoBtn = canHavePromo && !promo && promoEnabled;
     </div>
   `;
 
-  boxEl.querySelector("#deleteTicketInlineBtn")
-    ?.addEventListener("click", deleteMyTicketAndUnclaim);
-
-  const host = boxEl.querySelector("#qrRender");
-  if (host && window.QRCode && qrText) {
-    host.innerHTML = "";
-    new window.QRCode(host, { text: qrText, width: 220, height: 220 });
-  }
-}
+ boxEl.querySelector("#deleteTicketInlineBtn")
+  ?.addEventListener("click", deleteMyTicketAndUnclaim);
 
 // 🎟️ Bouton "Obtenir mon code promo"
 boxEl.querySelector("#btnGetPromo")?.addEventListener("click", async () => {
   const hint = boxEl.querySelector("#promoHint");
-
   try {
     if (hint) hint.textContent = "⏳ Attribution du code…";
 
@@ -883,14 +875,19 @@ boxEl.querySelector("#btnGetPromo")?.addEventListener("click", async () => {
     }
 
     if (hint) hint.textContent = "✅ Code attribué !";
-
-    await loadSavedTicket(); // recharge l'affichage
+    await loadSavedTicket();
   } catch (e) {
     console.log("btnGetPromo error:", e);
     if (hint) hint.textContent = "❌ " + (e?.message || String(e));
   }
 });
 
+const host = boxEl.querySelector("#qrRender");
+if (host && window.QRCode && qrText) {
+  host.innerHTML = "";
+  new window.QRCode(host, { text: qrText, width: 220, height: 220 });
+}
+  
 function renderWorkshopsList(workshops = []) {
   const listBox = document.getElementById("workshopsListBox");
   if (!listBox) return;
