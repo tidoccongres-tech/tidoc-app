@@ -1046,10 +1046,6 @@ const adminClose  = document.getElementById("adminPacksCloseBtn");
 const adminCancel = document.getElementById("adminPacksCancelBtn");
 const adminSave   = document.getElementById("adminPacksSaveBtn");
 
-// Cache par défaut (évite flash + non-admin qui voit les boutons)
-if (adminBtn) adminBtn.style.display = "none";
-if (promoBtn) promoBtn.style.display = "none";
-
 // ======================
 // ADMIN UI — PROMO CODES (LISTE + AJOUT + SUPPRESSION)
 // ======================
@@ -1066,6 +1062,10 @@ const promoEssentielEl = document.getElementById("promoEssentielInput");
 
 function setAdminMsg(t = "") { if (adminMsg) adminMsg.textContent = t; }
 function setPromoMsg(t = "") { if (promoMsg) promoMsg.textContent = t; }
+
+// Cache par défaut (évite flash + non-admin qui voit les boutons)
+if (adminBtn) adminBtn.style.display = "none";
+if (promoBtn) promoBtn.style.display = "none";
 
 // =====================
 // Modals hard close (bfcache safe)
@@ -1497,6 +1497,12 @@ window.addEventListener("focus", hardCloseModals);
 function updateAdminButtonsVisibility() {
   const ok = isAdmin();
   document.body.classList.toggle("is-admin", ok);
+
+  // ✅ si non-admin : on retire les boutons du DOM
+  if (!ok) {
+    document.getElementById("adminEditPacksBtn")?.remove();
+    document.getElementById("adminEditPromoBtn")?.remove();
+  }
 
   console.log("ADMIN CHECK:", {
     ok,
