@@ -788,17 +788,16 @@ function renderResult({ qrText, packKey, holderName, ticketNumber, promoCode, wo
   const discount = pack ? Number(pack.workshopDiscountPacks ?? 0) : 0;
   const imported = Number(workshopsImportedCount ?? 0);
 
+  const promo = String(promoCode || "").trim();
   const tier = String(packKey || "").toLowerCase();
-const canHavePromo = ["premium","standard","essentiel"].includes(tier);
-const promoEnabled = !!PROMO_STATE[tier];
-const showGetPromoBtn = canHavePromo && !promo && promoEnabled;
+  const canHavePromo = ["premium","standard","essentiel"].includes(tier);
+  const promoEnabled = !!PROMO_STATE[tier];
+  const showGetPromoBtn = canHavePromo && !promo && promoEnabled;
   
   const wsLine =
     key === "workshop"
       ? `${conf}`
       : (discount > 0 ? `${imported} / ${discount}` : `${imported}`);
-
-  const promo = String(promoCode || "").trim();
 
   boxEl.innerHTML = `
     <div style="position:relative; display:flex; flex-direction:column; gap:12px;">
@@ -887,19 +886,6 @@ if (host && window.QRCode && qrText) {
   host.innerHTML = "";
   new window.QRCode(host, { text: qrText, width: 220, height: 220 });
 }
-  
-function renderWorkshopsList(workshops = []) {
-  const listBox = document.getElementById("workshopsListBox");
-  if (!listBox) return;
-
-  if (!workshops.length) {
-    listBox.innerHTML = `
-      <div style="opacity:.8; font-weight:800; color:rgba(31,75,86,.75);">
-        Aucun billet workshop importé pour l’instant.
-      </div>
-    `;
-    return;
-  }
 
   const items = workshops.map(w => `
     <div style="border:1px solid var(--line); border-radius:14px; padding:12px; background:#fff;">
@@ -917,6 +903,19 @@ function renderWorkshopsList(workshops = []) {
     </div>
   `;
 }
+
+function renderWorkshopsList(workshops = []) {
+  const listBox = document.getElementById("workshopsListBox");
+  if (!listBox) return;
+
+  if (!workshops.length) {
+    listBox.innerHTML = `
+      <div style="opacity:.8; font-weight:800; color:rgba(31,75,86,.75);">
+        Aucun billet workshop importé pour l’instant.
+      </div>
+    `;
+    return;
+  }
 
 // =====================
 // Load saved ticket + workshops
