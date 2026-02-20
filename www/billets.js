@@ -789,10 +789,11 @@ function renderResult({ qrText, packKey, holderName, ticketNumber, promoCode, wo
   const imported = Number(workshopsImportedCount ?? 0);
 
   const promo = String(promoCode || "").trim();
-  const tier = String(packKey || "").toLowerCase();
-  const canHavePromo = ["premium","standard","essentiel"].includes(tier);
-  const promoEnabled = !!PROMO_STATE[tier];
-  const showGetPromoBtn = canHavePromo && !promo && promoEnabled;
+
+const tier = String(packKey || "").toLowerCase();
+const canHavePromo = ["premium","standard","essentiel"].includes(tier);
+const promoEnabled = !!PROMO_STATE[tier];
+const showGetPromoBtn = canHavePromo && !promo && promoEnabled;
   
   const wsLine =
     key === "workshop"
@@ -866,7 +867,7 @@ boxEl.querySelector("#btnGetPromo")?.addEventListener("click", async () => {
   try {
     if (hint) hint.textContent = "⏳ Attribution du code…";
 
-    const r = await assignPromoCodeIfNeeded(packKey);
+    const r = await assignPromoCodeIfNeeded(tier);
 
     if (!r?.code) {
       if (hint) hint.textContent = "❌ Pool vide ou code indisponible.";
