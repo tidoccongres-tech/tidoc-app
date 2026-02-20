@@ -1021,10 +1021,23 @@ setStatus("✅ Billet importé avec succès");
 // =====================
 const ADMIN_EMAIL = "tidoc.congres@gmail.com";
 
+let AUTH_USER = null;
+
 function isAdmin(){
-  const u = auth.currentUser;
+  const u = AUTH_USER || auth.currentUser;
   return !!u?.email && String(u.email).toLowerCase() === ADMIN_EMAIL.toLowerCase();
 }
+
+onAuthStateChanged(auth, async (user) => {
+  AUTH_USER = user; // ✅
+  try {
+    await loadPackConfig();
+    await loadPromoPools();
+    await loadSavedTicket();
+  } finally {
+    updateAdminButtonsVisibility();
+  }
+});
 
 // =====================
 // ADMIN UI — PACKS (quotas) (SANS "Autre")
