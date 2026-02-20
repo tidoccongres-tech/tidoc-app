@@ -1228,23 +1228,26 @@ async function loadSavedTicket() {
 
   // --- CAS: pas de billet principal ---
   if (!snap.exists()) {
-    LAST_MAIN_TICKET = null;
+  LAST_MAIN_TICKET = null;
 
-    setStatus(workshops.length ? "✅ Billets workshop chargés" : "");
-    if (!boxEl) return;
+  // ✅ afficher l’icône QR si on a des workshops
+  if (scanBtn) scanBtn.style.display = workshops.length ? "" : "none";
 
-    if (!workshops.length) {
-      boxEl.textContent = "Aucun billet importé pour l’instant.";
-      return;
-    }
+  setStatus(workshops.length ? "✅ Billets workshop chargés" : "");
+  if (!boxEl) return;
 
-    boxEl.innerHTML = `
-      <div style="font-weight:900; color:var(--tidoc); margin-bottom:10px;">🎫 Tes billets workshop</div>
-      <div id="workshopsListBox"></div>
-    `;
-    renderWorkshopsList(workshops);
+  if (!workshops.length) {
+    boxEl.textContent = "Aucun billet importé pour l’instant.";
     return;
   }
+
+  boxEl.innerHTML = `
+    <div style="font-weight:900; color:var(--tidoc); margin-bottom:10px;">🎫 Tes billets workshop</div>
+    <div id="workshopsListBox"></div>
+  `;
+  renderWorkshopsList(workshops);
+  return;
+}
 
    // --- CAS: billet principal ---
   const ticket = snap.data() || {};   // ✅ déclaré avant tout usage
