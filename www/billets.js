@@ -1157,9 +1157,14 @@ function openScanMode({ mainTicket = null, workshops = [] } = {}) {
 async function loadSavedTicket() {
   const u = auth.currentUser;
 
+  const scanBtn = document.getElementById("scanModeBtn");
+
   if (!u) {
     setStatus("Connecte-toi pour afficher ton billet.");
     if (boxEl) boxEl.textContent = "Aucun billet importé pour l’instant.";
+    LAST_MAIN_TICKET = null;
+    LAST_WORKSHOPS = [];
+    if (scanBtn) scanBtn.style.display = "none";
     return;
   }
 
@@ -1175,7 +1180,16 @@ async function loadSavedTicket() {
     workshops = [];
   }
 
+  // ✅ mémorise toujours les workshops
+  LAST_WORKSHOPS = workshops;
+
+  // ✅ bouton "Mode scan" visible si on a au moins un QR (main ou workshop)
+  if (scanBtn) scanBtn.style.display = (workshops.length ? "" : "none");
+
+  // --- CAS: pas de billet principal ---
   if (!snap.exists()) {
+    LAST_MAIN_TICKET = null;
+
     setStatus(workshops.length ? "✅ Billets workshop chargés" : "");
     if (!boxEl) return;
 
@@ -1192,9 +1206,19 @@ async function loadSavedTicket() {
     return;
   }
 
-  LAST_WORKSHOPS = workshops;
-  
+  // --- CAS: billet principal ---
   const t = snap.data() || {};
+
+  LAST_MAIN_TICKET = {
+    qrText: t.qrText || "",
+    packKey: t.packKey || "",
+    holderName: t.holderName || "",
+    ticketNumber: t.ticketNumber || ""
+  };
+
+  // ✅ bouton visible si billet principal OU workshops
+  if (scanBtn) scanBtn.style.display = (LAST_MAIN_TICKET.qrText || workshops.length) ? "" : "none";
+
   setStatus("✅ Billet chargé");
 
   renderResult({
@@ -1205,10 +1229,7 @@ async function loadSavedTicket() {
     promoCode: t.promoCode || "",
     workshopsImportedCount: workshops.length
   });
-      <button id="btnScanMode" class="btn-primary" type="button" style="width:100%;">
-        📲 Mode scan entrée
-      </button>
-  
+
   renderWorkshopsList(workshops);
 }
 
@@ -1775,11 +1796,16 @@ function initBilletsPage() {
   hardCloseModals();
   bindUI();
   bindAdminUI();
+
+  document.getElementById("scanModeBtn")?.addEventListener("click", () => {
+    openScanMode({ mainTicket: LAST_MAIN_TICKET, workshops: LAST_WORKSHOPS });
+  });
 }
 
 window.addEventListener("DOMContentLoaded", initBilletsPage);
 window.addEventListener("pageshow", hardCloseModals);
 window.addEventListener("focus", hardCloseModals);
+
 
 // =====================
 // Admin buttons visibility (tu l’as déjà ailleurs)
