@@ -945,6 +945,9 @@ selfExpelOverlay.innerHTML = `
 `;
 document.body.appendChild(selfExpelOverlay);
 
+const expImg = selfExpelOverlay.querySelector("img");
+if (expImg) expImg.src = asset("./assets/expulsion.png");
+
 const selfExpelCard = selfExpelOverlay.querySelector("#selfExpelCard");
 
 function showSelfExpelledCard(ms = SELF_EXPEL_MS){
@@ -1390,10 +1393,15 @@ function loadImg(src){
   return im;
 }
 
-const spritePose1 = loadImg("./assets/pose-1.png");
-const marche1     = loadImg("./assets/marche1.png");
-const marche2     = loadImg("./assets/marche2.png");
+// IMPORTANT : asset() déjà défini plus haut
+const spritePose1 = loadImg(asset("./assets/pose-1.png"));
+const marche1     = loadImg(asset("./assets/marche1.png"));
+const marche2     = loadImg(asset("./assets/marche2.png"));
 const WALK_SEQUENCE = [marche1, spritePose1, marche1, marche2, spritePose1, marche2];
+
+watchImg(spritePose1, "pose-1.png");
+watchImg(marche1, "marche1.png");
+watchImg(marche2, "marche2.png");
 
 // local walk anim
 let walking = false;
@@ -2338,6 +2346,12 @@ let chatBound = false;
 
 // cache status room accessible dans players snapshot
 let roomStatusCache = null;
+let unsubMyRole = null;
+let localPosReady = false;
+
+function ensureSpawnCenter(){ /* TODO */ }
+function refreshChatGating(){ /* TODO */ }
+function checkEndConditions(){ /* TODO */ }
 
 onAuthStateChanged(auth, async (u) => {
   if (!u) { location.href = "./login.html"; return; }
