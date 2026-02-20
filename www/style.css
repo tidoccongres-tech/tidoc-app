@@ -2579,3 +2579,33 @@ body.is-admin .admin-only { display: inline-flex !important; }
   outline: 3px solid rgba(41,168,196,.35);
   outline-offset: 3px;
 }
+
+/* Header du bloc "Mon billet" */
+.ticket-head{
+  display:flex;
+  align-items:flex-start;
+  justify-content:space-between;
+  gap:12px;
+}
+
+/* Groupe des actions admin à droite */
+.ticket-actions-right{
+  display:flex;
+  align-items:center;
+  justify-content:flex-end;
+  gap:10px;
+  flex-wrap:nowrap;     /* ✅ empêche Promos de passer dessous */
+}
+
+/* Mobile: chips plus compactes pour tenir côte à côte */
+@media (max-width: 420px){
+  .ticket-actions-right{
+    gap:8px;
+  }
+  .ticket-actions-right .admin-chip{
+    padding:10px 12px;   /* un peu plus petit */
+    font-size:13px;
+    border-radius:999px;
+    white-space:nowrap;  /* ✅ empêche retour à la ligne du texte */
+  }
+}
