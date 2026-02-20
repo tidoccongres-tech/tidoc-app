@@ -957,7 +957,7 @@ function ensureScanOverlay() {
         padding:12px 14px; border-bottom:1px solid rgba(0,0,0,.08);
         background:linear-gradient(180deg, rgba(15,79,96,.08), rgba(0,0,0,0));
       ">
-        <div style="font-weight:950; color:var(--tidoc);">📲 Mode scan entrée</div>
+        <div style="font-weight:950; color:var(--tidoc);">Qr codes</div>
         <button id="scanCloseBtn" class="delete-btn" type="button" aria-label="Fermer">✕</button>
       </div>
 
