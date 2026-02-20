@@ -1878,9 +1878,9 @@ function initBilletsPage() {
   bindUI();
   bindAdminUI();
 
-  document.getElementById("scanModeBtn")?.addEventListener("click", () => {
-    openScanMode({ mainTicket: LAST_MAIN_TICKET, workshops: LAST_WORKSHOPS });
-  });
+  document.getElementById("scanModeIconBtn")?.addEventListener("click", () => {
+  openScanMode({ mainTicket: LAST_MAIN_TICKET, workshops: LAST_WORKSHOPS });
+});
 }
 
 window.addEventListener("DOMContentLoaded", initBilletsPage);
