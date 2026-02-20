@@ -868,6 +868,29 @@ const showGetPromoBtn = canHavePromo && !promo && promoEnabled;
   }
 }
 
+// 🎟️ Bouton "Obtenir mon code promo"
+boxEl.querySelector("#btnGetPromo")?.addEventListener("click", async () => {
+  const hint = boxEl.querySelector("#promoHint");
+
+  try {
+    if (hint) hint.textContent = "⏳ Attribution du code…";
+
+    const r = await assignPromoCodeIfNeeded(packKey);
+
+    if (!r?.code) {
+      if (hint) hint.textContent = "❌ Pool vide ou code indisponible.";
+      return;
+    }
+
+    if (hint) hint.textContent = "✅ Code attribué !";
+
+    await loadSavedTicket(); // recharge l'affichage
+  } catch (e) {
+    console.log("btnGetPromo error:", e);
+    if (hint) hint.textContent = "❌ " + (e?.message || String(e));
+  }
+});
+
 function renderWorkshopsList(workshops = []) {
   const listBox = document.getElementById("workshopsListBox");
   if (!listBox) return;
