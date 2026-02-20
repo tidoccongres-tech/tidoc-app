@@ -1012,27 +1012,22 @@ setStatus("✅ Billet importé avec succès");
 // =====================
 // ADMIN (robuste)
 // =====================
-const ADMIN_UID   = "b831dIbb3xPcn2qhfxUuVqkVSKF3";        // 🔥 doit matcher tes rules
-const ADMIN_EMAIL = "tidoc.congres@gmail.com";             // (fallback debug)
+// =====================
+// ADMIN (email-based)
+// =====================
+const ADMIN_EMAIL = "tidoc.congres@gmail.com";
 
 let AUTH_USER = null;
 
 function isAdmin() {
   const u = AUTH_USER || auth.currentUser;
-
-  // ✅ règle officielle = UID (comme tes rules)
-  if (u?.uid && u.uid === ADMIN_UID) return true;
-
-  // (optionnel) fallback email uniquement pour debug visuel
-  if (u?.email && String(u.email).toLowerCase() === ADMIN_EMAIL.toLowerCase()) return true;
-
-  return false;
+  const email = String(u?.email || "").trim().toLowerCase();
+  return email === ADMIN_EMAIL.toLowerCase();
 }
 
 onAuthStateChanged(auth, async (user) => {
   AUTH_USER = user;
 
-  // 🔎 debug hyper clair
   console.log("AUTH USER:", {
     uid: user?.uid || null,
     email: user?.email || null
