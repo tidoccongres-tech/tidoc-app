@@ -18,6 +18,9 @@ import {
 const statusEl  = document.getElementById("ticketStatus");
 const boxEl     = document.getElementById("ticketBox");
 
+let LAST_MAIN_TICKET = null;     // { qrText, packKey, holderName, ticketNumber }
+let LAST_WORKSHOPS = [];         // array of workshop docs
+
 function setStatus(t = "") { if (statusEl) statusEl.textContent = t; }
 function escapeHTML(s = "") {
   return String(s)
@@ -917,6 +920,237 @@ function renderWorkshopsList(workshops = []) {
   `;
 }
 
+function ensureScanOverlay() {
+  let ov = document.getElementById("scanOverlay");
+  if (ov) return ov;
+
+  ov = document.createElement("div");
+  ov.id = "scanOverlay";
+  ov.style.cssText = `
+    position:fixed; inset:0; z-index:99999;
+    background:rgba(0,0,0,.72);
+    display:none;
+    padding:14px;
+  `;
+
+  ov.innerHTML = `
+    <div style="
+      width:min(980px, 100%);
+      height:100%;
+      margin:0 auto;
+      background:#fff;
+      border-radius:18px;
+      overflow:hidden;
+      display:flex;
+      flex-direction:column;
+      box-shadow:0 20px 70px rgba(0,0,0,.35);
+    ">
+      <div style="
+        display:flex; align-items:center; justify-content:space-between;
+        padding:12px 14px; border-bottom:1px solid rgba(0,0,0,.08);
+        background:linear-gradient(180deg, rgba(15,79,96,.08), rgba(0,0,0,0));
+      ">
+        <div style="font-weight:950; color:var(--tidoc);">📲 Mode scan entrée</div>
+        <button id="scanCloseBtn" class="delete-btn" type="button" aria-label="Fermer">✕</button>
+      </div>
+
+      <div id="scanBody" style="padding:14px; overflow:auto;"></div>
+    </div>
+  `;
+
+  document.body.appendChild(ov);
+
+  ov.querySelector("#scanCloseBtn")?.addEventListener("click", () => {
+    ov.style.display = "none";
+    document.body.style.overflow = "";
+  });
+
+  // clic sur fond = close
+  ov.addEventListener("click", (e) => {
+    if (e.target === ov) {
+      ov.style.display = "none";
+      document.body.style.overflow = "";
+    }
+  });
+
+  return ov;
+}
+
+function openScanMode({ mainTicket = null, workshops = [] } = {}) {
+  const ov = ensureScanOverlay();
+  const body = ov.querySelector("#scanBody");
+  if (!body) return;
+
+  const ws = Array.isArray(workshops) ? workshops : [];
+  const hasMain = !!(mainTicket && mainTicket.qrText);
+  const mainPackKey = String(mainTicket?.packKey || "").toLowerCase();
+  const pack = PACKS[mainPackKey] || null;
+  const packLabel = pack ? pack.label : (mainPackKey ? mainPackKey : "—");
+
+  // reset
+  body.innerHTML = "";
+
+  // wrapper
+  const wrap = document.createElement("div");
+  wrap.style.cssText = "display:flex; flex-direction:column; gap:14px;";
+
+  // ====== TOP: MAIN QR ======
+  if (hasMain) {
+    const top = document.createElement("div");
+    top.style.cssText = `
+      border:1px solid var(--line);
+      border-radius:16px;
+      padding:14px;
+      display:flex;
+      gap:14px;
+      align-items:center;
+      flex-wrap:wrap;
+    `;
+
+    top.innerHTML = `
+      <div style="min-width:220px; flex:0 0 auto;">
+        <div style="font-weight:950; color:var(--tidoc); margin-bottom:8px;">
+          🎫 Pass principal — ${escapeHTML(packLabel)}
+        </div>
+        <div id="scanMainQR" style="width:260px;height:260px;"></div>
+      </div>
+
+      <div style="min-width:220px; flex:1 1 240px;">
+        <div style="font-weight:900; margin-bottom:6px;">${escapeHTML(mainTicket?.holderName || "—")}</div>
+        <div style="opacity:.85; font-weight:800;">N° billet : ${escapeHTML(mainTicket?.ticketNumber || "—")}</div>
+        <div style="margin-top:10px; font-size:12px; font-weight:800; opacity:.75;">
+          Scanne ce QR à l’entrée générale.
+        </div>
+      </div>
+    `;
+
+    wrap.appendChild(top);
+
+    const host = top.querySelector("#scanMainQR");
+    if (host && window.QRCode) {
+      host.innerHTML = "";
+      new window.QRCode(host, { text: mainTicket.qrText, width: 260, height: 260 });
+    }
+  }
+
+  // ====== BOTTOM: WORKSHOP CAROUSEL ======
+  if (ws.length) {
+    const section = document.createElement("div");
+    section.style.cssText = `
+      border:1px solid var(--line);
+      border-radius:16px;
+      padding:14px;
+      background:#fff;
+    `;
+
+    const dotsId = "scanDots";
+    section.innerHTML = `
+      <div style="display:flex; align-items:center; justify-content:space-between; gap:10px; flex-wrap:wrap;">
+        <div style="font-weight:950; color:var(--tidoc);">🧪 Workshops — QR à scanner</div>
+        <div id="${dotsId}" style="display:flex; gap:6px; align-items:center;"></div>
+      </div>
+
+      <div id="scanCarousel" style="
+        margin-top:12px;
+        display:flex;
+        overflow-x:auto;
+        scroll-snap-type:x mandatory;
+        gap:12px;
+        -webkit-overflow-scrolling:touch;
+        padding-bottom:8px;
+      "></div>
+
+      <div style="margin-top:6px; font-size:12px; font-weight:800; opacity:.7;">
+        Swipe → pour passer au workshop suivant
+      </div>
+    `;
+
+    const carousel = section.querySelector("#scanCarousel");
+    const dotsEl = section.querySelector(`#${dotsId}`);
+
+    // dots
+    if (dotsEl) {
+      dotsEl.innerHTML = ws.map((_, i) => `
+        <span data-dot="${i}" style="
+          width:8px;height:8px;border-radius:99px;
+          background:rgba(15,79,96,.22);
+          display:inline-block;
+        "></span>
+      `).join("");
+    }
+
+    // slides
+    ws.forEach((w, i) => {
+      const slide = document.createElement("div");
+      slide.style.cssText = `
+        flex:0 0 100%;
+        scroll-snap-align:start;
+        border:1px solid rgba(0,0,0,.08);
+        border-radius:14px;
+        padding:12px;
+        background:rgba(15,79,96,.03);
+      `;
+
+      const title = w.workshopTitle || "Pack Workshop";
+      const qr = String(w.qrText || "").trim();
+      const qrid = `scanWsQR_${i}`;
+
+      slide.innerHTML = `
+        <div style="font-weight:950; color:#0f4f60; margin-bottom:10px;">
+          ${escapeHTML(title)}
+        </div>
+        <div style="display:flex; gap:12px; align-items:center; flex-wrap:wrap;">
+          <div id="${qrid}" style="width:220px;height:220px; background:#fff; border-radius:12px; padding:8px;"></div>
+          <div style="min-width:200px; flex:1 1 220px;">
+            <div style="font-weight:900;">${escapeHTML(w.holderName || "—")}</div>
+            <div style="opacity:.85; font-weight:800;">N° billet : ${escapeHTML(w.ticketNumber || "—")}</div>
+            <div style="margin-top:10px; font-size:12px; font-weight:800; opacity:.75;">
+              Scanne ce QR au check-in workshop.
+            </div>
+          </div>
+        </div>
+      `;
+
+      carousel?.appendChild(slide);
+
+      // render QR
+      const host = slide.querySelector(`#${qrid}`);
+      if (host && window.QRCode && qr) {
+        host.innerHTML = "";
+        new window.QRCode(host, { text: qr, width: 220, height: 220 });
+      }
+    });
+
+    // update dots on scroll
+    if (carousel && dotsEl) {
+      const setDot = (idx) => {
+        dotsEl.querySelectorAll("[data-dot]").forEach((d, j) => {
+          d.style.background = (j === idx) ? "rgba(15,79,96,.85)" : "rgba(15,79,96,.22)";
+        });
+      };
+      setDot(0);
+
+      carousel.addEventListener("scroll", () => {
+        const w = carousel.clientWidth || 1;
+        const idx = Math.round(carousel.scrollLeft / w);
+        setDot(Math.max(0, Math.min(ws.length - 1, idx)));
+      }, { passive: true });
+    }
+
+    wrap.appendChild(section);
+  }
+
+  // fallback (aucun QR)
+  if (!hasMain && !ws.length) {
+    wrap.innerHTML = `<div style="font-weight:900; opacity:.8;">Aucun billet à afficher.</div>`;
+  }
+
+  body.appendChild(wrap);
+
+  ov.style.display = "block";
+  document.body.style.overflow = "hidden";
+}
+
 // =====================
 // Load saved ticket + workshops
 // =====================
@@ -958,6 +1192,8 @@ async function loadSavedTicket() {
     return;
   }
 
+  LAST_WORKSHOPS = workshops;
+  
   const t = snap.data() || {};
   setStatus("✅ Billet chargé");
 
@@ -969,7 +1205,10 @@ async function loadSavedTicket() {
     promoCode: t.promoCode || "",
     workshopsImportedCount: workshops.length
   });
-
+      <button id="btnScanMode" class="btn-primary" type="button" style="width:100%;">
+        📲 Mode scan entrée
+      </button>
+  
   renderWorkshopsList(workshops);
 }
 
