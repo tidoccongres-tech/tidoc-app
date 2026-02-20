@@ -2453,3 +2453,16 @@ body.modal-open {
   position:relative;
   z-index:10;
 }
+
+/* Les modals ne doivent JAMAIS bloquer quand fermés */
+#adminPacksModal,
+#adminPromoModal {
+  display: none;
+  pointer-events: none;
+}
+
+/* Optionnel : si tu as un backdrop interne */
+#adminPacksModal *,
+#adminPromoModal * {
+  pointer-events: auto;
+}
