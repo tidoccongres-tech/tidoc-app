@@ -1055,6 +1055,31 @@ const adminClose  = document.getElementById("adminPacksCloseBtn");
 const adminCancel = document.getElementById("adminPacksCancelBtn");
 const adminSave   = document.getElementById("adminPacksSaveBtn");
 
+function hardCloseModals() {
+  const pm = document.getElementById("adminPromoModal");
+  const am = document.getElementById("adminPacksModal");
+
+  if (pm) {
+    pm.style.display = "none";
+    pm.style.pointerEvents = "none";
+    pm.style.visibility = "hidden";
+    pm.setAttribute("aria-hidden", "true");
+  }
+  if (am) {
+    am.style.display = "none";
+    am.style.pointerEvents = "none";
+    am.style.visibility = "hidden";
+    am.setAttribute("aria-hidden", "true");
+  }
+
+  document.body.classList.remove("modal-open");
+}
+
+// au chargement + quand la page revient (iOS/Chrome bfcache)
+window.addEventListener("DOMContentLoaded", hardCloseModals);
+window.addEventListener("pageshow", hardCloseModals);
+window.addEventListener("focus", hardCloseModals);
+
 function setAdminMsg(t=""){ if (adminMsg) adminMsg.textContent = t; }
 
 function ensureDefaultPacks(packs) {
@@ -1126,13 +1151,22 @@ function openAdminModal() {
 
   if (adminModal) {
     adminModal.style.display = "block";
+    adminModal.style.pointerEvents = "auto";
+    adminModal.style.visibility = "visible";
+    adminModal.setAttribute("aria-hidden", "false");
     adminModal.scrollTop = 0; // ✅
   }
+
   lockBodyScroll(); // ✅
 }
 
 function closeAdminModal() {
-  if (adminModal) adminModal.style.display = "none";
+  if (adminModal) {
+    adminModal.style.display = "none";
+    adminModal.style.pointerEvents = "none";
+    adminModal.style.visibility = "hidden";
+    adminModal.setAttribute("aria-hidden", "true");
+  }
   unlockBodyScroll(); // ✅
 }
   
@@ -1322,15 +1356,23 @@ function openPromoModal() {
   renderPromoListForTier("essentiel", promoEssentielEl);
 
   if (promoModal) {
-    promoModal.style.display = "block";
-    promoModal.scrollTop = 0; // ✅
-  }
+  promoModal.style.display = "block";
+  promoModal.style.pointerEvents = "auto";
+  promoModal.style.visibility = "visible";
+  promoModal.setAttribute("aria-hidden", "false");
+  promoModal.scrollTop = 0; // ✅
+}
   lockBodyScroll(); // ✅
 }
 
 function closePromoModal(){
-  if (promoModal) promoModal.style.display = "none";
-  unlockBodyScroll(); // ✅
+  if (promoModal) {
+    promoModal.style.display = "none";
+    promoModal.style.pointerEvents = "none";
+    promoModal.style.visibility = "hidden";
+    promoModal.setAttribute("aria-hidden", "true");
+  }
+  unlockBodyScroll();
 }
 
 async function savePromoPools() {
