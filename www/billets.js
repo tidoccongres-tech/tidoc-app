@@ -790,11 +790,11 @@ function renderResult({ qrText, packKey, holderName, ticketNumber, promoCode, wo
 
   const promo = String(promoCode || "").trim();
 
-const tier = String(packKey || "").toLowerCase();
-const canHavePromo = ["premium","standard","essentiel"].includes(tier);
-const promoEnabled = !!PROMO_STATE[tier];
-const showGetPromoBtn = canHavePromo && !promo && promoEnabled;
-  
+  const tier = key;
+  const canHavePromo = ["premium", "standard", "essentiel"].includes(tier);
+  const promoEnabled = !!PROMO_STATE?.[tier];
+  const showGetPromoBtn = canHavePromo && !promo && promoEnabled;
+
   const wsLine =
     key === "workshop"
       ? `${conf}`
@@ -840,53 +840,65 @@ const showGetPromoBtn = canHavePromo && !promo && promoEnabled;
         }
 
         ${
-  showGetPromoBtn
-    ? `
-      <div style="margin-top:12px;">
-        <button id="btnGetPromo" class="btn-premium btn-premium-primary" type="button">
-          🎟️ Obtenir mon code promo
-        </button>
-        <div id="promoHint" style="margin-top:8px;font-size:12px;font-weight:800;color:rgba(15,35,42,.65);"></div>
-      </div>
-    `
-    : ""
-}
-
+          showGetPromoBtn
+            ? `
+              <div style="margin-top:12px;">
+                <button id="btnGetPromo" class="btn-premium btn-premium-primary" type="button">
+                  🎟️ Obtenir mon code promo
+                </button>
+                <div id="promoHint" style="margin-top:8px;font-size:12px;font-weight:800;color:rgba(15,35,42,.65);"></div>
+              </div>
+            `
+            : ""
+        }
       </div>
 
       <div id="workshopsListBox"></div>
     </div>
   `;
 
- boxEl.querySelector("#deleteTicketInlineBtn")
-  ?.addEventListener("click", deleteMyTicketAndUnclaim);
+  boxEl.querySelector("#deleteTicketInlineBtn")
+    ?.addEventListener("click", deleteMyTicketAndUnclaim);
 
-// 🎟️ Bouton "Obtenir mon code promo"
-boxEl.querySelector("#btnGetPromo")?.addEventListener("click", async () => {
-  const hint = boxEl.querySelector("#promoHint");
-  try {
-    if (hint) hint.textContent = "⏳ Attribution du code…";
+  boxEl.querySelector("#btnGetPromo")?.addEventListener("click", async () => {
+    const hint = boxEl.querySelector("#promoHint");
+    try {
+      if (hint) hint.textContent = "⏳ Attribution du code…";
 
-    const r = await assignPromoCodeIfNeeded(tier);
+      const r = await assignPromoCodeIfNeeded(tier);
 
-    if (!r?.code) {
-      if (hint) hint.textContent = "❌ Pool vide ou code indisponible.";
-      return;
+      if (!r?.code) {
+        if (hint) hint.textContent = "❌ Pool vide ou code indisponible.";
+        return;
+      }
+
+      if (hint) hint.textContent = "✅ Code attribué !";
+      await loadSavedTicket();
+    } catch (e) {
+      console.log("btnGetPromo error:", e);
+      if (hint) hint.textContent = "❌ " + (e?.message || String(e));
     }
+  });
 
-    if (hint) hint.textContent = "✅ Code attribué !";
-    await loadSavedTicket();
-  } catch (e) {
-    console.log("btnGetPromo error:", e);
-    if (hint) hint.textContent = "❌ " + (e?.message || String(e));
+  const host = boxEl.querySelector("#qrRender");
+  if (host && window.QRCode && qrText) {
+    host.innerHTML = "";
+    new window.QRCode(host, { text: qrText, width: 220, height: 220 });
   }
-});
-
-const host = boxEl.querySelector("#qrRender");
-if (host && window.QRCode && qrText) {
-  host.innerHTML = "";
-  new window.QRCode(host, { text: qrText, width: 220, height: 220 });
 }
+
+function renderWorkshopsList(workshops = []) {
+  const listBox = document.getElementById("workshopsListBox");
+  if (!listBox) return;
+
+  if (!workshops.length) {
+    listBox.innerHTML = `
+      <div style="opacity:.8; font-weight:800; color:rgba(31,75,86,.75);">
+        Aucun billet workshop importé pour l’instant.
+      </div>
+    `;
+    return;
+  }
 
   const items = workshops.map(w => `
     <div style="border:1px solid var(--line); border-radius:14px; padding:12px; background:#fff;">
@@ -904,19 +916,6 @@ if (host && window.QRCode && qrText) {
     </div>
   `;
 }
-
-function renderWorkshopsList(workshops = []) {
-  const listBox = document.getElementById("workshopsListBox");
-  if (!listBox) return;
-
-  if (!workshops.length) {
-    listBox.innerHTML = `
-      <div style="opacity:.8; font-weight:800; color:rgba(31,75,86,.75);">
-        Aucun billet workshop importé pour l’instant.
-      </div>
-    `;
-    return;
-  }
 
 // =====================
 // Load saved ticket + workshops
