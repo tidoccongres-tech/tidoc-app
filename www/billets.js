@@ -966,7 +966,7 @@ function renderWorkshopsList(workshops = []) {
     </div>
   `;
 
-  // ✅ bind ICI
+  // ✅ bind des poubelles ICI (dans le scope)
   listBox.querySelectorAll(".ws-del-btn").forEach(btn => {
     btn.addEventListener("click", async () => {
       const h = btn.getAttribute("data-ws-hash") || "";
@@ -1238,9 +1238,6 @@ async function loadSavedTicket() {
 
   // ✅ mémorise toujours les workshops
   LAST_WORKSHOPS = workshops;
-
-  // ✅ bouton "Mode scan" visible si on a au moins un QR (main ou workshop)
-  if (scanBtn) scanBtn.style.display = ((t?.qrText || workshops.length) ? "" : "none");
 
   // --- CAS: pas de billet principal ---
   if (!snap.exists()) {
