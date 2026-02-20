@@ -474,12 +474,19 @@ async function saveWorkshopTicket({ qrText, packKey, holderName, ticketNumber, w
   if (!u) throw new Error("Connexion requise.");
 
   const qrHash = await sha256Hex(qrText);
+
+  // ✅ Check "already imported" via query (autorisé par rules)
+  const q = query(
+    collection(db, "userWorkshopTickets"),
+    where("uid", "==", u.uid),
+    where("qrHash", "==", qrHash)
+  );
+  const snap = await getDocs(q);
+  if (!snap.empty) return { already: true };
+
+  // ✅ Crée ensuite un doc stable (uid + hash) => pas de doublon
   const id = `${u.uid}_${qrHash}`;
   const ref = doc(db, "userWorkshopTickets", id);
-
-  // ✅ évite un update (interdit par rules)
-  const existing = await getDoc(ref);
-  if (existing.exists()) return { already: true };
 
   const title = String(workshopTitle || "").trim();
   const key = title ? normalizeKey(title) : "";
@@ -493,7 +500,7 @@ async function saveWorkshopTicket({ qrText, packKey, holderName, ticketNumber, w
     workshopTitle: title || "",
     workshopKey: key || "",
     createdAt: serverTimestamp()
-  }); // ✅ pas de merge
+  }); // ✅ create uniquement (si existe déjà => update => interdit, mais on l'a évité)
 
   return { already: false };
 }
