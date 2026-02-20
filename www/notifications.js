@@ -117,6 +117,7 @@ async function deleteNotif(notifId) {
 async function loadNotifs() {
   const uid = auth.currentUser?.uid;
   if (!uid) return;
+  if (!root) return;
 
   root.innerHTML = `<section class="card"><p>Chargement…</p></section>`;
 
