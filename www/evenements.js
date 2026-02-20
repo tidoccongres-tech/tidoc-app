@@ -71,20 +71,28 @@ async function loadPackConfig(){
       PACKS = { ...PACKS_FALLBACK };
       return;
     }
+
     const normalized = normalizePackConfig(snap.data() || {});
     PACKS = {
-      ...PACKS_FALLBACK,
-      ...(Object.keys(normalized).length ? normalized : {}),
+      premium:   { ...PACKS_FALLBACK.premium,   ...(normalized.premium   || {}) },
+      standard:  { ...PACKS_FALLBACK.standard,  ...(normalized.standard  || {}) },
+      essentiel: { ...PACKS_FALLBACK.essentiel, ...(normalized.essentiel || {}) },
+      workshop:  { ...PACKS_FALLBACK.workshop,  ...(normalized.workshop  || {}) },
+      staff:     { ...PACKS_FALLBACK.staff,     ...(normalized.staff     || {}) },
     };
 
-    // labels figés (sécurité)
+    // labels figés
     PACKS.premium.label   = PACKS_FALLBACK.premium.label;
     PACKS.standard.label  = PACKS_FALLBACK.standard.label;
     PACKS.essentiel.label = PACKS_FALLBACK.essentiel.label;
     PACKS.workshop.label  = PACKS_FALLBACK.workshop.label;
     PACKS.staff.label     = "Pack staffeurs";
 
-  } catch (e){
+    // sécurité staff
+    if (!Number.isFinite(PACKS.staff.conferencesAllowed) || PACKS.staff.conferencesAllowed <= 0) PACKS.staff.conferencesAllowed = 999;
+    if (!Number.isFinite(PACKS.staff.workshopDiscountPacks) || PACKS.staff.workshopDiscountPacks <= 0) PACKS.staff.workshopDiscountPacks = 999;
+
+  } catch(e){
     console.log("loadPackConfig error:", e);
     PACKS = { ...PACKS_FALLBACK };
   }
@@ -121,6 +129,17 @@ function tierFromPackKey(pk = "") {
   if (s.includes("essentiel") || s.includes("essent") || s.includes("essential")) return "essentiel";
 
   return ""; // pas un tier promo
+}
+
+// ✅ AJOUTE ICI :
+function normalizePackKey(pk=""){
+  const s = String(pk || "").trim().toLowerCase();
+  if (s.includes("staff")) return "staff";
+  if (s.includes("premium") || s.includes("prem")) return "premium";
+  if (s.includes("standard") || s.includes("stand")) return "standard";
+  if (s.includes("essentiel") || s.includes("essent")) return "essentiel";
+  if (s.includes("workshop") || s.includes("atelier")) return "workshop";
+  return s;
 }
 
 function isAdmin(){
@@ -231,12 +250,10 @@ async function getMyRights(){
   const tSnap = await getDoc(doc(db, "userTickets", uid));
   if (!tSnap.exists()) return { ok:false, reason:"noticket" };
 
-  const packKeyRaw = String(tSnap.data()?.packKey || "").toLowerCase();
-  const packKey = packKeyRaw.includes("staff") ? "staff" : packKeyRaw;
-
+  const packKey = normalizePackKey(tSnap.data()?.packKey || "");
   const pack = PACKS[packKey];
+  
   if (!pack) return { ok:false, reason:"badpack" };
-
   const uSnap = await getDoc(doc(db, "userUsage", uid));
   const usage = uSnap.exists() ? (uSnap.data() || {}) : {};
 
