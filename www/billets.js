@@ -1213,7 +1213,7 @@ function openScanMode({ mainTicket = null, workshops = [] } = {}) {
 async function loadSavedTicket() {
   const u = auth.currentUser;
 
-  const scanBtn = document.getElementById("scanModeBtn");
+  const scanBtn = document.getElementById("scanModeIconBtn");
 
   if (!u) {
     setStatus("Connecte-toi pour afficher ton billet.");
@@ -1269,7 +1269,7 @@ async function loadSavedTicket() {
     ticketNumber: ticket.ticketNumber || ""
   };
 
-  if (scanBtn) scanBtn.style.display = (LAST_MAIN_TICKET.qrText || workshops.length) ? "" : "none";
+  if (scanBtn) scanBtn.style.display = (LAST_MAIN_TICKET?.qrText || workshops.length) ? "" : "none";
 
   setStatus("✅ Billet chargé");
 
