@@ -2092,9 +2092,19 @@ function draw(){
 
   // LOBBY
   if (!gameStarted){
-    const bg = (lobbyBgImg.complete && lobbyBgImg.naturalWidth > 0) ? lobbyBgImg : mapImg;
-    if (!(bg.complete && bg.naturalWidth > 0)) return;
+    const bgOk  = lobbyBgImg.complete && lobbyBgImg.naturalWidth > 0;
+const mapOk = mapImg.complete && mapImg.naturalWidth > 0;
+const bg = bgOk ? lobbyBgImg : mapImg;
 
+if (!(bgOk || mapOk)){
+  // fallback : pas d’image encore => on affiche quelque chose
+  ctx.fillStyle = "#0b3440";
+  ctx.fillRect(0, 0, window.innerWidth, window.innerHeight);
+  ctx.fillStyle = "rgba(255,255,255,.85)";
+  ctx.font = "900 22px system-ui";
+  ctx.fillText("Chargement lobby…", 24, 46);
+  return;
+}
     const bw = bg.naturalWidth;
     const bh = bg.naturalHeight;
 
