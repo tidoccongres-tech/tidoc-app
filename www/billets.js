@@ -1022,16 +1022,15 @@ function isAdmin() {
 onAuthStateChanged(auth, async (user) => {
   AUTH_USER = user;
 
-  console.log("AUTH USER:", {
-    uid: user?.uid || null,
-    email: user?.email || null
-  });
+  // ✅ recache / affiche immédiatement selon l'utilisateur courant
+  updateAdminButtonsVisibility();
 
   try {
     await loadPackConfig();
     await loadPromoPools();
     await loadSavedTicket();
   } finally {
+    // ✅ sécurité : recheck après chargements async
     updateAdminButtonsVisibility();
   }
 });
@@ -1046,6 +1045,10 @@ const adminMsg    = document.getElementById("adminPacksMsg");
 const adminClose  = document.getElementById("adminPacksCloseBtn");
 const adminCancel = document.getElementById("adminPacksCancelBtn");
 const adminSave   = document.getElementById("adminPacksSaveBtn");
+
+// Cache par défaut (évite flash + non-admin qui voit les boutons)
+if (adminBtn) adminBtn.style.display = "none";
+if (promoBtn) promoBtn.style.display = "none";
 
 // ======================
 // ADMIN UI — PROMO CODES (LISTE + AJOUT + SUPPRESSION)
