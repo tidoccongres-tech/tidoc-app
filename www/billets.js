@@ -917,7 +917,7 @@ function renderResult({ qrText, packKey, holderName, ticketNumber, promoCode, wo
 }
 
 function renderWorkshopsList(workshops = []) {
-  const listBox = document.getElementById("workshopsListBox");
+  const listBox = boxEl?.querySelector("#workshopsListBox") || document.getElementById("workshopsListBox");
   if (!listBox) return;
 
   if (!workshops.length) {
