@@ -1411,6 +1411,26 @@ fileInput?.addEventListener("change", async () => {
 deleteBtn?.addEventListener("click", deleteMyTicketAndUnclaim);
 
 // =====================
+// UI binds (au début, safe)
+// =====================
+if (uploadBtn && fileInput) {
+  uploadBtn.addEventListener("click", () => {
+    fileInput.value = "";
+    fileInput.click();
+  });
+
+  fileInput.addEventListener("change", async () => {
+    const file = fileInput.files?.[0];
+    if (file) await handleFile(file);
+    fileInput.value = "";
+  });
+
+  console.log("✅ Import bind OK");
+} else {
+  console.warn("❌ uploadBtn/fileInput introuvables", { uploadBtn, fileInput });
+}
+
+// =====================
 // Admin buttons visibility
 // =====================
 function updateAdminButtonsVisibility(){
