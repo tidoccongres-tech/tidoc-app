@@ -1406,10 +1406,8 @@ deleteBtn?.addEventListener("click", deleteMyTicketAndUnclaim);
 // Admin buttons visibility
 // =====================
 function updateAdminButtonsVisibility(){
-  const u = auth.currentUser;
-  const ok = u && String(u.email || "").toLowerCase() === ADMIN_EMAIL.toLowerCase();
-
-  console.log("ADMIN CHECK:", ok, u?.email);
+  const ok = isAdmin();
+  console.log("ADMIN CHECK:", ok, auth.currentUser?.email);
 
   if (adminBtn) adminBtn.style.display = ok ? "inline-flex" : "none";
   if (promoBtn) promoBtn.style.display = ok ? "inline-flex" : "none";
