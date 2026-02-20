@@ -1259,32 +1259,30 @@ async function loadSavedTicket() {
     return;
   }
 
-  // --- CAS: billet principal ---
-  const t = snap.data() || {};
+   // --- CAS: billet principal ---
+  const ticket = snap.data() || {};   // ✅ déclaré avant tout usage
 
   LAST_MAIN_TICKET = {
-    qrText: t.qrText || "",
-    packKey: t.packKey || "",
-    holderName: t.holderName || "",
-    ticketNumber: t.ticketNumber || ""
+    qrText: ticket.qrText || "",
+    packKey: ticket.packKey || "",
+    holderName: ticket.holderName || "",
+    ticketNumber: ticket.ticketNumber || ""
   };
 
-  // ✅ bouton visible si billet principal OU workshops
   if (scanBtn) scanBtn.style.display = (LAST_MAIN_TICKET.qrText || workshops.length) ? "" : "none";
 
   setStatus("✅ Billet chargé");
 
   renderResult({
-    qrText: t.qrText || "",
-    packKey: t.packKey || "",
-    holderName: t.holderName || "",
-    ticketNumber: t.ticketNumber || "",
-    promoCode: t.promoCode || "",
+    qrText: ticket.qrText || "",
+    packKey: ticket.packKey || "",
+    holderName: ticket.holderName || "",
+    ticketNumber: ticket.ticketNumber || "",
+    promoCode: ticket.promoCode || "",
     workshopsImportedCount: workshops.length
   });
 
   renderWorkshopsList(workshops);
-}
 
 // =====================
 // MAIN IMPORT HANDLER
