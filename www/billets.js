@@ -855,13 +855,6 @@ function renderResult({ qrText, packKey, holderName, ticketNumber, promoCode, wo
         ✅ Billet importé
       </div>
 
-      <div class="qr-premium">
-        <div class="qr-title">QR Code</div>
-        <div class="qr-box">
-          <div id="qrRender" style="width:220px;height:220px;"></div>
-        </div>
-      </div>
-
       <div style="border:1px solid var(--line); border-radius:14px; padding:12px;">
         <div><b>Nom :</b> ${escapeHTML(holderName || "—")}</div>
         <div><b>N° billet :</b> ${escapeHTML(ticketNumber || "—")}</div>
@@ -921,12 +914,6 @@ function renderResult({ qrText, packKey, holderName, ticketNumber, promoCode, wo
       if (hint) hint.textContent = "❌ " + (e?.message || String(e));
     }
   });
-
-  const host = boxEl.querySelector("#qrRender");
-  if (host && window.QRCode && qrText) {
-    host.innerHTML = "";
-    new window.QRCode(host, { text: qrText, width: 220, height: 220 });
-  }
 }
 
 function renderWorkshopsList(workshops = []) {
