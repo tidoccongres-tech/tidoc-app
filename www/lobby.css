@@ -367,3 +367,26 @@ body.chat-open canvas{
   opacity: 1;
   visibility: visible;
 }
+
+#gameCanvas{
+  position: fixed;
+  inset: 0;
+  z-index: 0;          /* fond */
+}
+
+/* UI lobby */
+.ui{
+  position: fixed;
+  z-index: 50;
+}
+
+/* Joystick au-dessus de l’UI */
+#joystick{
+  position: fixed;
+  z-index: 80;
+}
+
+/* Overlays encore au-dessus */
+.chat-overlay{ z-index: 200; }
+.role-overlay{ z-index: 210; }
+#reportOverlay{ z-index: 250; }
