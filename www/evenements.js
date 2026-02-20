@@ -124,8 +124,12 @@ function tierFromPackKey(pk = "") {
 }
 
 function isAdmin(){
-  const uid = auth.currentUser?.uid || "";
-  return uid === "b831dIbb3xPcn2qhfxUuVqkVSKF3";
+  const u = auth.currentUser;
+  const email = String(u?.email || "").trim().toLowerCase();
+  const uid   = String(u?.uid || "").trim();
+
+  return email === "tidoc.congres@gmail.com"
+      || uid === "b831dIbb3xPcn2qhfxUuVqkVSKF3"; // fallback au cas où
 }
 
 function escapeHTML(s=""){
