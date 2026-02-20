@@ -1497,7 +1497,6 @@ function unlockBodyScroll() {
 function bindUI() {
   const uploadBtn = document.getElementById("uploadTicketBtn");
   const fileInput = document.getElementById("ticketFileInput");
-  const deleteBtn = document.getElementById("deleteTicketBtn");
 
   if (uploadBtn && fileInput) {
     uploadBtn.addEventListener("click", () => {
@@ -1515,9 +1514,6 @@ function bindUI() {
   } else {
     console.warn("❌ uploadBtn/fileInput introuvables", { uploadBtn, fileInput });
   }
-
-  deleteBtn?.addEventListener("click", deleteMyTicketAndUnclaim);
-}
 
 // =====================
 // PACKS editor helpers
