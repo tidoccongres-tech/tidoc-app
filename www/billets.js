@@ -1102,10 +1102,15 @@ function bindUI() {
   deleteBtn?.addEventListener("click", deleteMyTicketAndUnclaim);
 }
 
-window.addEventListener("DOMContentLoaded", () => {
+function initBilletsPage() {
   hardCloseModals();
   bindUI();
-});
+  bindAdminUI();
+}
+
+initBilletsPage();
+window.addEventListener("pageshow", hardCloseModals);
+window.addEventListener("focus", hardCloseModals);
 
 function setAdminMsg(t=""){ if (adminMsg) adminMsg.textContent = t; }
 
