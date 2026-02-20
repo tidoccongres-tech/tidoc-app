@@ -323,3 +323,27 @@ body.chat-open canvas{
 
 /* Utils */
 .is-hidden{ display:none !important; }
+
+/* Par défaut, les overlays ne doivent jamais capter les clics */
+#chatOverlay,
+#roleOverlay,
+#reportOverlay,
+#activityOverlay,
+#selfExpelOverlay,
+#endOverlay {
+  pointer-events: none;
+}
+
+/* Ils ne captent les clics que quand ils sont vraiment ouverts/affichés */
+#chatOverlay.open,
+#roleOverlay.open {
+  pointer-events: auto;
+}
+
+/* Overlays gérés via display:flex */
+#reportOverlay[style*="display: flex"],
+#activityOverlay[style*="display: flex"],
+#selfExpelOverlay[style*="display: flex"],
+#endOverlay[style*="display: flex"] {
+  pointer-events: auto;
+}
