@@ -2537,3 +2537,12 @@ body.is-admin .admin-only { display: inline-flex !important; }
     justify-content: center;
   }
 }
+
+/* Billets: harmoniser les 2 boutons */
+#openHelloAssoBtn,
+#uploadTicketBtn{
+  font-size: 16px;      /* ajuste si besoin */
+  font-weight: 800;
+  line-height: 1;
+  padding: 12px 16px;   /* optionnel pour le rendu */
+}
