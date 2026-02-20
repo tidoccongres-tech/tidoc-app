@@ -942,22 +942,22 @@ function renderWorkshopsList(workshops = []) {
     return;
   }
 
-  const items = workshops.map((w, i) => `
-  <div style="position:relative; border:1px solid var(--line); border-radius:14px; padding:12px; background:#fff;">
-    <button class="delete-btn ws-del-btn"
-            type="button"
-            data-ws-hash="${escapeHTML(w.qrHash || "")}"
-            aria-label="Supprimer le workshop"
-            title="Supprimer"
-            style="position:absolute; top:10px; right:10px;">
-      ${TRASH_TIDOC_SVG}
-    </button>
+  const items = workshops.map((w) => `
+    <div style="position:relative; border:1px solid var(--line); border-radius:14px; padding:12px; background:#fff;">
+      <button class="delete-btn ws-del-btn"
+              type="button"
+              data-ws-hash="${escapeHTML(w.qrHash || "")}"
+              aria-label="Supprimer le workshop"
+              title="Supprimer"
+              style="position:absolute; top:10px; right:10px;">
+        ${TRASH_TIDOC_SVG}
+      </button>
 
-    <div style="font-weight:900; color:#0f4f60;">🧪 ${escapeHTML(w.workshopTitle || "Pack Workshop")}</div>
-    <div style="margin-top:6px;"><b>Nom :</b> ${escapeHTML(w.holderName || "—")}</div>
-    <div><b>N° billet :</b> ${escapeHTML(w.ticketNumber || "—")}</div>
-  </div>
-`).join("");
+      <div style="font-weight:900; color:#0f4f60;">🧪 ${escapeHTML(w.workshopTitle || "Pack Workshop")}</div>
+      <div style="margin-top:6px;"><b>Nom :</b> ${escapeHTML(w.holderName || "—")}</div>
+      <div><b>N° billet :</b> ${escapeHTML(w.ticketNumber || "—")}</div>
+    </div>
+  `).join("");
 
   listBox.innerHTML = `
     <div style="margin-top:6px; font-weight:900; color:var(--tidoc);">🎫 Billets workshop importés</div>
@@ -965,15 +965,16 @@ function renderWorkshopsList(workshops = []) {
       ${items}
     </div>
   `;
-}
 
-listBox.querySelectorAll(".ws-del-btn").forEach(btn => {
-  btn.addEventListener("click", async () => {
-    const h = btn.getAttribute("data-ws-hash") || "";
-    if (!h) return;
-    await deleteWorkshopTicketByHash(h);
+  // ✅ bind ICI
+  listBox.querySelectorAll(".ws-del-btn").forEach(btn => {
+    btn.addEventListener("click", async () => {
+      const h = btn.getAttribute("data-ws-hash") || "";
+      if (!h) return;
+      await deleteWorkshopTicketByHash(h);
+    });
   });
-});
+}
 
 function ensureScanOverlay() {
   let ov = document.getElementById("scanOverlay");
