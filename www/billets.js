@@ -583,6 +583,38 @@ async function deleteMyTicketAndUnclaim() {
   }
 }
 
+async function deleteWorkshopTicketByHash(qrHash) {
+  const u = auth.currentUser;
+  if (!u) { setStatus("🔒 Connecte-toi."); return; }
+
+  const ok = confirm("Supprimer ce billet workshop ?");
+  if (!ok) return;
+
+  setStatus("⏳ Suppression du workshop…");
+
+  try {
+    const id = `${u.uid}_${qrHash}`;
+    await deleteDoc(doc(db, "userWorkshopTickets", id)).catch(() => {});
+
+    // Optionnel : libérer le QR si tu as choisi de claim aussi les workshops
+    if (typeof CLAIM_WORKSHOP_QR === "undefined" ? true : CLAIM_WORKSHOP_QR) {
+      const claimRef = doc(db, "qrClaims", qrHash);
+      await runTransaction(db, async (tx) => {
+        const cs = await tx.get(claimRef);
+        if (!cs.exists()) return;
+        const uidInClaim = String(cs.data()?.uid || "");
+        if (uidInClaim === u.uid) tx.delete(claimRef);
+      }).catch(() => {});
+    }
+
+    await loadSavedTicket();
+    setStatus("✅ Workshop supprimé");
+  } catch (e) {
+    console.error("deleteWorkshopTicketByHash error:", e);
+    setStatus("❌ " + (e?.message || "Erreur suppression workshop"));
+  }
+}
+
 // =====================
 // QR scan (jsQR)
 // =====================
@@ -910,14 +942,22 @@ function renderWorkshopsList(workshops = []) {
     return;
   }
 
-  const items = workshops.map(w => `
-    <div style="border:1px solid var(--line); border-radius:14px; padding:12px; background:#fff;">
-      <div style="font-weight:900; color:#0f4f60;">🧪 ${escapeHTML(w.workshopTitle || "Pack Workshop")}</div>
-      <div style="margin-top:6px;"><b>Nom :</b> ${escapeHTML(w.holderName || "—")}</div>
-      <div><b>N° billet :</b> ${escapeHTML(w.ticketNumber || "—")}</div>
-      ${w.workshopKey ? `<div style="opacity:.75;font-weight:800;margin-top:6px;">Key: ${escapeHTML(w.workshopKey)}</div>` : ""}
-    </div>
-  `).join("");
+  const items = workshops.map((w, i) => `
+  <div style="position:relative; border:1px solid var(--line); border-radius:14px; padding:12px; background:#fff;">
+    <button class="delete-btn ws-del-btn"
+            type="button"
+            data-ws-hash="${escapeHTML(w.qrHash || "")}"
+            aria-label="Supprimer le workshop"
+            title="Supprimer"
+            style="position:absolute; top:10px; right:10px;">
+      ${TRASH_TIDOC_SVG}
+    </button>
+
+    <div style="font-weight:900; color:#0f4f60;">🧪 ${escapeHTML(w.workshopTitle || "Pack Workshop")}</div>
+    <div style="margin-top:6px;"><b>Nom :</b> ${escapeHTML(w.holderName || "—")}</div>
+    <div><b>N° billet :</b> ${escapeHTML(w.ticketNumber || "—")}</div>
+  </div>
+`).join("");
 
   listBox.innerHTML = `
     <div style="margin-top:6px; font-weight:900; color:var(--tidoc);">🎫 Billets workshop importés</div>
@@ -926,6 +966,14 @@ function renderWorkshopsList(workshops = []) {
     </div>
   `;
 }
+
+listBox.querySelectorAll(".ws-del-btn").forEach(btn => {
+  btn.addEventListener("click", async () => {
+    const h = btn.getAttribute("data-ws-hash") || "";
+    if (!h) return;
+    await deleteWorkshopTicketByHash(h);
+  });
+});
 
 function ensureScanOverlay() {
   let ov = document.getElementById("scanOverlay");
