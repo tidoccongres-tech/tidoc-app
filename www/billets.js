@@ -5,23 +5,13 @@
 // ✅ Promo codes: pools (premium/standard/essentiel) + UI lisible (liste + ajouter + supprimer)
 // ✅ Vérif officielle OPTIONNELLE (ne casse plus l’import si URL non configurée)
 
-import { firebaseConfig } from "./firebase-config.js";
-import { initializeApp, getApps, getApp } from "https://www.gstatic.com/firebasejs/10.12.4/firebase-app.js";
+import { auth, db } from "./auth.js";
+import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.4/firebase-auth.js";
 import {
-  getFirestore,
-  doc,
-  getDoc,
-  setDoc,
-  updateDoc,
-  deleteDoc,
-  runTransaction,
-  serverTimestamp,
-  collection,
-  query,
-  where,
-  getDocs
+  doc, getDoc, setDoc, updateDoc, deleteDoc, runTransaction,
+  serverTimestamp, collection, query, where, getDocs
 } from "https://www.gstatic.com/firebasejs/10.12.4/firebase-firestore.js";
-import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.4/firebase-auth.js";
+
 // =====================
 // Firebase init
 // =====================
