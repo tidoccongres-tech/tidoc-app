@@ -67,15 +67,15 @@ async function fetchOfficialTicketsIndex() {
   if (!res.ok) throw new Error("Index officiel indisponible.");
 
   const data = await res.json();
-  if (!data || typeof data !== "object") throw new Error("Index officiel invalide.");
-  OFFICIAL_CACHE = data;
-  return OFFICIAL_CACHE;
+if (!data || typeof data !== "object") throw new Error("Index officiel invalide.");
+OFFICIAL_CACHE = data;
 
-  try {
-    localStorage.setItem("tidoc_official_index", JSON.stringify({ ts: Date.now(), data }));
-  } catch (_) {}
+try {
+  localStorage.setItem("tidoc_official_index", JSON.stringify({ ts: Date.now(), data }));
+} catch (_) {}
 
-  return OFFICIAL_CACHE;
+return OFFICIAL_CACHE;
+
 }
 
 async function verifyPackWithQrOrThrow(qrText, detectedPackKey) {
@@ -299,21 +299,7 @@ tx.set(claimRef, {
   ticketNumber: String(userData?.ticketNumber || "").trim(),
   assignedAt: serverTimestamp()
 });
-
-if (!existingClaim.exists()) {
-  tx.set(claimRef, {
-    qrHash,
-    tier,
-    code,
-    assignedTo: u.uid,
-    assignedEmail: String(u.email || "").toLowerCase(),
-    holderName: String(userData?.holderName || "").trim(),
-    ticketNumber: String(userData?.ticketNumber || "").trim(),
-    assignedAt: serverTimestamp()
-  });
-}
-
-        // (optionnel) registre admin promoCodes/{codeLower}
+        
     // ⚠️ IMPORTANT: pas de READ ici (sinon permission-denied car read admin-only)
     const codeId = String(code).toLowerCase();
     const codeRef = doc(db, "promoCodes", codeId);
