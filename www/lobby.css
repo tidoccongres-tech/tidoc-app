@@ -185,3 +185,57 @@ canvas{
 #activityOverlay{ z-index: 260; }
 #selfExpelOverlay{ z-index: 300; }
 #endOverlay{ z-index: 999; }
+
+#chatOverlay{
+  position: fixed;
+  inset: 0;
+  z-index: 150;
+  display: none;
+  background: rgba(0,0,0,.55);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+
+#chatOverlay.open{
+  display: flex;
+  align-items: flex-end; /* ou center si tu veux */
+  justify-content: center;
+  padding: 16px;
+}
+
+#chatOverlay .chat-panel{
+  width: min(520px, calc(100vw - 24px));
+  height: min(70vh, 640px);
+  border-radius: 18px;
+  background: rgba(0,0,0,.78);
+  border: 1px solid rgba(255,255,255,.12);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}#chatOverlay{
+  position: fixed;
+  inset: 0;
+  z-index: 150;
+  display: none;
+  background: rgba(0,0,0,.55);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+
+#chatOverlay.open{
+  display: flex;
+  align-items: flex-end; /* ou center si tu veux */
+  justify-content: center;
+  padding: 16px;
+}
+
+#chatOverlay .chat-panel{
+  width: min(520px, calc(100vw - 24px));
+  height: min(70vh, 640px);
+  border-radius: 18px;
+  background: rgba(0,0,0,.78);
+  border: 1px solid rgba(255,255,255,.12);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
