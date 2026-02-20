@@ -1258,8 +1258,11 @@ async function handleFile(file) {
     let holderName = "";
     let ticketNumber = "";
     let workshopTitle = "";
+    let rawText = ""; // utile si tu veux debugger
 
-    // PDF
+    // =====================
+    // 1) EXTRACTION (PDF / IMAGE)
+    // =====================
     if (file.type === "application/pdf") {
       const out = await scanPdfForQR(file);
       qrText = out?.qrText || "";
@@ -1270,9 +1273,8 @@ async function handleFile(file) {
       holderName = meta?.holderName || "";
       ticketNumber = meta?.ticketNumber || "";
       workshopTitle = meta?.workshopTitle || "";
-    }
-    // IMAGE
-    else if (file.type.startsWith("image/")) {
+      rawText = meta?.rawText || "";
+    } else if (file.type.startsWith("image/")) {
       const canvas = await loadImageToCanvas(file);
 
       qrText = scanCanvasForQR(canvas) || "";
@@ -1281,42 +1283,68 @@ async function handleFile(file) {
       const text = await ocrCanvas(crop);
       const meta = parseMetaFromText(text);
 
-      packKey = meta.packKey || "";
-      holderName = meta.holderName || "";
-      ticketNumber = meta.ticketNumber || "";
-      workshopTitle = meta.workshopTitle || "";
-    }
-    else {
+      packKey = meta?.packKey || "";
+      holderName = meta?.holderName || "";
+      ticketNumber = meta?.ticketNumber || "";
+      workshopTitle = meta?.workshopTitle || "";
+      rawText = meta?.rawText || text || "";
+    } else {
       throw new Error("Format non supporté (PDF ou image uniquement).");
     }
 
     if (!qrText) throw new Error("QR Code non détecté sur le billet.");
 
-    // Vérif officielle (optionnelle)
+    // =====================
+    // 2) HEURISTIQUE ANTI-ÉCRASEMENT (workshop sans 'Pack ...')
+    // =====================
+    const hasPackKey = !!String(packKey || "").trim();
+
+    // Si on a détecté un titre workshop mais pas de pack => c'est un billet workshop
+    if (!hasPackKey && String(workshopTitle || "").trim()) {
+      packKey = "workshop";
+    }
+
+    // Sécurité supplémentaire : si le texte “sent” le workshop mais packKey inconnu
+    const p0 = String(packKey || "").toLowerCase();
+    const isKnownMain = ["premium", "standard", "essentiel", "staff"].includes(p0);
+
+    const looksWorkshop =
+      /workshop|atelier/i.test(String(workshopTitle || "")) ||
+      /workshop|atelier/i.test(String(rawText || "")); // rawText contient le texte OCR/PDF
+
+    if (!isKnownMain && looksWorkshop) {
+      packKey = "workshop";
+    }
+
+    // =====================
+    // 3) VÉRIF OFFICIELLE (optionnelle)
+    // =====================
     const v = await verifyPackWithQrOrThrow(qrText, packKey);
     if (v?.finalPackKey) packKey = v.finalPackKey;
 
     const p = String(packKey || "").toLowerCase();
 
-    // Lock anti-double (selon option métier)
+    // =====================
+    // 4) LOCK ANTI-DOUBLE (qrClaims)
+    // =====================
     if (p !== "workshop" || (typeof CLAIM_WORKSHOP_QR === "undefined" ? true : CLAIM_WORKSHOP_QR)) {
       await claimQrOrThrow(qrText);
     }
 
-    // Workshop = multi billets
+    // =====================
+    // 5) SAVE (workshop multi / main ticket)
+    // =====================
     if (p === "workshop") {
       const r = await saveWorkshopTicket({ qrText, packKey, holderName, ticketNumber, workshopTitle });
       await syncNameFromTicket(holderName);
       await loadSavedTicket();
-      setStatus(r.already ? "ℹ️ Billet workshop déjà importé" : "✅ Billet workshop importé");
+      setStatus(r?.already ? "ℹ️ Billet workshop déjà importé" : "✅ Billet workshop importé");
       return;
     }
 
     // Billet principal
     await saveTicketToFirestore({ qrText, packKey, holderName, ticketNumber });
-
     await syncNameFromTicket(holderName);
-
     await loadSavedTicket();
     setStatus("✅ Billet importé avec succès");
   } catch (e) {
