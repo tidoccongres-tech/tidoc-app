@@ -426,13 +426,15 @@ async function registerToEvent(eventId){
     const ev = evSnap.data() || {};
     if (isWorkshopEvent(ev.type)) throw new Error("Les workshops se font uniquement via HelloAsso.");
 
+    // déjà inscrit ?
+    const regSnap = await tx.get(regRef);
+    if (regSnap.exists()) throw new Error("Tu es déjà inscrit(e).");
+
+    // capacité (lecture OK) — mais on ne touche plus events/ côté user
     const capPublic  = Number(ev.capacity || 0);
     const capStaff   = Number(ev.capacityStaff || 0);
     const bookedPub  = Number(ev.bookedCount || 0);
     const bookedStf  = Number(ev.bookedStaffCount || 0);
-
-    const regSnap = await tx.get(regRef);
-    if (regSnap.exists()) throw new Error("Tu es déjà inscrit(e).");
 
     if (rights.isStaff){
       if (capStaff > 0 && bookedStf >= capStaff) throw new Error("Plus de places STAFF disponibles.");
@@ -442,32 +444,34 @@ async function registerToEvent(eventId){
 
     const typeKey = eventTypeKey(ev.type);
 
+    // USAGE
     const uSnap = await tx.get(usageRef);
     const usage = uSnap.exists() ? (uSnap.data() || {}) : {};
-    const wsUsed    = Number(usage.workshopUsed || 0);
+
     const confUsed  = Number(usage.conferenceUsed || 0);
     const otherUsed = Number(usage.otherUsed || 0);
 
-    if (typeKey === "conf"){
-      if (confUsed >= rights.confAllowed) throw new Error("Tu n’as plus de conférence disponible.");
-      tx.set(usageRef, { conferenceUsed: confUsed + 1 }, { merge:true });
-    } else {
-      // other
-      if (otherUsed >= rights.otherAllowed) throw new Error("Tu n’as plus de quota “Autre” disponible.");
-      tx.set(usageRef, { otherUsed: otherUsed + 1 }, { merge:true });
+    // si doc absent => on le crée (rules allow create)
+    if (!uSnap.exists()) {
+      tx.set(usageRef, { workshopUsed: 0, conferenceUsed: 0, otherUsed: 0 });
     }
 
+    if (typeKey === "conf"){
+      if (confUsed >= rights.confAllowed) throw new Error("Tu n’as plus de conférence disponible.");
+      tx.update(usageRef, { conferenceUsed: confUsed + 1 });
+    } else {
+      if (otherUsed >= rights.otherAllowed) throw new Error("Tu n’as plus de quota “Autre” disponible.");
+      tx.update(usageRef, { otherUsed: otherUsed + 1 });
+    }
+
+    // REGISTRATION (rules OK)
     tx.set(regRef, {
       uid,
       isStaff: !!rights.isStaff,
       createdAt: serverTimestamp()
     });
 
-    if (rights.isStaff){
-      tx.update(evRef, { bookedStaffCount: bookedStf + 1 });
-    } else {
-      tx.update(evRef, { bookedCount: bookedPub + 1 });
-    }
+    // ✅ IMPORTANT : PAS de tx.update(evRef, bookedCount...) (interdit par rules)
   });
 }
 
@@ -499,35 +503,32 @@ async function unregisterFromEvent(eventId){
     const regSnap = await tx.get(regRef);
     if (!regSnap.exists()) throw new Error("Tu n’es pas inscrit(e).");
 
-    const reg = regSnap.data() || {};
-    const wasStaff = !!reg.isStaff;
-
-    const bookedPub  = Number(ev.bookedCount || 0);
-    const bookedStf  = Number(ev.bookedStaffCount || 0);
-
     const typeKey = eventTypeKey(ev.type);
 
+    // USAGE
     const uSnap = await tx.get(usageRef);
     const usage = uSnap.exists() ? (uSnap.data() || {}) : {};
+
     const confUsed  = Number(usage.conferenceUsed || 0);
     const otherUsed = Number(usage.otherUsed || 0);
 
+    // si doc absent => on le crée (safe)
+    if (!uSnap.exists()) {
+      tx.set(usageRef, { workshopUsed: 0, conferenceUsed: 0, otherUsed: 0 });
+    }
+
     if (typeKey === "conf"){
-      tx.set(usageRef, { conferenceUsed: Math.max(0, confUsed - 1) }, { merge:true });
+      tx.update(usageRef, { conferenceUsed: Math.max(0, confUsed - 1) });
     } else {
-      tx.set(usageRef, { otherUsed: Math.max(0, otherUsed - 1) }, { merge:true });
+      tx.update(usageRef, { otherUsed: Math.max(0, otherUsed - 1) });
     }
 
     tx.delete(regRef);
 
-    if (wasStaff){
-      tx.update(evRef, { bookedStaffCount: Math.max(0, bookedStf - 1) });
-    } else {
-      tx.update(evRef, { bookedCount: Math.max(0, bookedPub - 1) });
-    }
+    // ✅ IMPORTANT : PAS de tx.update(evRef, bookedCount...) (interdit par rules)
   });
 }
-
+    
 // =====================
 // ADMIN: LISTE PARTICIPANTS
 // =====================
