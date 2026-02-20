@@ -15,9 +15,6 @@ import {
 // =====================
 // UI
 // =====================
-const uploadBtn = document.getElementById("uploadTicketBtn");
-const deleteBtn = document.getElementById("deleteTicketBtn"); // si présent
-const fileInput = document.getElementById("ticketFileInput");
 const statusEl  = document.getElementById("ticketStatus");
 const boxEl     = document.getElementById("ticketBox");
 
