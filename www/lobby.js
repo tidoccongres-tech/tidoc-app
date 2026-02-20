@@ -66,6 +66,13 @@ const chatInput = document.getElementById("chatInput");
 const canvas = document.getElementById("gameCanvas");
 const ctx = canvas?.getContext?.("2d") || null;
 
+if (canvas){
+  canvas.style.position = "fixed";
+  canvas.style.inset = "0";
+  canvas.style.zIndex = "0";
+  canvas.style.pointerEvents = "none"; // ✅ laisse passer les clics
+}
+
 if (!canvas || !ctx){
   console.warn("[lobby.js] Canvas introuvable (#gameCanvas). Le lobby ne pourra pas se dessiner.");
 }
@@ -1058,30 +1065,30 @@ function startLoopOnce(){
 }
 
 // ===================
-// IMAGES
+// IMAGES (paths safe en module)
 // ===================
+function asset(p){ return new URL(p, import.meta.url).href; }
+
 const lobbyBgImg = new Image();
-lobbyBgImg.src = "./assets/lobby.png";
+lobbyBgImg.src = asset("./assets/lobby.png");
 
 const lobbyMaskImg = new Image();
-lobbyMaskImg.src = "./assets/lobby-NB.png";
+lobbyMaskImg.src = asset("./assets/lobby-NB.png");
 
 const mapImg = new Image();
-mapImg.src = "./assets/map.png";
+mapImg.src = asset("./assets/map.png");
 
 const collisionImg = new Image();
-collisionImg.src = "./assets/collisions.png";
+collisionImg.src = asset("./assets/collisions.png");
 
 // rôle images
-const tinocentImgSrc = "./assets/tinocent.png";
-const titruantImgSrc = "./assets/titruant.png";
+const tinocentImgSrc = asset("./assets/tinocent.png");
+const titruantImgSrc = asset("./assets/titruant.png");
 
 // expulsé sprite
 const pleurImg = new Image();
-pleurImg.src = "./assets/pleur.png";
-pleurImg.onerror = () => {
-  if (pleurImg.src.includes("pleur.png")) pleurImg.src = "./assets/pleure.png";
-};
+pleurImg.src = asset("./assets/pleur.png");
+pleurImg.onerror = () => { pleurImg.src = asset("./assets/pleure.png"); };
 
 function watchImg(img, name){
   img.onload = () => console.log(`[IMG OK] ${name}`, img.src, img.naturalWidth, img.naturalHeight);
