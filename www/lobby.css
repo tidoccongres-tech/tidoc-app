@@ -347,3 +347,23 @@ body.chat-open canvas{
 #endOverlay[style*="display: flex"] {
   pointer-events: auto;
 }
+
+/* Les overlays existent mais ne doivent pas capter quand cachés */
+.chat-overlay,
+.role-overlay {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;     /* IMPORTANT */
+  opacity: 0;
+  visibility: hidden;
+  z-index: 200;             /* ou ce que tu veux */
+  transition: opacity .18s ease, visibility .18s ease;
+}
+
+/* Quand ouvert : là seulement ça capte */
+.chat-overlay.open,
+.role-overlay.open {
+  pointer-events: auto;
+  opacity: 1;
+  visibility: visible;
+}
