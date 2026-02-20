@@ -1010,27 +1010,25 @@ setStatus("✅ Billet importé avec succès");
 }
 
 // =====================
-// ADMIN (robuste)
-// =====================
-// =====================
-// ADMIN (email-based)
+// ADMIN (aligné rules)
 // =====================
 const ADMIN_EMAIL = "tidoc.congres@gmail.com";
+const ADMIN_UID   = "b831dIbb3xPcn2qhfxUuVqkVSKF3";
 let AUTH_USER = null;
+
+function normEmail(e=""){
+  return String(e || "").trim().toLowerCase();
+}
 
 function isAdmin() {
   const u = AUTH_USER || auth.currentUser;
-  const email = String(u?.email || "").trim().toLowerCase();
-  return email === ADMIN_EMAIL.toLowerCase();
+  const email = normEmail(u?.email);
+  const uid = String(u?.uid || "");
+  return (uid === ADMIN_UID) || (email === normEmail(ADMIN_EMAIL));
 }
 
 onAuthStateChanged(auth, async (user) => {
   AUTH_USER = user;
-
-  console.log("AUTH USER:", {
-    uid: user?.uid || null,
-    email: user?.email || null
-  });
 
   try {
     await loadPackConfig();
@@ -1040,6 +1038,11 @@ onAuthStateChanged(auth, async (user) => {
     updateAdminButtonsVisibility();
   }
 });
+
+  console.log("AUTH USER:", {
+    uid: user?.uid || null,
+    email: user?.email || null
+  });
 
 // =====================
 // ADMIN UI — PACKS (quotas) (SANS "Autre")
@@ -1412,16 +1415,22 @@ deleteBtn?.addEventListener("click", deleteMyTicketAndUnclaim);
 // =====================
 function updateAdminButtonsVisibility(){
   const ok = isAdmin();
-  const u = AUTH_USER || auth.currentUser;
+
+  if (adminBtn) {
+    adminBtn.style.display = ok ? "inline-flex" : "none";
+    adminBtn.disabled = !ok;
+    adminBtn.style.pointerEvents = ok ? "auto" : "none";
+  }
+
+  if (promoBtn) {
+    promoBtn.style.display = ok ? "inline-flex" : "none";
+    promoBtn.disabled = !ok;
+    promoBtn.style.pointerEvents = ok ? "auto" : "none";
+  }
 
   console.log("ADMIN CHECK:", {
     ok,
-    uid: u?.uid || null,
-    email: u?.email || null,
-    adminBtnFound: !!adminBtn,
-    promoBtnFound: !!promoBtn
+    uid: (AUTH_USER||auth.currentUser)?.uid || null,
+    email: (AUTH_USER||auth.currentUser)?.email || null
   });
-
-  if (adminBtn) adminBtn.style.display = ok ? "inline-flex" : "none";
-  if (promoBtn) promoBtn.style.display = ok ? "inline-flex" : "none";
 }
