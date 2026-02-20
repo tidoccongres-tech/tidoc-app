@@ -1030,6 +1030,11 @@ function isAdmin() {
 onAuthStateChanged(auth, async (user) => {
   AUTH_USER = user;
 
+  console.log("AUTH USER:", {
+    uid: user?.uid || null,
+    email: user?.email || null
+  });
+
   try {
     await loadPackConfig();
     await loadPromoPools();
@@ -1038,11 +1043,6 @@ onAuthStateChanged(auth, async (user) => {
     updateAdminButtonsVisibility();
   }
 });
-
-  console.log("AUTH USER:", {
-    uid: user?.uid || null,
-    email: user?.email || null
-  });
 
 // =====================
 // ADMIN UI — PACKS (quotas) (SANS "Autre")
