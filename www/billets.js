@@ -313,7 +313,6 @@ tx.set(claimRef, {
       copiedAt: null,
       redeemedAt: null
     }, { merge: true });
-    }
 
     return { code, already: false };
   });
