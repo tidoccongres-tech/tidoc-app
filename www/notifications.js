@@ -73,14 +73,11 @@ function renderNotifLinkButton(n = {}) {
   const url = String(n.linkUrl || "").trim();
   if (!url) return "";
 
+  const href = safeHref(url);
+  if (!href) return "";
+
   const label = String(n.linkLabel || "Ouvrir").trim() || "Ouvrir";
   const isPremium = String(n.type || "") === "workshop_promo";
-
-  const href = safeHref(url);
-if (!href) return "";
-
-<a href="${href}" target="_blank" ...
-  
   const cls = isPremium ? "btn-helloasso-premium" : "btn-helloasso";
 
   const icon = `
@@ -93,7 +90,7 @@ if (!href) return "";
 
   return `
     <div style="margin-top:10px;">
-      <a href="${escapeHTML(url)}" target="_blank" rel="noreferrer"
+      <a href="${href}" target="_blank" rel="noreferrer"
          class="${cls}" style="text-decoration:none">
         ${icon}
         ${escapeHTML(label)}
