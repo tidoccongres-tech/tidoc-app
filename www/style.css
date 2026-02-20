@@ -2498,3 +2498,42 @@ body.is-admin .admin-only { display: inline-flex !important; }
   }
 
 }
+
+/* ====== Ticket header : titre + boutons admin ====== */
+.ticket-head{
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;           /* ✅ autorise retour ligne si besoin */
+}
+
+.ticket-head .ticket-title{
+  margin: 0;
+  flex: 1 1 auto;            /* ✅ le titre prend l’espace restant */
+  min-width: 180px;
+}
+
+/* Les 2 boutons admin collés à droite */
+.ticket-head #adminEditPacksBtn,
+.ticket-head #adminEditPromoBtn{
+  margin-left: 0;
+  white-space: nowrap;
+}
+
+/* ====== TABLETTES : boutons plus grands et bien "collés" ====== */
+@media (min-width: 768px) and (max-width: 1200px){
+  .ticket-head{
+    gap: 12px;
+  }
+
+  .ticket-head #adminEditPacksBtn,
+  .ticket-head #adminEditPromoBtn{
+    padding: 12px 16px;
+    font-size: 15px;
+    border-radius: 18px;
+    height: 46px;            /* ✅ taille tablette */
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+}
