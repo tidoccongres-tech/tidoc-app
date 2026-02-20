@@ -2584,32 +2584,29 @@ if (room.status === "ended" && room.winner){
   showEndScreen(room.winner);
 }
     // modes
-    if (status === "starting"){
-      if (lastRoomStatus !== "starting"){
-        setStartingMode();
-        startTriggeredLocal = false;
-      }
-    }
+    // modes
+if (status === "starting"){
+  if (lastRoomStatus !== "starting"){
+    setStartingMode();
+    startTriggeredLocal = false;
+  }
+} else if (status === "started"){
+  spinRunning = false;
+  hideRoleOverlay();
+  setGameMode();
+} else {
+  spinRunning = false;
+  hideRoleOverlay();
+  setLobbyMode();
+}
 
-    } else if (status === "started"){
-      spinRunning = false;
-      hideRoleOverlay();
-      setGameMode();
-      // (tasks perso seront gérées côté players snapshot quand myDead est connu)
-    } else {
-      spinRunning = false;
-      hideRoleOverlay();
-      setLobbyMode();
-    }
+// refresh chat gating (room side)
+refreshChatGating(status);
 
-    // refresh chat gating (room side)
-    refreshChatGating(status);
-
-    if (lastRoomStatus !== status){
-      ensureSpawnCenter();
-    }
-    lastRoomStatus = status;
-  });
+if (lastRoomStatus !== status){
+  ensureSpawnCenter();
+}
+lastRoomStatus = status;
 
   // ===================
   // PLAYERS SNAPSHOT (COLLECTION)
