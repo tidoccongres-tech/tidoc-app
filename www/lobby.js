@@ -1079,7 +1079,6 @@ function startLoopOnce(){
 // ===================
 // IMAGES (paths safe en module)
 // ===================
-function asset(p){ return new URL(p, import.meta.url).href; }
 
 const lobbyBgImg = new Image();
 lobbyBgImg.src = asset("./assets/lobby.png");
