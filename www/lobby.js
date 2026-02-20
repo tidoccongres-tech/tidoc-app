@@ -7,6 +7,8 @@ import {
   addDoc, query, orderBy, limit, getDocs, setDoc, increment, arrayUnion
 } from "https://www.gstatic.com/firebasejs/10.12.4/firebase-firestore.js";
 
+function asset(p){ return new URL(p, import.meta.url).href; }
+
 let phase = "lobby";
 let myRole = null;
 let myDead = false;
@@ -66,17 +68,21 @@ const chatInput = document.getElementById("chatInput");
 const canvas = document.getElementById("gameCanvas");
 const ctx = canvas?.getContext?.("2d") || null;
 
+function setCanvasInteract(on){
+  if (!canvas) return;
+  canvas.style.pointerEvents = on ? "auto" : "none";
+}
+
 if (canvas){
   canvas.style.position = "fixed";
   canvas.style.inset = "0";
   canvas.style.zIndex = "0";
-  canvas.style.pointerEvents = "none"; // ✅ laisse passer les clics
+  setCanvasInteract(false); // ✅ par défaut: laisse passer les clics UI
 }
 
 if (!canvas || !ctx){
   console.warn("[lobby.js] Canvas introuvable (#gameCanvas). Le lobby ne pourra pas se dessiner.");
 }
-
 // ===================
 // TOASTS
 // ===================
@@ -1003,7 +1009,9 @@ function setLobbyMode(){
   gameStarted = false;
   phase = "lobby";
   joy?.classList.remove("is-hidden");
+  
 
+  setCanvasInteract(false);
   setMeetingLock(false);
   hideReportSplash();
   safeStyle(debatePill, "display", "none");
@@ -1052,6 +1060,7 @@ function setGameMode(){
   chatCanViewNow  = !!roomChatEnabled;
   chatCanWriteNow = !!roomChatEnabled && !myDead;
 
+  setCanvasInteract(myDead && !meetingLockActive);
   setChatFabVisible(chatCanViewNow);
   if (!chatCanViewNow && chatOverlay?.classList.contains("open")) closeChat(true);
   applyChatWriteLock();
@@ -2583,6 +2592,7 @@ onAuthStateChanged(auth, async (u) => {
 
         if (!wasDead && myDead){
           showSelfExpelledCard(10_000);
+          setCanvasInteract(true);
 
           specCamX = (typeof me.x === "number") ? me.x : player.x;
           specCamY = (typeof me.y === "number") ? me.y : player.y;
@@ -2593,6 +2603,7 @@ onAuthStateChanged(auth, async (u) => {
 
         if (wasDead && !myDead){
           specCamX = null; specCamY = null;
+          setCanvasInteract(false);
         }
 
         // position locale init
