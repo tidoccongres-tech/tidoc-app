@@ -140,6 +140,19 @@ canvas{
    OVERLAYS - SINGLE SOURCE OF TRUTH
 ========================= */
 
+#roleOverlay{
+  display: none;          /* caché par défaut */
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+}
+#roleOverlay.open{
+  display: flex;          /* ton JS ajoute .open */
+  opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
+}
+
 /* REPORT / ACTIVITY / SELF / END : pilotés par display dans ton JS */
 #reportOverlay,
 #activityOverlay,
