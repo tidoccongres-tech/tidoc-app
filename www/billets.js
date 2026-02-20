@@ -13,13 +13,6 @@ import {
 } from "https://www.gstatic.com/firebasejs/10.12.4/firebase-firestore.js";
 
 // =====================
-// Firebase init
-// =====================
-const app  = getApps().length ? getApp() : initializeApp(firebaseConfig);
-const db   = getFirestore(app);
-const auth = getAuth(app);
-
-// =====================
 // UI
 // =====================
 const uploadBtn = document.getElementById("uploadTicketBtn");
@@ -1416,15 +1409,3 @@ function updateAdminButtonsVisibility(){
   if (promoBtn) promoBtn.style.display = ok ? "inline-flex" : "none";
 }
 
-// =====================
-// INIT
-// =====================
-onAuthStateChanged(auth, async (user) => {
-  try {
-    await loadPackConfig();
-    await loadPromoPools();
-    await loadSavedTicket();
-  } finally {
-    updateAdminButtonsVisibility();
-  }
-});
