@@ -1282,7 +1282,9 @@ async function loadSavedTicket() {
     workshopsImportedCount: workshops.length
   });
 
-  renderWorkshopsList(workshops);
+    renderWorkshopsList(workshops);
+  return;
+}
 
 // =====================
 // MAIN IMPORT HANDLER
