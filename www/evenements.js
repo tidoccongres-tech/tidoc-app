@@ -788,29 +788,38 @@ async function broadcastPromoToTier(tier, helloAssoUrl){
 
     const failed = [];
   for (const u of recipients){
-    if (u.promoCode) continue;
+  if (u.promoCode) continue;
 
-    try {
-      u.promoCode = await assignPromoCodeToUserIfNeeded(u.uid, tier);
-    } catch (e) {
-      console.log("assignPromoCodeToUserIfNeeded failed for", u.uid, e);
-      failed.push(u.uid);
-    }
+  try {
+    u.promoCode = await assignPromoCodeToUserIfNeeded(u.uid, tier);
+    u.assignError = u.promoCode ? "" : "POOL_VIDE_OU_TIER_INVALIDE";
+  } catch (e) {
+    console.log("assignPromoCodeToUserIfNeeded failed for", u.uid, e);
+    u.assignError = e?.message || String(e);
+  }
+}
+  
+ await Promise.all(recipients.map(u => {
+  const code = String(u.promoCode || "").trim();
+
+  let text;
+  if (code) {
+    text = `Ton code promo personnel est : ${code}`;
+  } else if (u.assignError && u.assignError !== "POOL_VIDE_OU_TIER_INVALIDE") {
+    text = `❌ Erreur attribution code : ${u.assignError}`;
+  } else {
+    text = `Codes promo temporairement indisponibles. Contacte l’admin.`;
   }
 
-  await Promise.all(recipients.map(u => {
-    const code = String(u.promoCode || "").trim();
-    const text = code ? `Ton code promo personnel est : ${code}` : `Codes promo temporairement indisponibles. Contacte l’admin.`;
-
-    return sendNotif(u.uid, {
-      type: "workshop_promo",
-      title,
-      text,
-      promoCode: code,
-      linkLabel: "Ouvrir HelloAsso",
-      linkUrl: String(helloAssoUrl || "").trim()
-    });
-  }));
+  return sendNotif(u.uid, {
+    type: "workshop_promo",
+    title,
+    text,
+    promoCode: code,
+    linkLabel: "Ouvrir HelloAsso",
+    linkUrl: String(helloAssoUrl || "").trim()
+  });
+}));
 
   return recipients.length;
 }
