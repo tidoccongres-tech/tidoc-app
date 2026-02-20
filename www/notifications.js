@@ -143,32 +143,66 @@ async function loadNotifs() {
     const canDeleteNewsletter = admin && (n.type === "newsletter");
 
     card.innerHTML = `
-      ${n.logoUrl ? `
-        <div style="margin-top:10px;display:flex;align-items:center;gap:10px;">
-          <img src="${n.logoUrl}" alt="logo"
-            style="width:28px;height:28px;border-radius:8px;object-fit:cover">
-          <span style="font-size:12px;color:var(--muted);font-weight:800">Ti’Doc</span>
-        </div>
-      ` : ""}
+  ${n.logoUrl ? `
+    <div style="margin-top:10px;display:flex;align-items:center;gap:10px;">
+      <img src="${n.logoUrl}" alt="logo"
+        style="width:28px;height:28px;border-radius:8px;object-fit:cover">
+      <span style="font-size:12px;color:var(--muted);font-weight:800">Ti’Doc</span>
+    </div>
+  ` : ""}
 
-      ${canDeleteNewsletter ? `
-        <button
-          type="button"
-          data-del="${d.id}"
-          class="link"
-          style="position:absolute;top:12px;right:12px;font-size:13px;"
-        >
-          Supprimer
+  ${canDeleteNewsletter ? `
+    <button
+      type="button"
+      data-del="${d.id}"
+      class="link"
+      style="position:absolute;top:12px;right:12px;font-size:13px;"
+    >
+      Supprimer
+    </button>
+  ` : ""}
+
+  <div>
+    <strong>${escapeHTML(n.title || "Notification")}</strong>
+
+    ${n.text ? `<div style="margin-top:4px">${escapeHTML(n.text)}</div>` : ""}
+
+    <!-- ✅ BLOC CODE PROMO -->
+    ${(n.type === "workshop_promo" && n.promoCode) ? `
+      <div style="
+        margin-top:12px;
+        padding:12px;
+        border-radius:14px;
+        background:rgba(23,140,168,.08);
+        border:1px solid rgba(23,140,168,.18);
+        display:flex;
+        align-items:center;
+        justify-content:space-between;
+        gap:10px;
+        font-weight:950;
+      ">
+        <span>Code promo :</span>
+        <span style="
+          font-family:ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+          font-size:15px;
+          letter-spacing:1px;
+        ">
+          ${escapeHTML(n.promoCode)}
+        </span>
+        <button type="button"
+          data-copy="${d.id}"
+          class="btn-outline"
+          style="height:34px;border-radius:10px;font-weight:900;">
+          Copier
         </button>
-      ` : ""}
-
-      <div>
-        <strong>${escapeHTML(n.title || "Notification")}</strong>
-        ${n.text ? `<div style="margin-top:4px">${escapeHTML(n.text)}</div>` : ""}
-        ${n.imageUrl ? `<img src="${n.imageUrl}" style="margin-top:10px;width:100%;border-radius:12px">` : ""}
-        ${renderNotifLinkButton(n)}
       </div>
-    `;
+    ` : ""}
+
+    ${n.imageUrl ? `<img src="${n.imageUrl}" style="margin-top:10px;width:100%;border-radius:12px">` : ""}
+
+    ${renderNotifLinkButton(n)}
+  </div>
+`;
 
     // clic supprimer (ne doit pas markRead)
     const delBtn = card.querySelector(`[data-del="${d.id}"]`);
