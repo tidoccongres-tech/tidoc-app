@@ -1080,6 +1080,36 @@ window.addEventListener("DOMContentLoaded", hardCloseModals);
 window.addEventListener("pageshow", hardCloseModals);
 window.addEventListener("focus", hardCloseModals);
 
+function bindUI() {
+  const uploadBtn = document.getElementById("uploadTicketBtn");
+  const fileInput = document.getElementById("ticketFileInput");
+  const deleteBtn = document.getElementById("deleteTicketBtn");
+
+  if (uploadBtn && fileInput) {
+    uploadBtn.addEventListener("click", () => {
+      fileInput.value = "";
+      fileInput.click();
+    });
+
+    fileInput.addEventListener("change", async () => {
+      const file = fileInput.files?.[0];
+      if (file) await handleFile(file);
+      fileInput.value = "";
+    });
+
+    console.log("✅ Import bind OK");
+  } else {
+    console.warn("❌ uploadBtn/fileInput introuvables", { uploadBtn, fileInput });
+  }
+
+  deleteBtn?.addEventListener("click", deleteMyTicketAndUnclaim);
+}
+
+window.addEventListener("DOMContentLoaded", () => {
+  hardCloseModals();
+  bindUI();
+});
+
 function setAdminMsg(t=""){ if (adminMsg) adminMsg.textContent = t; }
 
 function ensureDefaultPacks(packs) {
@@ -1440,28 +1470,6 @@ function schedulePromoAutosave() {
     autosavePromoPoolsIfAdmin();
   }, 600);
 }
-
-// =====================
-// UI binds (au début, safe)
-// =====================
-if (uploadBtn && fileInput) {
-  uploadBtn.addEventListener("click", () => {
-    fileInput.value = "";
-    fileInput.click();
-  });
-
-  fileInput.addEventListener("change", async () => {
-    const file = fileInput.files?.[0];
-    if (file) await handleFile(file);
-    fileInput.value = "";
-  });
-
-  console.log("✅ Import bind OK");
-} else {
-  console.warn("❌ uploadBtn/fileInput introuvables", { uploadBtn, fileInput });
-}
-
-deleteBtn?.addEventListener("click", deleteMyTicketAndUnclaim);
 
 // =====================
 // Admin buttons visibility
