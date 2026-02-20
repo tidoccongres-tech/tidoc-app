@@ -2474,3 +2474,27 @@ body.is-admin .admin-only {
 
 .admin-only { display: none !important; }
 body.is-admin .admin-only { display: inline-flex !important; }
+
+/* =========================
+   TABLETTE (≥ 768px)
+========================= */
+@media (min-width: 768px) and (max-width: 1024px) {
+
+  .ticket-head {
+    justify-content: center !important;
+  }
+
+  .ticket-head > div {
+    display: flex;
+    gap: 18px;              /* rapproche les boutons */
+    justify-content: center;
+    width: 100%;
+  }
+
+  .admin-chip {
+    font-size: 16px;        /* texte plus grand */
+    padding: 10px 22px;     /* boutons plus larges */
+    border-radius: 999px;   /* pill propre */
+  }
+
+}
