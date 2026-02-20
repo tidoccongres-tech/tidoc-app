@@ -1240,7 +1240,7 @@ async function loadSavedTicket() {
   LAST_WORKSHOPS = workshops;
 
   // ✅ bouton "Mode scan" visible si on a au moins un QR (main ou workshop)
-  if (scanBtn) scanBtn.style.display = (workshops.length ? "" : "none");
+  if (scanBtn) scanBtn.style.display = ((t?.qrText || workshops.length) ? "" : "none");
 
   // --- CAS: pas de billet principal ---
   if (!snap.exists()) {
