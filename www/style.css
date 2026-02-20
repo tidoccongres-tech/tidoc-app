@@ -2466,3 +2466,9 @@ body.modal-open {
 #adminPromoModal * {
   pointer-events: auto;
 }
+
+/* caché par défaut */
+.admin-only { display: none !important; }
+
+/* visible uniquement si body a la classe is-admin */
+body.is-admin .admin-only { display: inline-flex !important; }
