@@ -76,29 +76,32 @@
   </div>
 
   <main class="page blog-page">
-    <section class="card ticket-card" id="ticketsCard">
-      
-      <div class="ticket-head">
-  <h2 class="ticket-title">Mon billet</h2>
+   <section class="card ticket-card" id="ticketsCard">
 
-  <div class="ticket-actions-right">
-    <!-- ✅ Bouton QR (user) -->
-    <button id="scanModeIconBtn" class="qr-icon-btn" type="button" aria-label="Voir mes QR codes" style="display:none;">
-      <!-- SVG QR (version currentColor) -->
-      <svg viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-        <!-- mets ici tes <path ...> (en remplaçant les fill="#1C274C" par fill="currentColor") -->
-      </svg>
-    </button>
+  <div class="ticket-head">
+    <h2 class="ticket-title">Mon billet</h2>
 
-    <!-- ADMIN ONLY -->
-    <div class="admin-only" style="display:flex; gap:8px; align-items:center;">
-      <button id="adminEditPacksBtn" class="admin-chip admin-chip-premium" type="button">✨ Quotas</button>
-      <button id="adminEditPromoBtn" class="admin-chip admin-chip-premium" type="button">🎟️ Promos</button>
+    <div class="ticket-actions-right">
+
+      <!-- ✅ Bouton QR (user) -->
+      <button id="scanModeIconBtn" class="qr-icon-btn" type="button"
+              aria-label="Voir mes QR codes" style="display:none;">
+        <!-- SVG QR en currentColor (Ti'Doc) -->
+        <svg viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+          <!-- Colle ici UNIQUEMENT les <path ...> de ton SVG (et remplace fill="#1C274C" par fill="currentColor") -->
+        </svg>
+      </button>
+
+      <!-- ADMIN ONLY -->
+      <div class="ticket-actions-right admin-only" style="display:flex; gap:8px; align-items:center;">
+        <button id="adminEditPacksBtn" class="admin-chip admin-chip-premium" type="button">✨ Quotas</button>
+        <button id="adminEditPromoBtn" class="admin-chip admin-chip-premium" type="button">🎟️ Promos</button>
+      </div>
+
     </div>
   </div>
-</div>
-      
-      <p class="ticket-sub">
+
+  <p class="ticket-sub">
         Importe ton billet (PDF HelloAsso ou capture). L’app extrait le QR + détecte le pack.
       </p>
 
