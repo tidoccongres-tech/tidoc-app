@@ -110,12 +110,16 @@
           Importer mon billet
         </button>
       </div>
-
+     
       <input type="file" id="ticketFileInput" accept="application/pdf,image/*"
       style="position:fixed; left:-9999px; width:1px; height:1px; opacity:0;" />
       <p id="ticketStatus" class="ticket-status"></p>
     </section>
-
+    
+    <button class="btn-primary" id="scanModeBtn" type="button" style="display:none; width:100%; margin-bottom:10px;">
+  📲 Mode scan entrée
+</button>
+    
     <section class="card" style="margin-top:12px;">
       <div id="ticketBox">Aucun billet importé pour l’instant.</div>
     </section>
