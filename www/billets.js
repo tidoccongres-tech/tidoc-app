@@ -1063,10 +1063,6 @@ const promoEssentielEl = document.getElementById("promoEssentielInput");
 function setAdminMsg(t = "") { if (adminMsg) adminMsg.textContent = t; }
 function setPromoMsg(t = "") { if (promoMsg) promoMsg.textContent = t; }
 
-// Cache par défaut (évite flash + non-admin qui voit les boutons)
-if (adminBtn) adminBtn.style.display = "none";
-if (promoBtn) promoBtn.style.display = "none";
-
 // =====================
 // Modals hard close (bfcache safe)
 // =====================
