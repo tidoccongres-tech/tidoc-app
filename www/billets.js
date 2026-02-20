@@ -1398,17 +1398,6 @@ function schedulePromoAutosave() {
     autosavePromoPoolsIfAdmin();
   }, 600);
 }
-  
-// =====================
-// UI binds
-// =====================
-uploadBtn?.addEventListener("click", () => fileInput?.click());
-fileInput?.addEventListener("change", async () => {
-  const file = fileInput.files?.[0];
-  await handleFile(file);
-  if (fileInput) fileInput.value = "";
-});
-deleteBtn?.addEventListener("click", deleteMyTicketAndUnclaim);
 
 // =====================
 // UI binds (au début, safe)
@@ -1429,6 +1418,8 @@ if (uploadBtn && fileInput) {
 } else {
   console.warn("❌ uploadBtn/fileInput introuvables", { uploadBtn, fileInput });
 }
+
+deleteBtn?.addEventListener("click", deleteMyTicketAndUnclaim);
 
 // =====================
 // Admin buttons visibility
