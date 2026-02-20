@@ -292,3 +292,14 @@ canvas{
 
 #gameCanvas{ z-index: 0 !important; }
 #chatOverlay{ z-index: 9999 !important; }
+
+.chat-fab{
+  display: grid;
+  place-items: center;
+}
+
+.chat-fab svg{
+  width: 26px;
+  height: 26px;
+  display: block;
+}
