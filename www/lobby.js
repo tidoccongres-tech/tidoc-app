@@ -1582,6 +1582,10 @@ function listenMyRole(){
       myRole = role;
       setRoleHud(myRole);
       updateMyTaskHud();
+
+    if (phase === "starting" && !spinRunning){
+  playSpinThenReveal(myRole);
+}
     }
   });
 
@@ -2585,12 +2589,7 @@ if (room.status === "ended" && room.winner){
         setStartingMode();
         startTriggeredLocal = false;
       }
-
-        if (!startTriggeredLocal){
-  startTriggeredLocal = true;
-  playSpinThenReveal(myRole);
-}
-      }
+    }
 
     } else if (status === "started"){
       spinRunning = false;
