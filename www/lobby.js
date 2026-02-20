@@ -2233,7 +2233,7 @@ if (!(bgOk || mapOk)){
 
   drawVignette();
   drawTaskArrow();
-  return;
+   }
 
 let lastT = performance.now();
 function loop(t){
