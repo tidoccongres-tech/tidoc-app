@@ -2443,3 +2443,13 @@ body.modal-open {
 .event-card {
   margin-bottom: 18px;
 }
+
+/* DEBUG ADMIN BUTTONS (temporaire) */
+#adminEditPacksBtn, #adminEditPromoBtn{
+  display:inline-flex !important;
+  opacity:1 !important;
+  visibility:visible !important;
+  pointer-events:auto !important;
+  position:relative;
+  z-index:10;
+}
