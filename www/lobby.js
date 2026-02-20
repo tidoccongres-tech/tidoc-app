@@ -2358,7 +2358,124 @@ let roomStatusCache = null;
 let unsubMyRole = null;
 let localPosReady = false;
 
-function ensureSpawnCenter(){ /* TODO */ }
+async function ensureSpawnCenter(){
+  if (!myUid || !roomId) return;
+
+  // Choix du monde selon l’état actuel
+  const inGame = (phase === "started"); // ou gameStarted
+
+  // Trouve un point walkable près du centre
+  const pos = inGame ? findSpawnNearCenter() : findSpawnNearLobbyCenter();
+
+  // Applique localement
+  player.x = pos.x;
+  player.y = pos.y;
+
+  // Reset cam spectateur
+  specCamX = null;
+  specCamY = null;
+
+  // Enregistre sur Firestore (comme ça tout le monde te voit au bon endroit)
+  try{
+    await updateDoc(doc(db,"rooms",roomId,"players",myUid), {
+      x: player.x,
+      y: player.y,
+      updatedAt: serverTimestamp()
+    });
+  } catch(e){
+    console.log("ensureSpawnCenter updateDoc error:", e);
+  }
+}
+
+function canMoveLobby(nx, ny){
+  const R = PLAYER_RADIUS_LOBBY;
+  return (
+    isWalkableLobby(nx, ny) &&
+    isWalkableLobby(nx - R, ny) &&
+    isWalkableLobby(nx + R, ny) &&
+    isWalkableLobby(nx, ny - R) &&
+    isWalkableLobby(nx, ny + R)
+  );
+}
+
+function findSpawnNearLobbyCenter(){
+  const cx = WORLD_W * 0.5;
+  const cy = WORLD_H * 0.5;
+
+  const step = 14;
+  const maxR = 420;
+
+  // spiral autour du centre
+  for (let r = 0; r <= maxR; r += step){
+    for (let a = 0; a < Math.PI * 2; a += Math.PI / 12){
+      const x = cx + Math.cos(a) * r;
+      const y = cy + Math.sin(a) * r;
+      if (canMoveLobby(x, y)) return { x, y };
+    }
+  }
+
+  // fallback centre
+  return { x: cx, y: cy };
+}async function ensureSpawnCenter(){
+  if (!myUid || !roomId) return;
+
+  // Choix du monde selon l’état actuel
+  const inGame = (phase === "started"); // ou gameStarted
+
+  // Trouve un point walkable près du centre
+  const pos = inGame ? findSpawnNearCenter() : findSpawnNearLobbyCenter();
+
+  // Applique localement
+  player.x = pos.x;
+  player.y = pos.y;
+
+  // Reset cam spectateur
+  specCamX = null;
+  specCamY = null;
+
+  // Enregistre sur Firestore (comme ça tout le monde te voit au bon endroit)
+  try{
+    await updateDoc(doc(db,"rooms",roomId,"players",myUid), {
+      x: player.x,
+      y: player.y,
+      updatedAt: serverTimestamp()
+    });
+  } catch(e){
+    console.log("ensureSpawnCenter updateDoc error:", e);
+  }
+}
+
+function canMoveLobby(nx, ny){
+  const R = PLAYER_RADIUS_LOBBY;
+  return (
+    isWalkableLobby(nx, ny) &&
+    isWalkableLobby(nx - R, ny) &&
+    isWalkableLobby(nx + R, ny) &&
+    isWalkableLobby(nx, ny - R) &&
+    isWalkableLobby(nx, ny + R)
+  );
+}
+
+function findSpawnNearLobbyCenter(){
+  const cx = WORLD_W * 0.5;
+  const cy = WORLD_H * 0.5;
+
+  const step = 14;
+  const maxR = 420;
+
+  // spiral autour du centre
+  for (let r = 0; r <= maxR; r += step){
+    for (let a = 0; a < Math.PI * 2; a += Math.PI / 12){
+      const x = cx + Math.cos(a) * r;
+      const y = cy + Math.sin(a) * r;
+      if (canMoveLobby(x, y)) return { x, y };
+    }
+  }
+
+  // fallback centre
+  return { x: cx, y: cy };
+}
+
 function refreshChatGating(){ /* TODO */ }
 function checkEndConditions(){ /* TODO */ }
 
