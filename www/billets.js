@@ -67,7 +67,9 @@ async function fetchOfficialTicketsIndex() {
   if (!res.ok) throw new Error("Index officiel indisponible.");
 
   const data = await res.json();
+  if (!data || typeof data !== "object") throw new Error("Index officiel invalide.");
   OFFICIAL_CACHE = data;
+  return OFFICIAL_CACHE;
 
   try {
     localStorage.setItem("tidoc_official_index", JSON.stringify({ ts: Date.now(), data }));
@@ -83,17 +85,21 @@ async function verifyPackWithQrOrThrow(qrText, detectedPackKey) {
   }
 
   const qrHash = await sha256Hex(qrText);
-  const index = await fetchOfficialTicketsIndex();
+const index = await fetchOfficialTicketsIndex();
 
-  const officialPack = (index && index[qrHash]) ? String(index[qrHash]).toLowerCase() : "";
-  if (!officialPack) throw new Error("Billet non reconnu (QR absent de la liste officielle).");
+if (!index || typeof index !== "object") {
+  throw new Error("Index officiel invalide.");
+}
 
-  if (!detectedPackKey) return { qrHash, officialPack, finalPackKey: officialPack };
+const officialPack = index[qrHash] ? String(index[qrHash]).toLowerCase() : "";
+if (!officialPack) throw new Error("Billet non reconnu (QR absent de la liste officielle).");
 
-  const det = String(detectedPackKey).toLowerCase();
-  if (det && det !== officialPack) {
-    throw new Error(`Billet refusé : pack incohérent (détecté: ${det} / officiel: ${officialPack}).`);
-  }
+if (!detectedPackKey) return { qrHash, officialPack, finalPackKey: officialPack };
+
+const det = String(detectedPackKey).toLowerCase();
+if (det && det !== officialPack) {
+  throw new Error(`Billet refusé : pack incohérent (détecté: ${det} / officiel: ${officialPack}).`);
+}
 
   return { qrHash, officialPack, finalPackKey: officialPack };
 }
@@ -282,8 +288,17 @@ async function assignPromoCodeIfNeeded(packKey) {
       promoAssignedAt: serverTimestamp()
     }, { merge: true });
 
-    // ✅ 5) créer le verrou promoClaims/{qrHash}
-    const existingClaim = await tx.get(claimRef);
+// ✅ 5) créer le verrou promoClaims/{qrHash} (pas de 2e read)
+tx.set(claimRef, {
+  qrHash,
+  tier,
+  code,
+  assignedTo: u.uid,
+  assignedEmail: String(u.email || "").toLowerCase(),
+  holderName: String(userData?.holderName || "").trim(),
+  ticketNumber: String(userData?.ticketNumber || "").trim(),
+  assignedAt: serverTimestamp()
+});
 
 if (!existingClaim.exists()) {
   tx.set(claimRef, {
