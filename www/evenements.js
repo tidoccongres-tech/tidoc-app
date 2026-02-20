@@ -743,37 +743,18 @@ async function assignPromoCodeToUserIfNeeded(uid, tier){
     const rest = list.slice(1);
 
     // ✅ READ 3: promoCodes registre
-    const codeId  = String(code).toLowerCase();
-    const codeRef = doc(db, "promoCodes", codeId);
-    const codeSnap = await tx.get(codeRef);
+   const codeId  = String(code).toLowerCase();
+const codeRef = doc(db, "promoCodes", codeId);
 
-    // ✅ WRITES (après tous les reads)
-    tx.set(poolsRef, { [realTier]: rest, updatedAt: serverTimestamp() }, { merge:true });
-
-    tx.set(userRef, {
-      promoCode: code,
-      promoTier: realTier,
-      promoAssignedAt: serverTimestamp(),
-    }, { merge:true });
-
-    tx.set(claimRef, {
-      qrHash,
-      tier: realTier,
-      code,
-      assignedTo: uid,
-      assignedAt: serverTimestamp()
-    });
-
-    if (!codeSnap.exists()){
-      tx.set(codeRef, {
-        code,
-        tier: realTier,
-        assignedTo: uid,
-        assignedAt: serverTimestamp(),
-        copiedAt: null,
-        redeemedAt: null
-      }, { merge:false });
-    }
+// ✅ pas de read (rules), on écrit direct
+tx.set(codeRef, {
+  code,
+  tier: realTier,
+  assignedTo: uid,
+  assignedAt: serverTimestamp(),
+  copiedAt: null,
+  redeemedAt: null
+}, { merge: true });
 
     return { code };
   });
