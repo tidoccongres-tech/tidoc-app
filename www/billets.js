@@ -1496,18 +1496,7 @@ window.addEventListener("focus", hardCloseModals);
 // =====================
 function updateAdminButtonsVisibility() {
   const ok = isAdmin();
-
-  if (adminBtn) {
-    adminBtn.style.display = ok ? "inline-flex" : "none";
-    adminBtn.disabled = !ok;
-    adminBtn.style.pointerEvents = ok ? "auto" : "none";
-  }
-
-  if (promoBtn) {
-    promoBtn.style.display = ok ? "inline-flex" : "none";
-    promoBtn.disabled = !ok;
-    promoBtn.style.pointerEvents = ok ? "auto" : "none";
-  }
+  document.body.classList.toggle("is-admin", ok);
 
   console.log("ADMIN CHECK:", {
     ok,
