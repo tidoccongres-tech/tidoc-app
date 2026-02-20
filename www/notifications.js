@@ -221,6 +221,21 @@ async function loadNotifs() {
       }
     });
 
+    // bouton copier code promo
+const copyBtn = card.querySelector(`[data-copy="${d.id}"]`);
+copyBtn?.addEventListener("click", async (e) => {
+  e.preventDefault();
+  e.stopPropagation();
+
+  try {
+    await navigator.clipboard.writeText(String(n.promoCode || ""));
+    copyBtn.textContent = "✅ Copié";
+    setTimeout(() => copyBtn.textContent = "Copier", 1000);
+  } catch {
+    alert("Copie impossible. Copie manuellement le code.");
+  }
+});
+
     // clic carte = markRead
     card.addEventListener("click", async () => {
       try { await markRead(d.id); } catch {}
