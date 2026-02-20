@@ -124,9 +124,8 @@ function tierFromPackKey(pk = "") {
 }
 
 function isAdmin(){
-  if (window.TIDOC_AUTH?.isAdmin) return true;
-  const email = (auth.currentUser?.email || "").toLowerCase();
-  return email === ADMIN_EMAIL.toLowerCase();
+  const uid = auth.currentUser?.uid || "";
+  return uid === "b831dIbb3xPcn2qhfxUuVqkVSKF3";
 }
 
 function escapeHTML(s=""){
