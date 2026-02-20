@@ -1514,7 +1514,7 @@ function bindUI() {
   } else {
     console.warn("❌ uploadBtn/fileInput introuvables", { uploadBtn, fileInput });
   }
-
+ }
 // =====================
 // PACKS editor helpers
 // =====================
