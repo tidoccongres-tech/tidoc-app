@@ -1031,10 +1031,9 @@ setStatus("✅ Billet importé avec succès");
 // =====================
 const ADMIN_EMAIL = "tidoc.congres@gmail.com";
 
-function isAdmin() {
-  if (window.TIDOC_AUTH?.isAdmin) return true;
-  const email = String(auth.currentUser?.email || "").toLowerCase();
-  return email === ADMIN_EMAIL.toLowerCase();
+function isAdmin(){
+  const uid = auth.currentUser?.uid || "";
+  return uid === "b831dIbb3xPcn2qhfxUuVqkVSKF3";
 }
 
 // =====================
