@@ -1550,11 +1550,11 @@ function updateAdminButtonsVisibility() {
   const ok = isAdmin();
   document.body.classList.toggle("is-admin", ok);
 
-  // ✅ si non-admin : on retire les boutons du DOM
-  if (!ok) {
-    document.getElementById("adminEditPacksBtn")?.remove();
-    document.getElementById("adminEditPromoBtn")?.remove();
-  }
+  const packsBtn = document.getElementById("adminEditPacksBtn");
+  const promoBtn = document.getElementById("adminEditPromoBtn");
+
+  if (packsBtn) packsBtn.style.display = ok ? "" : "none";
+  if (promoBtn) promoBtn.style.display = ok ? "" : "none";
 
   console.log("ADMIN CHECK:", {
     ok,
