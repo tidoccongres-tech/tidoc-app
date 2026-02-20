@@ -2317,177 +2317,20 @@ async function sendChat(text){
 }
 
 // ===================
-// FIREBASE (PROPRE)
+// FIREBASE (STRUCTURE PROPRE)
+// 1 snapshot room + 1 snapshot players + 1 snapshot chat
+// + bind start/leave/chat submit une seule fois
 // ===================
-let localPosReady = false;
-let spawning = false;
-let unsubMyRole = null;
-let startTriggeredLocal = false;
-let startBtnBound = false;
-
-// petit cache de room.status pour l’avoir dans players snapshot
-let roomStatusCache = null;
-
-function refreshChatGating(status){
-  if (status === "started"){
-    chatCanViewNow  = meetingLockActive ? true : !!roomChatEnabled;
-    chatCanWriteNow = chatCanViewNow && !myDead;
-
-    setChatFabVisible(chatCanViewNow);
-    if (!chatCanViewNow && chatOverlay?.classList.contains("open")) closeChat(true);
-    applyChatWriteLock();
-  } else {
-    chatCanViewNow = true;
-    chatCanWriteNow = true;
-    setChatFabVisible(true);
-    applyChatWriteLock();
-  }
-}
-
-async function ensureSpawnCenter(){
-  if (!myUid || !roomId) return;
-  if (spawning) return;
-  spawning = true;
-
-  const spawn = findSpawnNearCenter();
-  player.x = spawn.x;
-  player.y = spawn.y;
-
-  try{
-    await updateDoc(doc(db,"rooms",roomId,"players",myUid), {
-      x: player.x,
-      y: player.y,
-      updatedAt: serverTimestamp()
-    });
-  } catch (e){
-    console.log("spawn write error:", e);
-  } finally {
-    spawning = false;
-  }
-}
-
-// ===================
-// END SCREEN (Victoire / Défaite) — V1
-// ===================
-const endOverlay = document.createElement("div");
-endOverlay.id = "endOverlay";
-endOverlay.style.cssText = `
-  position: fixed; inset:0; z-index: 999;
-  display:none; align-items:center; justify-content:center;
-  background: rgba(0,0,0,.72);
-  color:#fff; text-align:center;
-  font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
-`;
-
-endOverlay.innerHTML = `
-  <div style="
-    width:min(560px, calc(100vw - 24px));
-    padding:14px; border-radius:18px;
-    background: rgba(0,0,0,.70);
-    border:1px solid rgba(255,255,255,.14);
-    box-shadow:0 18px 55px rgba(0,0,0,.35);
-  ">
-    <img id="endImg" src="./assets/tinocent.png" alt="fin"
-      style="display:block;width:100%;max-width:360px;margin:0 auto;border-radius:16px;border:1px solid rgba(255,255,255,.12);"/>
-    <div id="endText" style="margin-top:14px; font:1000 24px system-ui; letter-spacing:.6px;">FIN</div>
-    <div id="endSub" style="margin-top:8px; font:900 12px system-ui; opacity:.92;">Retour au menu…</div>
-  </div>
-`;
-document.body.appendChild(endOverlay);
-
-const endImgEl  = endOverlay.querySelector("#endImg");
-const endTextEl = endOverlay.querySelector("#endText");
-const endSubEl  = endOverlay.querySelector("#endSub");
-
-// anti double affichage + anti double redirect
-let __endShown = false;
-let __endRedirectTimer = null;
-
-function freezeAllInputs(){
-  try{ meetingLockActive = true; } catch(_) {}
-  try{ activityOpen = true; } catch(_) {} // empêche actions
-  try{ move.x = 0; move.y = 0; } catch(_) {}
-  try{ setActionUI({ show:false }); } catch(_) {}
-  try{ closeActivityUI?.(); } catch(_) {}
-  try{ closeChat?.(true); } catch(_) {}
-  try{ joy?.classList.add("is-hidden"); } catch(_) {}
-}
-
-function showEndScreen(winnerCamp){
-  // winnerCamp: "tinocent" | "titruant"
-  if (__endShown) return;
-  __endShown = true;
-
-  freezeAllInputs();
-
-  const myCamp = (myRole === "titruant") ? "titruant" : "tinocent";
-  const iWin = (winnerCamp === myCamp);
-
-  if (endImgEl){
-    endImgEl.src = (winnerCamp === "titruant") ? "./assets/titruant.png" : "./assets/tinocent.png";
-  }
-  if (endTextEl){
-    endTextEl.textContent = iWin ? "VICTOIRE" : "DÉFAITE";
-  }
-  if (endSubEl){
-    endSubEl.textContent = "Retour au menu…";
-  }
-
-  endOverlay.style.display = "flex";
-
-  clearTimeout(__endRedirectTimer);
-  __endRedirectTimer = setTimeout(() => {
-    window.location.href = "./game.html";
-  }, 5500);
-}
-
-// ===================
-// END CONDITIONS
-// - Nocents gagnent si tasksDone >= tasksTotal
-// - Truants gagnent si truantsAlive >= nocentsAlive
-// ===================
-function checkEndConditions(room){
-  if (__endShown) return;
-  if (!room || room.status !== "started") return;
-
-  const done  = (typeof room.tasksDone === "number")  ? room.tasksDone  : 0;
-  const total = (typeof room.tasksTotal === "number") ? room.tasksTotal : TASKS_TOTAL;
-
-  // 1) Win missions
-  if (total > 0 && done >= total){
-    showEndScreen("tinocent");
-    return;
-  }
-
-  // 2) Win imposteurs : truant >= nocent vivants
-  // => on déduit les vivants par playersMap + myRole known via privateRoles
-  let nocentsAlive = 0;
-  let truantsAlive = 0;
-
-  for (const p of playersMap.values()){
-    if (!p || p.isDead) continue;
-
-    // rôle connu seulement pour soi -> donc on ne peut pas compter “vrais” camps juste via myRole
-    // MAIS on peut compter à partir du champ room.truantsCount si tu veux, sinon on fait "fin seulement missions".
-    // Ici: on utilise room.truantsCount si présent ET playersCount pour approx
-  }
-
-  // ✅ Version safe & simple:
-  // Si tu veux la condition “truants >= nocents” fiable, il faut stocker les rôles côté host (par ex dans room.rolesPublic ou room.privateRoles consultable host).
-  // Donc par défaut: on ne déclenche PAS cette fin côté client si on n'a pas la donnée fiable.
-
-  // 👉 Si tu as un champ room.publicAliveCounts = { nocentsAlive, truantsAlive } géré par host -> on l'utilise:
-  const counts = room.publicAliveCounts || null;
-  if (counts && typeof counts.nocentsAlive === "number" && typeof counts.truantsAlive === "number"){
-    if (counts.nocentsAlive <= 0 || counts.truantsAlive >= counts.nocentsAlive){
-      showEndScreen("titruant");
-      return;
-    }
-  }
-}
-
 let unsubRoom = null;
 let unsubPlayers = null;
+let unsubChat = null;
+
+let startBtnBound = false;
+let leaveBtnBound = false;
+let chatBound = false;
+
+// cache status room accessible dans players snapshot
+let roomStatusCache = null;
 
 onAuthStateChanged(auth, async (u) => {
   if (!u) { location.href = "./login.html"; return; }
@@ -2495,260 +2338,101 @@ onAuthStateChanged(auth, async (u) => {
 
   myUid = u.uid;
 
+  // écoute mon rôle (1 fois)
   if (!unsubMyRole) unsubMyRole = listenMyRole();
 
-  // ROOM snapshot
-  if (!unsubRoom){
-    unsubRoom = onSnapshot(doc(db,"rooms",roomId), async (snap)=>{
-      if (!snap.exists()){
-        alert("Partie supprimée");
-        location.href="./game.html";
+  // ===================
+  // START button (bind 1 fois)
+  // ===================
+  if (!startBtnBound){
+    startBtnBound = true;
+
+    btnStart?.addEventListener("click", async (e) => {
+      e.preventDefault();
+
+      if (!myIsHost){
+        setStartInfo("Seul l’hôte peut démarrer.");
         return;
       }
 
-      const room = snap.data() || {};
-      const status = room.status || "lobby";
-      roomStatusCache = status;
-
-      roomChatEnabled = !!room.chatEnabled;
-
-      const deadArr = Array.isArray(room.deadUids) ? room.deadUids : [];
-      deadUidsSet = new Set(deadArr);
-
-      roomTasksDone = (typeof room.tasksDone === "number") ? room.tasksDone : 0;
-      const tasksTotalRoom = (typeof room.tasksTotal === "number") ? room.tasksTotal : TASKS_TOTAL;
-      setGlobalTasksProgress(roomTasksDone, tasksTotalRoom);
-
-      myIsHost = (room.hostUid === myUid);
-      if (btnStart) btnStart.style.display = myIsHost ? "" : "none";
-
-      handleMeetingState(room, status);
-      try { checkEndConditions(room); } catch(_) {}
-
-      if (status === "starting"){
-        if (lastRoomStatus !== "starting"){
-          setStartingMode();
-          startTriggeredLocal = false;
-        }
-      } else if (status === "started"){
-        spinRunning = false;
-        hideRoleOverlay();
-        setGameMode();
-      } else {
-        spinRunning = false;
-        hideRoleOverlay();
-        setLobbyMode();
+      const n = playersMap.size;
+      if (n < 4){
+        setStartInfo(`Il faut au moins 4 joueurs pour démarrer (actuellement ${n}).`);
+        return;
       }
 
-      refreshChatGating(status);
+      setStartInfo("");
 
-      if (lastRoomStatus !== status){
-        ensureSpawnCenter();
+      try{
+        await updateDoc(doc(db, "rooms", roomId), {
+          status: "starting",
+          startingAt: serverTimestamp(),
+          chatEnabled: false,
+          tasksTotal: TASKS_TOTAL,
+          tasksDone: 0,
+          deadUids: [],
+          meetingType: null,
+          meetingAt: null,
+          meetingBy: null,
+          reportedBodyUid: null
+        });
+
+        const snapPlayers = await getDocs(collection(db, "rooms", roomId, "players"));
+        const players = snapPlayers.docs.map(d => d.data());
+        await hostAssignRoles(players);
+
+        await sleep(3200);
+
+        await updateDoc(doc(db, "rooms", roomId), {
+          status: "started",
+          startedAt: serverTimestamp()
+        });
+
+      } catch (err){
+        console.log("START ERROR:", err);
+        setStartInfo(`Erreur démarrage: ${err?.code || ""} ${err?.message || err}`);
       }
-      lastRoomStatus = status;
     });
   }
 
-  // PLAYERS snapshot (séparé, hors du snapshot room)
-  if (!unsubPlayers){
-    unsubPlayers = onSnapshot(collection(db,"rooms",roomId,"players"), async (snap)=>{
-      const status = roomStatusCache || lastRoomStatus || "lobby";
-      const players = snap.docs.map(d=>d.data());
+  // ===================
+  // LEAVE button (bind 1 fois)
+  // ===================
+  if (!leaveBtnBound){
+    leaveBtnBound = true;
 
-      renderPlayers(players);
-      for (const p of players) ensurePlayerState(p);
-
-      const me = players.find(p => p.uid === myUid);
-      if (me?.name) myName = me.name;
-
-      if (me){
-        const wasDead = myDead;
-        myDead = !!me.isDead || deadUidsSet.has(myUid);
-
-        if (!localPosReady){
-          if (typeof me.x === "number" && typeof me.y === "number"){
-            player.x = me.x; player.y = me.y;
-          } else {
-            await ensureSpawnCenter();
-          }
-          localPosReady = true;
+    btnLeave?.addEventListener("click", async ()=>{
+      try{
+        await deleteDoc(doc(db,"rooms",roomId,"players",myUid));
+        const roomSnap = await getDoc(doc(db,"rooms",roomId));
+        const room = roomSnap.data();
+        if (room?.hostUid === myUid){
+          await deleteDoc(doc(db,"rooms",roomId));
         }
-
-        ensurePlayerState({ ...me, x: player.x, y: player.y });
-        refreshChatGating(status);
-
-        if (status === "started" && myRole === "tinocent" && !myDead){
-          await ensureMyTasksAssigned();
-        }
-        updateMyTaskHud();
+      } catch(e){
+        console.log("leave error:", e);
       }
-
-      startLoopOnce();
+      window.location.href = "./game.html";
     });
   }
-});
 
   // ===================
-  // ROOM SNAPSHOT (1 SEUL)
+  // CHAT snapshot + submit (1 fois)
   // ===================
-  onSnapshot(doc(db,"rooms",roomId), async (snap)=>{
-    if (!snap.exists()){
-      alert("Partie supprimée");
-      location.href="./game.html";
-      return;
-    }
+  if (!chatBound && chatForm && chatInput){
+    chatBound = true;
 
-    const room = snap.data() || {};
-    const status = room.status || "lobby";
-    roomStatusCache = status;
-
-    roomChatEnabled = !!room.chatEnabled;
-    
-    // deadUids persistant
-    const deadArr = Array.isArray(room.deadUids) ? room.deadUids : [];
-    deadUidsSet = new Set(deadArr);
-
-    // tasks global
-    roomTasksDone = (typeof room.tasksDone === "number") ? room.tasksDone : 0;
-    const tasksTotalRoom = (typeof room.tasksTotal === "number") ? room.tasksTotal : TASKS_TOTAL;
-    setGlobalTasksProgress(roomTasksDone, tasksTotalRoom);
-
-    if (status === "started" && roomTasksDone >= tasksTotalRoom){
-      setStartInfo("✅ Les Ti’Nocents ont gagné (missions terminées) !");
-    }
-
-    myIsHost = (room.hostUid === myUid);
-    if (btnStart) btnStart.style.display = myIsHost ? "" : "none";
-
-    // meeting/report (lock + splash)
-    handleMeetingState(room, status);
-// ✅ END SCREEN
-try { checkEndConditions(room); } catch(_) {}
-
-// ✅ si la room est déjà marquée ended (optionnel)
-if (room.status === "ended" && room.winner){
-  showEndScreen(room.winner);
-}
-    // modes
-    // modes
-if (status === "starting"){
-  if (lastRoomStatus !== "starting"){
-    setStartingMode();
-    startTriggeredLocal = false;
-  }
-} else if (status === "started"){
-  spinRunning = false;
-  hideRoleOverlay();
-  setGameMode();
-} else {
-  spinRunning = false;
-  hideRoleOverlay();
-  setLobbyMode();
-}
-
-// refresh chat gating (room side)
-refreshChatGating(status);
-
-if (lastRoomStatus !== status){
-  ensureSpawnCenter();
-}
-lastRoomStatus = status;
-  });
-  // ===================
-  // PLAYERS SNAPSHOT (COLLECTION)
-  // ===================
-  onSnapshot(collection(db,"rooms",roomId,"players"), async (snap)=>{
-    const status = roomStatusCache || lastRoomStatus || "lobby";
-    const players = snap.docs.map(d=>d.data());
-
-    // toast “X a quitté”
-    const nowMap = new Map(players.map(p => [p.uid, p.name || "Joueur"]));
-    if (prevPlayersSnapshot.size){
-      for (const [uid, name] of prevPlayersSnapshot.entries()){
-        if (!nowMap.has(uid) && uid !== myUid){
-          showLeaveToast(`${name} a quitté la partie`);
-        }
-      }
-    }
-    prevPlayersSnapshot = nowMap;
-
-    renderPlayers(players);
-
-    if (myIsHost && players.length >= 4) setStartInfo("");
-
-    for (const p of players) ensurePlayerState(p);
-
-    // cleanup disconnected
-    const live = new Set(players.map(p => p.uid));
-    for (const uid of Array.from(playersMap.keys())){
-      if (!live.has(uid)) playersMap.delete(uid);
-    }
-
-    const me = players.find(p => p.uid === myUid);
-    if (me?.name) myName = me.name;
-
-    if (me){
-      const wasDead = myDead;
-
-      myDead = !!me.isDead || deadUidsSet.has(myUid);
-      myLastExpelAtMs = (typeof me.lastExpelAtMs === "number")
-        ? me.lastExpelAtMs
-        : (myLastExpelAtMs || 0);
-
-      if (!wasDead && myDead){
-        showSelfExpelledCard(10_000);
-
-        specCamX = (typeof me.x === "number") ? me.x : player.x;
-        specCamY = (typeof me.y === "number") ? me.y : player.y;
-
-        updateMyTaskHud();
-        closeActivityUI();
-      }
-
-      if (wasDead && !myDead){
-        specCamX = null; specCamY = null;
-      }
-
-      if (!localPosReady){
-        if (typeof me.x === "number" && typeof me.y === "number"){
-          player.x = me.x;
-          player.y = me.y;
-        } else {
-          await ensureSpawnCenter();
-        }
-        localPosReady = true;
-      }
-
-      // ✅ me dans playersMap avec coords locales
-      ensurePlayerState({ ...me, x: player.x, y: player.y });
-
-      // ✅ chat gating après myDead connu
-      refreshChatGating(status);
-
-      // ✅ tasks uniquement en started + nocent + vivant
-      if (status === "started" && myRole === "tinocent" && !myDead){
-        await ensureMyTasksAssigned();
-      }
-      updateMyTaskHud();
-    }
-
-    startLoopOnce();
-  });
-
-  // ===================
-  // CHAT SNAPSHOT + SUBMIT (1 SEUL bind)
-  // ===================
-  if (chatForm && chatInput){
     const q = query(
       collection(db, "rooms", roomId, "messages"),
       orderBy("createdAtMs", "asc"),
       limit(120)
     );
 
-    onSnapshot(q, (snap) => {
+    unsubChat = onSnapshot(q, (snap) => {
       const msgs = snap.docs.map(d => d.data());
       renderChat(msgs);
 
+      // badge unread
       const canBadge = (phase !== "started") ? true : chatCanViewNow;
       if (msgs.length && canBadge && !chatOverlay?.classList.contains("open")){
         const last = msgs[msgs.length - 1];
@@ -2772,20 +2456,150 @@ lastRoomStatus = status;
   }
 
   // ===================
-  // LEAVE
+  // ROOM snapshot (1 seul)
   // ===================
-  btnLeave?.addEventListener("click", async ()=>{
-    try{
-      await deleteDoc(doc(db,"rooms",roomId,"players",myUid));
-      const roomSnap = await getDoc(doc(db,"rooms",roomId));
-      const room = roomSnap.data();
-      if (room?.hostUid === myUid){
-        await deleteDoc(doc(db,"rooms",roomId));
+  if (!unsubRoom){
+    unsubRoom = onSnapshot(doc(db,"rooms",roomId), async (snap)=>{
+      if (!snap.exists()){
+        alert("Partie supprimée");
+        location.href="./game.html";
+        return;
       }
-    } catch(e){
-      console.log("leave error:", e);
-    }
-    window.location.href = "./game.html";
-  });
-});
 
+      const room = snap.data() || {};
+      const status = room.status || "lobby";
+      roomStatusCache = status;
+
+      // flags room
+      roomChatEnabled = !!room.chatEnabled;
+
+      // deadUids persistant
+      const deadArr = Array.isArray(room.deadUids) ? room.deadUids : [];
+      deadUidsSet = new Set(deadArr);
+
+      // tasks global
+      roomTasksDone = (typeof room.tasksDone === "number") ? room.tasksDone : 0;
+      const tasksTotalRoom = (typeof room.tasksTotal === "number") ? room.tasksTotal : TASKS_TOTAL;
+      setGlobalTasksProgress(roomTasksDone, tasksTotalRoom);
+
+      // host
+      myIsHost = (room.hostUid === myUid);
+      if (btnStart) btnStart.style.display = myIsHost ? "" : "none";
+
+      // meeting/report (lock + splash)
+      handleMeetingState(room, status);
+
+      // END screen (safe)
+      try { checkEndConditions(room); } catch(_) {}
+
+      // modes (1 seul endroit)
+      if (status === "starting"){
+        if (lastRoomStatus !== "starting"){
+          setStartingMode();
+        }
+      } else if (status === "started"){
+        spinRunning = false;
+        hideRoleOverlay();
+        setGameMode();
+      } else {
+        spinRunning = false;
+        hideRoleOverlay();
+        setLobbyMode();
+      }
+
+      // gating chat
+      refreshChatGating(status);
+
+      // spawn on change status
+      if (lastRoomStatus !== status){
+        await ensureSpawnCenter();
+      }
+      lastRoomStatus = status;
+    });
+  }
+
+  // ===================
+  // PLAYERS snapshot (1 seul)
+  // ===================
+  if (!unsubPlayers){
+    unsubPlayers = onSnapshot(collection(db,"rooms",roomId,"players"), async (snap)=>{
+      const status = roomStatusCache || lastRoomStatus || "lobby";
+      const players = snap.docs.map(d=>d.data());
+
+      // toast “X a quitté”
+      const nowMap = new Map(players.map(p => [p.uid, p.name || "Joueur"]));
+      if (prevPlayersSnapshot.size){
+        for (const [uid, name] of prevPlayersSnapshot.entries()){
+          if (!nowMap.has(uid) && uid !== myUid){
+            showLeaveToast(`${name} a quitté la partie`);
+          }
+        }
+      }
+      prevPlayersSnapshot = nowMap;
+
+      renderPlayers(players);
+
+      // maj playersMap
+      for (const p of players) ensurePlayerState(p);
+
+      // cleanup disconnected
+      const live = new Set(players.map(p => p.uid));
+      for (const uid of Array.from(playersMap.keys())){
+        if (!live.has(uid)) playersMap.delete(uid);
+      }
+
+      // me
+      const me = players.find(p => p.uid === myUid);
+      if (me?.name) myName = me.name;
+
+      if (me){
+        const wasDead = myDead;
+
+        myDead = !!me.isDead || deadUidsSet.has(myUid);
+        myLastExpelAtMs = (typeof me.lastExpelAtMs === "number")
+          ? me.lastExpelAtMs
+          : (myLastExpelAtMs || 0);
+
+        if (!wasDead && myDead){
+          showSelfExpelledCard(10_000);
+
+          specCamX = (typeof me.x === "number") ? me.x : player.x;
+          specCamY = (typeof me.y === "number") ? me.y : player.y;
+
+          updateMyTaskHud();
+          try{ closeActivityUI(); } catch(_) {}
+        }
+
+        if (wasDead && !myDead){
+          specCamX = null; specCamY = null;
+        }
+
+        // position locale init
+        if (!localPosReady){
+          if (typeof me.x === "number" && typeof me.y === "number"){
+            player.x = me.x;
+            player.y = me.y;
+          } else {
+            await ensureSpawnCenter();
+          }
+          localPosReady = true;
+        }
+
+        // moi dans playersMap avec coords locales
+        ensurePlayerState({ ...me, x: player.x, y: player.y });
+
+        // gating chat après myDead connu
+        refreshChatGating(status);
+
+        // tasks uniquement en started + nocent + vivant
+        if (status === "started" && myRole === "tinocent" && !myDead){
+          await ensureMyTasksAssigned();
+        }
+
+        updateMyTaskHud();
+      }
+
+      startLoopOnce();
+    });
+  }
+});
