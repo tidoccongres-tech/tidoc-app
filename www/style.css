@@ -2467,8 +2467,12 @@ body.modal-open {
   pointer-events: auto;
 }
 
-/* caché par défaut */
-.admin-only { display: none !important; }
+/* Caché par défaut */
+.admin-only {
+  display: none !important;
+}
 
-/* visible uniquement si body a la classe is-admin */
-body.is-admin .admin-only { display: inline-flex !important; }
+/* Visible uniquement si body = admin */
+body.is-admin .admin-only {
+  display: inline-flex !important;
+}
