@@ -2169,7 +2169,7 @@ if (!(bgOk || mapOk)){
     return;
   }
 
-  // GAME: map + camera
+    // GAME: map + camera
   const targetX = myDead ? (specCamX ?? player.x) : player.x;
   const targetY = myDead ? (specCamY ?? player.y) : player.y;
 
@@ -2181,20 +2181,27 @@ if (!(bgOk || mapOk)){
   camX = clamp(camX, halfW, MAP_W - halfW);
   camY = clamp(camY, halfH, MAP_H - halfH);
 
+  // ✅ APPLIQUE LA CAMÉRA + ZOOM
+  ctx.save();
+  ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+
+  // centre écran -> zoom -> translate monde (cam)
+  ctx.translate(window.innerWidth / 2, window.innerHeight / 2);
+  ctx.scale(ZOOM_GAME, ZOOM_GAME);
+  ctx.translate(-camX, -camY);
+
   // draw map (avec fallback)
-if (mapImg.complete && mapImg.naturalWidth > 0){
-  ctx.drawImage(mapImg, 0, 0, MAP_W, MAP_H);
-} else {
-  // fallback clair = tu SAIS que le loop tourne
-  ctx.fillStyle = "#0b3440";
-  ctx.fillRect(0, 0, MAP_W, MAP_H);
+  if (mapImg.complete && mapImg.naturalWidth > 0){
+    ctx.drawImage(mapImg, 0, 0, MAP_W, MAP_H);
+  } else {
+    ctx.fillStyle = "#0b3440";
+    ctx.fillRect(0, 0, MAP_W, MAP_H);
+    ctx.fillStyle = "rgba(255,255,255,.85)";
+    ctx.font = "900 28px system-ui";
+    ctx.fillText("Chargement map…", 40, 60);
+  }
 
-  ctx.fillStyle = "rgba(255,255,255,.85)";
-  ctx.font = "900 28px system-ui";
-  ctx.fillText("Chargement map…", 40, 60);
-}
-
-  // clip FOV
+  // clip FOV (dans le monde, PAS en écran)
   const visR = getVisionRadiusWorld();
   const clipCX = myDead ? camX : player.x;
   const clipCY = myDead ? camY : player.y;
@@ -2222,11 +2229,11 @@ if (mapImg.complete && mapImg.naturalWidth > 0){
   }
 
   ctx.restore(); // clip
-  ctx.restore(); // world
+  ctx.restore(); // world (caméra)
 
   drawVignette();
   drawTaskArrow();
-}
+  return;
 
 let lastT = performance.now();
 function loop(t){
