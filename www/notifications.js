@@ -61,6 +61,14 @@ function escapeHTML(s = "") {
     .replaceAll("'", "&#039;");
 }
 
+function safeHref(u=""){
+  const url = String(u||"").trim();
+  if (!url) return "";
+  // optionnel : force http(s)
+  if (!/^https?:\/\//i.test(url)) return "";
+  return url.replaceAll('"', "%22").replaceAll("'", "%27");
+}
+
 function renderNotifLinkButton(n = {}) {
   const url = String(n.linkUrl || "").trim();
   if (!url) return "";
@@ -68,6 +76,11 @@ function renderNotifLinkButton(n = {}) {
   const label = String(n.linkLabel || "Ouvrir").trim() || "Ouvrir";
   const isPremium = String(n.type || "") === "workshop_promo";
 
+  const href = safeHref(url);
+if (!href) return "";
+
+<a href="${href}" target="_blank" ...
+  
   const cls = isPremium ? "btn-helloasso-premium" : "btn-helloasso";
 
   const icon = `
