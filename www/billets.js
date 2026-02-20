@@ -1418,9 +1418,16 @@ deleteBtn?.addEventListener("click", deleteMyTicketAndUnclaim);
 // =====================
 function updateAdminButtonsVisibility(){
   const ok = isAdmin();
-  console.log("ADMIN CHECK:", ok, auth.currentUser?.email);
+  const u = AUTH_USER || auth.currentUser;
+
+  console.log("ADMIN CHECK:", {
+    ok,
+    uid: u?.uid || null,
+    email: u?.email || null,
+    adminBtnFound: !!adminBtn,
+    promoBtnFound: !!promoBtn
+  });
 
   if (adminBtn) adminBtn.style.display = ok ? "inline-flex" : "none";
   if (promoBtn) promoBtn.style.display = ok ? "inline-flex" : "none";
 }
-
