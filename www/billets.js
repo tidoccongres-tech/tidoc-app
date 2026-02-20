@@ -1016,7 +1016,6 @@ setStatus("✅ Billet importé avec succès");
 // ADMIN (email-based)
 // =====================
 const ADMIN_EMAIL = "tidoc.congres@gmail.com";
-
 let AUTH_USER = null;
 
 function isAdmin() {
