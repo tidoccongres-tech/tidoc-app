@@ -2364,35 +2364,6 @@ let roomStatusCache = null;
 let unsubMyRole = null;
 let localPosReady = false;
 
-async function ensureSpawnCenter(){
-  if (!myUid || !roomId) return;
-
-  // Choix du monde selon l’état actuel
-  const inGame = (phase === "started"); // ou gameStarted
-
-  // Trouve un point walkable près du centre
-  const pos = inGame ? findSpawnNearCenter() : findSpawnNearLobbyCenter();
-
-  // Applique localement
-  player.x = pos.x;
-  player.y = pos.y;
-
-  // Reset cam spectateur
-  specCamX = null;
-  specCamY = null;
-
-  // Enregistre sur Firestore (comme ça tout le monde te voit au bon endroit)
-  try{
-    await updateDoc(doc(db,"rooms",roomId,"players",myUid), {
-      x: player.x,
-      y: player.y,
-      updatedAt: serverTimestamp()
-    });
-  } catch(e){
-    console.log("ensureSpawnCenter updateDoc error:", e);
-  }
-}
-
 function canMoveLobby(nx, ny){
   const R = PLAYER_RADIUS_LOBBY;
   return (
@@ -2422,7 +2393,9 @@ function findSpawnNearLobbyCenter(){
 
   // fallback centre
   return { x: cx, y: cy };
-}async function ensureSpawnCenter(){
+}
+
+async function ensureSpawnCenter(){
   if (!myUid || !roomId) return;
 
   // Choix du monde selon l’état actuel
