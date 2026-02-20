@@ -1144,7 +1144,7 @@ let lobbyMaskData = null;
 let LOBBY_W = 0;
 let LOBBY_H = 0;
 
-lobbyMaskImg.onload = () => {
+lobbyMaskImg.onload = async () => {
   LOBBY_W = lobbyMaskImg.width;
   LOBBY_H = lobbyMaskImg.height;
 
@@ -1153,7 +1153,13 @@ lobbyMaskImg.onload = () => {
   tmp.height = LOBBY_H;
   const tctx = tmp.getContext("2d");
   tctx.drawImage(lobbyMaskImg, 0, 0);
+
   lobbyMaskData = tctx.getImageData(0, 0, LOBBY_W, LOBBY_H);
+
+  // ✅ si on est en lobby et déjà connecté, replace proprement
+  if (phase !== "started" && myUid && roomId){
+    await ensureSpawnCenter();
+  }
 };
 
 // ===================
