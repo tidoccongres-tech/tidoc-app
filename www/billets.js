@@ -224,6 +224,28 @@ async function loadPromoPools() {
   }
 }
 
+// =====================
+// PROMO STATE (admin active par tier)
+// Firestore: config/promoState
+// { premium:true/false, standard:true/false, essentiel:true/false, updatedAt: ... }
+// =====================
+let PROMO_STATE = { premium: false, standard: false, essentiel: false };
+
+async function loadPromoState() {
+  try {
+    const snap = await getDoc(doc(db, "config", "promoState"));
+    const d = snap.exists() ? (snap.data() || {}) : {};
+    PROMO_STATE = {
+      premium: !!d.premium,
+      standard: !!d.standard,
+      essentiel: !!d.essentiel
+    };
+  } catch (e) {
+    console.log("loadPromoState error:", e);
+    PROMO_STATE = { premium: false, standard: false, essentiel: false };
+  }
+}
+
 // Attribuer 1 code selon le pack (premium/standard/essentiel), et le retirer du pool
 // + écrire un registre promoCodes/{codeLower} pour l’admin
 async function assignPromoCodeIfNeeded(packKey) {
@@ -766,6 +788,11 @@ function renderResult({ qrText, packKey, holderName, ticketNumber, promoCode, wo
   const discount = pack ? Number(pack.workshopDiscountPacks ?? 0) : 0;
   const imported = Number(workshopsImportedCount ?? 0);
 
+  const tier = String(packKey || "").toLowerCase();
+const canHavePromo = ["premium","standard","essentiel"].includes(tier);
+const promoEnabled = !!PROMO_STATE[tier];
+const showGetPromoBtn = canHavePromo && !promo && promoEnabled;
+  
   const wsLine =
     key === "workshop"
       ? `${conf}`
@@ -811,6 +838,20 @@ function renderResult({ qrText, packKey, holderName, ticketNumber, promoCode, wo
             ? `<div style="margin-top:10px;"><b>Code promo :</b> <span style="font-weight:950;">${escapeHTML(promo)}</span></div>`
             : ""
         }
+
+        ${
+  showGetPromoBtn
+    ? `
+      <div style="margin-top:12px;">
+        <button id="btnGetPromo" class="btn-premium btn-premium-primary" type="button">
+          🎟️ Obtenir mon code promo
+        </button>
+        <div id="promoHint" style="margin-top:8px;font-size:12px;font-weight:800;color:rgba(15,35,42,.65);"></div>
+      </div>
+    `
+    : ""
+}
+
       </div>
 
       <div id="workshopsListBox"></div>
@@ -988,9 +1029,6 @@ async function handleFile(file) {
     // Billet principal
     await saveTicketToFirestore({ qrText, packKey, holderName, ticketNumber });
 
-    // Attribution automatique code promo
-    await assignPromoCodeIfNeeded(packKey);
-
     await syncNameFromTicket(holderName);
 
     await loadSavedTicket();
@@ -1021,16 +1059,14 @@ function isAdmin() {
 
 onAuthStateChanged(auth, async (user) => {
   AUTH_USER = user;
-
-  // ✅ recache / affiche immédiatement selon l'utilisateur courant
   updateAdminButtonsVisibility();
 
   try {
     await loadPackConfig();
     await loadPromoPools();
+    await loadPromoState();     // ✅ AJOUT
     await loadSavedTicket();
   } finally {
-    // ✅ sécurité : recheck après chargements async
     updateAdminButtonsVisibility();
   }
 });
