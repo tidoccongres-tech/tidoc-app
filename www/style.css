@@ -2529,3 +2529,53 @@ body.is-admin .admin-only { display: inline-flex !important; }
   line-height: 1;
   padding: 12px 16px;   /* optionnel pour le rendu */
 }
+
+/* Bouton Mode scan entrée */
+.btn-scan {
+  width: 100%;
+  margin: 10px 0 12px;
+  padding: 14px 16px;
+
+  border: 0;
+  border-radius: 18px;
+
+  font-weight: 950;
+  letter-spacing: .2px;
+  font-size: 15px;
+
+  color: #fff;
+  background: linear-gradient(135deg, rgba(15,79,96,1), rgba(41,168,196,1));
+  
+  box-shadow:
+    0 14px 30px rgba(15,79,96,.22),
+    inset 0 1px 0 rgba(255,255,255,.22);
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+
+  transition: transform .12s ease, box-shadow .18s ease, filter .18s ease;
+}
+
+.btn-scan::before {
+  content: "📲";
+  font-size: 18px;
+  transform: translateY(-.5px);
+}
+
+.btn-scan:hover {
+  filter: brightness(1.03);
+  box-shadow:
+    0 16px 34px rgba(15,79,96,.28),
+    inset 0 1px 0 rgba(255,255,255,.26);
+}
+
+.btn-scan:active {
+  transform: translateY(1px) scale(.99);
+}
+
+.btn-scan:focus-visible {
+  outline: 3px solid rgba(41,168,196,.35);
+  outline-offset: 3px;
+}
