@@ -140,32 +140,42 @@ canvas{
    OVERLAYS - SINGLE SOURCE OF TRUTH
 ========================= */
 
-/* base: overlays existent mais ne captent rien et sont invisibles */
+/* CHAT + ROLE : pilotés par .open dans ton JS */
 .chat-overlay,
-.role-overlay,
-#reportOverlay,
-#activityOverlay,
-#selfExpelOverlay,
-#endOverlay{
+.role-overlay{
   position: fixed;
   inset: 0;
-  z-index: 200;
   pointer-events: none;
   opacity: 0;
   visibility: hidden;
   transition: opacity .18s ease, visibility .18s ease;
 }
 
-/* ouverts = visibles + captent */
 .chat-overlay.open,
-.role-overlay.open,
-#reportOverlay.open,
-#activityOverlay.open,
-#selfExpelOverlay.open,
-#endOverlay.open{
+.role-overlay.open{
   pointer-events: auto;
   opacity: 1;
   visibility: visible;
+}
+
+/* REPORT / ACTIVITY / SELF / END : pilotés par display dans ton JS */
+#reportOverlay,
+#activityOverlay,
+#selfExpelOverlay,
+#endOverlay{
+  pointer-events: auto;      /* ok */
+  opacity: 1;
+  visibility: visible;
+  transition: none;
+  display: none;             /* cachés par défaut */
+}
+
+/* comme ton JS met display:flex */
+#reportOverlay[style*="display: flex"],
+#activityOverlay[style*="display: flex"],
+#selfExpelOverlay[style*="display: flex"],
+#endOverlay[style*="display: flex"]{
+  display: flex;
 }
 
 /* z-index stacking */
