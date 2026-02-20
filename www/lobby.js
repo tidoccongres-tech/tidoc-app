@@ -2486,71 +2486,107 @@ function checkEndConditions(room){
   }
 }
 
+let unsubRoom = null;
+let unsubPlayers = null;
+
 onAuthStateChanged(auth, async (u) => {
   if (!u) { location.href = "./login.html"; return; }
-  if (!roomId){
-    console.warn("[LOBBY] roomId manquant -> pas de connexion Firestore");
-    setStartInfo("⚠️ Code de partie manquant. Reviens via “Créer une partie” ou utilise ?room=XXXX");
-    return;
-  }
+  if (!roomId) { setStartInfo("⚠️ Code de partie manquant."); return; }
 
   myUid = u.uid;
 
-  if (!unsubMyRole){
-    unsubMyRole = listenMyRole();
-  }
+  if (!unsubMyRole) unsubMyRole = listenMyRole();
 
-  // ✅ START button (bind une seule fois)
-  if (!startBtnBound){
-    startBtnBound = true;
-
-    btnStart?.addEventListener("click", async (e) => {
-      e.preventDefault();
-
-      if (!myIsHost){
-        setStartInfo("Seul l’hôte peut démarrer.");
+  // ROOM snapshot
+  if (!unsubRoom){
+    unsubRoom = onSnapshot(doc(db,"rooms",roomId), async (snap)=>{
+      if (!snap.exists()){
+        alert("Partie supprimée");
+        location.href="./game.html";
         return;
       }
 
-      const n = playersMap.size;
-      if (n < 4){
-        setStartInfo(`Il faut au moins 4 joueurs pour démarrer (actuellement ${n}).`);
-        return;
+      const room = snap.data() || {};
+      const status = room.status || "lobby";
+      roomStatusCache = status;
+
+      roomChatEnabled = !!room.chatEnabled;
+
+      const deadArr = Array.isArray(room.deadUids) ? room.deadUids : [];
+      deadUidsSet = new Set(deadArr);
+
+      roomTasksDone = (typeof room.tasksDone === "number") ? room.tasksDone : 0;
+      const tasksTotalRoom = (typeof room.tasksTotal === "number") ? room.tasksTotal : TASKS_TOTAL;
+      setGlobalTasksProgress(roomTasksDone, tasksTotalRoom);
+
+      myIsHost = (room.hostUid === myUid);
+      if (btnStart) btnStart.style.display = myIsHost ? "" : "none";
+
+      handleMeetingState(room, status);
+      try { checkEndConditions(room); } catch(_) {}
+
+      if (status === "starting"){
+        if (lastRoomStatus !== "starting"){
+          setStartingMode();
+          startTriggeredLocal = false;
+        }
+      } else if (status === "started"){
+        spinRunning = false;
+        hideRoleOverlay();
+        setGameMode();
+      } else {
+        spinRunning = false;
+        hideRoleOverlay();
+        setLobbyMode();
       }
 
-      setStartInfo("");
+      refreshChatGating(status);
 
-      try{
-        await updateDoc(doc(db, "rooms", roomId), {
-          status: "starting",
-          startingAt: serverTimestamp(),
-          chatEnabled: false,
-          tasksTotal: TASKS_TOTAL,
-          tasksDone: 0,
-          deadUids: [],
-          meetingType: null,
-          meetingAt: null,
-          meetingBy: null,
-          reportedBodyUid: null
-        });
-
-        const snapPlayers = await getDocs(collection(db, "rooms", roomId, "players"));
-        const players = snapPlayers.docs.map(d => d.data());
-        await hostAssignRoles(players);
-
-        await sleep(3200);
-
-        await updateDoc(doc(db, "rooms", roomId), {
-          status: "started",
-          startedAt: serverTimestamp()
-        });
-
-      } catch (err){
-        console.log("START ERROR:", err);
-        setStartInfo(`Erreur démarrage: ${err?.code || ""} ${err?.message || err}`);
+      if (lastRoomStatus !== status){
+        ensureSpawnCenter();
       }
+      lastRoomStatus = status;
     });
   }
+
+  // PLAYERS snapshot (séparé, hors du snapshot room)
+  if (!unsubPlayers){
+    unsubPlayers = onSnapshot(collection(db,"rooms",roomId,"players"), async (snap)=>{
+      const status = roomStatusCache || lastRoomStatus || "lobby";
+      const players = snap.docs.map(d=>d.data());
+
+      renderPlayers(players);
+      for (const p of players) ensurePlayerState(p);
+
+      const me = players.find(p => p.uid === myUid);
+      if (me?.name) myName = me.name;
+
+      if (me){
+        const wasDead = myDead;
+        myDead = !!me.isDead || deadUidsSet.has(myUid);
+
+        if (!localPosReady){
+          if (typeof me.x === "number" && typeof me.y === "number"){
+            player.x = me.x; player.y = me.y;
+          } else {
+            await ensureSpawnCenter();
+          }
+          localPosReady = true;
+        }
+
+        ensurePlayerState({ ...me, x: player.x, y: player.y });
+        refreshChatGating(status);
+
+        if (status === "started" && myRole === "tinocent" && !myDead){
+          await ensureMyTasksAssigned();
+        }
+        updateMyTaskHud();
+      }
+
+      startLoopOnce();
+    });
+  }
+});
 
   // ===================
   // ROOM SNAPSHOT (1 SEUL)
@@ -2617,7 +2653,7 @@ if (lastRoomStatus !== status){
   ensureSpawnCenter();
 }
 lastRoomStatus = status;
-
+  });
   // ===================
   // PLAYERS SNAPSHOT (COLLECTION)
   // ===================
