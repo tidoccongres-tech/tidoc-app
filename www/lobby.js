@@ -1083,6 +1083,17 @@ pleurImg.onerror = () => {
   if (pleurImg.src.includes("pleur.png")) pleurImg.src = "./assets/pleure.png";
 };
 
+function watchImg(img, name){
+  img.onload = () => console.log(`[IMG OK] ${name}`, img.src, img.naturalWidth, img.naturalHeight);
+  img.onerror = () => console.error(`[IMG FAIL] ${name}`, img.src);
+}
+
+watchImg(lobbyBgImg, "lobby.png");
+watchImg(lobbyMaskImg, "lobby-NB.png");
+watchImg(mapImg, "map.png");
+watchImg(collisionImg, "collisions.png");
+watchImg(pleurImg, "pleur.png/pleure.png");
+
 // ===================
 // WORLD SIZES
 // ===================
@@ -2132,15 +2143,18 @@ function draw(){
   camX = clamp(camX, halfW, MAP_W - halfW);
   camY = clamp(camY, halfH, MAP_H - halfH);
 
-  // draw map
-  ctx.save();
-  ctx.translate(window.innerWidth/2, window.innerHeight/2);
-  ctx.scale(ZOOM_GAME, ZOOM_GAME);
-  ctx.translate(-camX, -camY);
+  // draw map (avec fallback)
+if (mapImg.complete && mapImg.naturalWidth > 0){
+  ctx.drawImage(mapImg, 0, 0, MAP_W, MAP_H);
+} else {
+  // fallback clair = tu SAIS que le loop tourne
+  ctx.fillStyle = "#0b3440";
+  ctx.fillRect(0, 0, MAP_W, MAP_H);
 
-  if (mapImg.complete && mapImg.naturalWidth > 0){
-    ctx.drawImage(mapImg, 0, 0, MAP_W, MAP_H);
-  }
+  ctx.fillStyle = "rgba(255,255,255,.85)";
+  ctx.font = "900 28px system-ui";
+  ctx.fillText("Chargement map…", 40, 60);
+}
 
   // clip FOV
   const visR = getVisionRadiusWorld();
