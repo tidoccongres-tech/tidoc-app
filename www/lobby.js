@@ -1101,6 +1101,8 @@ const pleurImg = new Image();
 pleurImg.src = asset("./assets/pleur.png");
 pleurImg.onerror = () => { pleurImg.src = asset("./assets/pleure.png"); };
 
+lobbyBgImg.decode?.().catch(()=>{});
+
 function watchImg(img, name){
   img.onload = () => console.log(`[IMG OK] ${name}`, img.src, img.naturalWidth, img.naturalHeight);
   img.onerror = () => console.error(`[IMG FAIL] ${name}`, img.src);
@@ -2120,32 +2122,32 @@ function draw(){
   ctx.clearRect(0,0,window.innerWidth, window.innerHeight);
 
   // LOBBY
-  if (!gameStarted){
-    const bgOk  = lobbyBgImg.complete && lobbyBgImg.naturalWidth > 0;
-const mapOk = mapImg.complete && mapImg.naturalWidth > 0;
-const bg = bgOk ? lobbyBgImg : mapImg;
+if (!gameStarted){
+  const bgOk = lobbyBgImg.complete && lobbyBgImg.naturalWidth > 0;
 
-if (!(bgOk || mapOk)){
-  // fallback : pas d’image encore => on affiche quelque chose
-  ctx.fillStyle = "#0b3440";
-  ctx.fillRect(0, 0, window.innerWidth, window.innerHeight);
-  ctx.fillStyle = "rgba(255,255,255,.85)";
-  ctx.font = "900 22px system-ui";
-  ctx.fillText("Chargement lobby…", 24, 46);
-  return;
-}
-    const bw = bg.naturalWidth;
-    const bh = bg.naturalHeight;
+  if (!bgOk){
+    // ✅ PAS de fallback map => pas de flash
+    ctx.fillStyle = "#0b3440";
+    ctx.fillRect(0, 0, window.innerWidth, window.innerHeight);
+    ctx.fillStyle = "rgba(255,255,255,.85)";
+    ctx.font = "900 22px system-ui";
+    ctx.fillText("Chargement lobby…", 24, 46);
+    return;
+  }
 
-    const s  = Math.max(window.innerWidth / bw, window.innerHeight / bh);
-    const ox = (window.innerWidth  - bw * s) / 2;
-    const oy = (window.innerHeight - bh * s) / 2;
+  const bg = lobbyBgImg;
 
-    ctx.save();
-    ctx.translate(ox, oy);
-    ctx.scale(s, s);
+  const bw = bg.naturalWidth;
+  const bh = bg.naturalHeight;
 
-    ctx.drawImage(bg, 0, 0, bw, bh);
+  const s  = Math.max(window.innerWidth / bw, window.innerHeight / bh);
+  const ox = (window.innerWidth  - bw * s) / 2;
+  const oy = (window.innerHeight - bh * s) / 2;
+
+  ctx.save();
+  ctx.translate(ox, oy);
+  ctx.scale(s, s);
+  ctx.drawImage(bg, 0, 0, bw, bh);
 
     const scaleX = bw / WORLD_W;
     const scaleY = bh / WORLD_H;
