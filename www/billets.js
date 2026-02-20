@@ -349,6 +349,13 @@ async function sha256Hex(str) {
 }
 
 // =====================
+// OPTION METIER
+// - true  => les billets workshop réservent aussi le QR dans qrClaims (comportement actuel)
+// - false => qrClaims réservé au billet principal uniquement
+// =====================
+const CLAIM_WORKSHOP_QR = true;
+
+// =====================
 // Lock QR (anti-double billet)
 // =====================
 async function claimQrOrThrow(qrText) {
@@ -361,25 +368,34 @@ async function claimQrOrThrow(qrText) {
   await runTransaction(db, async (tx) => {
     const snap = await tx.get(claimRef);
 
+    // Pas encore claim -> on claim
     if (!snap.exists()) {
       tx.set(claimRef, {
         uid: u.uid,
-        email: (u.email || "").toLowerCase(),
+        email: String(u.email || "").toLowerCase(),
         createdAt: serverTimestamp()
       });
       return;
     }
 
     const existing = snap.data() || {};
+    const existingUid = String(existing.uid || "");
 
-    // 🟢 Correction MAJEURE :
-    // si c’est le même utilisateur → on ne bloque PAS
-    if (existing.uid === u.uid) return;
-
-    // 🔴 on bloque UNIQUEMENT quand c’est un autre utilisateur
-    if (existing.uid && existing.uid !== u.uid) {
-      throw new Error("Ce billet est déjà lié à un autre compte (QR déjà utilisé).");
+    // Doc présent mais corrompu (pas de uid) -> on sécurise en le réécrivant
+    if (!existingUid) {
+      tx.set(claimRef, {
+        uid: u.uid,
+        email: String(u.email || "").toLowerCase(),
+        createdAt: existing.createdAt || serverTimestamp()
+      }, { merge: true });
+      return;
     }
+
+    // 🟢 Même utilisateur -> OK
+    if (existingUid === u.uid) return;
+
+    // 🔴 Autre utilisateur -> bloqué
+    throw new Error("Ce billet est déjà lié à un autre compte (QR déjà utilisé).");
   });
 
   return qrHash;
@@ -388,25 +404,24 @@ async function claimQrOrThrow(qrText) {
 // =====================
 // Sync Nom billet -> Firestore (NE TOUCHE PAS le pseudo affiché)
 // =====================
-async function syncNameFromTicket(holderName){
+async function syncNameFromTicket(holderName) {
   const u = auth.currentUser;
   const ticketHolderName = String(holderName || "").trim();
   if (!u || !ticketHolderName) return;
 
-  // ✅ On stocke le nom du billet dans un champ DÉDIÉ
-  // ⚠️ Ne jamais utiliser "ticketName" si ton header s'en sert pour afficher le pseudo
-  try{
+  // ✅ champ dédié
+  try {
     await setDoc(doc(db, "users", u.uid), {
       ticketHolderName,
       ticketUpdatedAt: serverTimestamp()
-    }, { merge:true });
-  } catch(_) {}
+    }, { merge: true });
+  } catch (_) {}
 
   // optionnel: affichage local
-  try{
+  try {
     localStorage.setItem("tidoc_ticket_holder_name", ticketHolderName);
-    window.dispatchEvent(new CustomEvent("tidoc:ticket", { detail: { ticketHolderName }}));
-  } catch(_) {}
+    window.dispatchEvent(new CustomEvent("tidoc:ticket", { detail: { ticketHolderName } }));
+  } catch (_) {}
 }
 
 // =====================
@@ -440,9 +455,7 @@ async function saveWorkshopTicket({ qrText, packKey, holderName, ticketNumber, w
 
   // ✅ évite un update (interdit par rules)
   const existing = await getDoc(ref);
-  if (existing.exists()) {
-    return { already: true };
-  }
+  if (existing.exists()) return { already: true };
 
   const title = String(workshopTitle || "").trim();
   const key = title ? normalizeKey(title) : "";
@@ -457,6 +470,7 @@ async function saveWorkshopTicket({ qrText, packKey, holderName, ticketNumber, w
     workshopKey: key || "",
     createdAt: serverTimestamp()
   }); // ✅ pas de merge
+
   return { already: false };
 }
 
@@ -483,81 +497,57 @@ async function deleteMyTicketAndUnclaim() {
   const userId = u.uid;
 
   try {
-    // ======================
     // 1️⃣ Lire le billet principal pour récupérer le qrHash
-    // ======================
     const ticketRef = doc(db, "userTickets", userId);
     const snap = await getDoc(ticketRef);
     const data = snap.exists() ? snap.data() : {};
     const qrHash = data.qrHash || null;
 
-    // ======================
     // 2️⃣ Supprimer billet principal
-    // ======================
-    await deleteDoc(ticketRef);
+    await deleteDoc(ticketRef).catch(() => {});
 
-    // ======================
     // 3️⃣ Supprimer billets workshop
-    // ======================
     const wsQ = query(collection(db, "userWorkshopTickets"), where("uid", "==", userId));
     const wsSnap = await getDocs(wsQ);
-
     const wsDeletes = wsSnap.docs.map(d => deleteDoc(d.ref));
-    await Promise.all(wsDeletes);
+    await Promise.allSettled(wsDeletes);
 
-    // ======================
     // 4️⃣ Supprimer toutes les inscriptions événements
-    // ======================
     const eventsSnap = await getDocs(collection(db, "events"));
     const deleteRegs = [];
-
     eventsSnap.forEach(ev => {
       const regRef = doc(db, "events", ev.id, "registrations", userId);
-      deleteRegs.push(deleteDoc(regRef).catch(()=>{}));
+      deleteRegs.push(deleteDoc(regRef));
     });
+    await Promise.allSettled(deleteRegs);
 
-    await Promise.all(deleteRegs);
-
-    // ======================
     // 5️⃣ Supprimer document usage (quotas)
-    // ======================
-    await deleteDoc(doc(db, "userUsage", userId)).catch(()=>{});
+    await deleteDoc(doc(db, "userUsage", userId)).catch(() => {});
 
-    // ======================
     // 6️⃣ Libérer QR claim (si existait)
-    // ======================
     if (qrHash) {
       const claimRef = doc(db, "qrClaims", qrHash);
       await runTransaction(db, async (tx) => {
         const cs = await tx.get(claimRef);
         if (!cs.exists()) return;
-        if (cs.data()?.uid === userId) tx.delete(claimRef);
-      });
+        const uid = String(cs.data()?.uid || "");
+        if (uid === userId) tx.delete(claimRef);
+      }).catch(() => {});
     }
 
-    // ======================
     // 7️⃣ Effacer le nom associé au billet
-    // ======================
     await setDoc(doc(db, "users", userId), {
       ticketHolderName: "",
       ticketUpdatedAt: serverTimestamp()
-    }, { merge: true });
+    }, { merge: true }).catch(() => {});
 
-    // ======================
     // 8️⃣ Nettoyage interface
-    // ======================
-if (boxEl) boxEl.textContent = "Aucun billet importé pour l’instant.";
-
-// 🔥 Rafraîchir l’écran pour virer les workshops affichés
-await loadSavedTicket();
-
-setStatus("✅ Billet totalement supprimé !");
-  }
-  catch (e) {
+    if (boxEl) boxEl.textContent = "Aucun billet importé pour l’instant.";
+    await loadSavedTicket().catch(() => {});
+    setStatus("✅ Billet totalement supprimé !");
+  } catch (e) {
     console.error("deleteMyTicketAndUnclaim error:", e);
     setStatus("❌ " + (e?.message || "Erreur inconnue"));
-        // ✅ si erreur d’import, on recharge le billet sauvegardé
-    // (comme ça l’écran est cohérent avec le statut)
     try { await loadSavedTicket(); } catch {}
   }
 }
@@ -691,7 +681,6 @@ function parseMetaFromText(raw = "") {
 
   if (mp && mp[1]) {
     const v = mp[1].toLowerCase();
-
     // ordre IMPORTANT : staff AVANT standard
     if (v.startsWith("staff")) packKey = "staff";
     else if (v.startsWith("ess")) packKey = "essentiel";
@@ -730,27 +719,19 @@ function parseMetaFromText(raw = "") {
     if (mSame) holderName = mSame[1].trim();
   }
 
-  // ✅ Workshop title (si packKey === workshop)
-  // On cherche une ligne qui contient "Workshop ..." ou "Atelier ..."
-  // et on extrait le texte après le mot-clé.
+  // Workshop title
   let workshopTitle = "";
 
-  // 1) d'abord sur les lignes (plus fiable)
   for (const l of lines) {
-    // exemples acceptés:
-    // "Workshop Échographie", "Atelier Intubation", "Pack Workshop - Échographie"
     const m1 = l.match(/\b(workshop|atelier)\b\s*[:\-–—]?\s*(.+)$/i);
     if (m1 && m1[2]) {
       const tail = String(m1[2]).trim();
-
-      // évite "Pack Workshop" sans nom derrière
-      if (tail && !/^$/.test(tail) && !/^pack\b/i.test(tail)) {
+      if (tail && !/^pack\b/i.test(tail)) {
         workshopTitle = `${m1[1][0].toUpperCase()}${m1[1].slice(1).toLowerCase()} ${tail}`.trim();
         break;
       }
     }
 
-    // cas "Pack Workshop - Échographie"
     const m2 = l.match(/\bpack\s*(workshop|atelier)\b\s*[:\-–—]?\s*(.+)$/i);
     if (m2 && m2[2]) {
       const tail = String(m2[2]).trim();
@@ -761,7 +742,6 @@ function parseMetaFromText(raw = "") {
     }
   }
 
-  // 2) fallback: cherche dans full si rien trouvé
   if (!workshopTitle) {
     const m = full.match(/\b(workshop|atelier)\b\s*[:\-–—]?\s*([A-Za-zÀ-ÖØ-öø-ÿ0-9'’"()\/+ .]{3,})/i);
     if (m && m[2]) {
@@ -792,6 +772,8 @@ function renderResult({ qrText, packKey, holderName, ticketNumber, promoCode, wo
       ? `${conf}`
       : (discount > 0 ? `${imported} / ${discount}` : `${imported}`);
 
+  const promo = String(promoCode || "").trim();
+
   boxEl.innerHTML = `
     <div style="position:relative; display:flex; flex-direction:column; gap:12px;">
 
@@ -815,6 +797,7 @@ function renderResult({ qrText, packKey, holderName, ticketNumber, promoCode, wo
       <div style="border:1px solid var(--line); border-radius:14px; padding:12px;">
         <div><b>Nom :</b> ${escapeHTML(holderName || "—")}</div>
         <div><b>N° billet :</b> ${escapeHTML(ticketNumber || "—")}</div>
+
         <div style="margin-top:8px;"><b>Pack :</b> ${escapeHTML(packLabel)}</div>
         <div><b>${key === "workshop" ? "Workshops" : "Conférences"} :</b> ${escapeHTML(String(conf))}</div>
 
@@ -822,6 +805,12 @@ function renderResult({ qrText, packKey, holderName, ticketNumber, promoCode, wo
           key !== "workshop" && key !== "staff"
             ? `<div><b>Workshops (importés / remisés) :</b> ${escapeHTML(String(wsLine))}</div>`
             : (key === "staff" ? `<div><b>Workshops :</b> Illimités</div>` : "")
+        }
+
+        ${
+          promo
+            ? `<div style="margin-top:10px;"><b>Code promo :</b> <span style="font-weight:950;">${escapeHTML(promo)}</span></div>`
+            : ""
         }
       </div>
 
@@ -853,13 +842,13 @@ function renderWorkshopsList(workshops = []) {
   }
 
   const items = workshops.map(w => `
-  <div style="border:1px solid var(--line); border-radius:14px; padding:12px; background:#fff;">
-    <div style="font-weight:900; color:#0f4f60;">🧪 ${escapeHTML(w.workshopTitle || "Pack Workshop")}</div>
-    <div style="margin-top:6px;"><b>Nom :</b> ${escapeHTML(w.holderName || "—")}</div>
-    <div><b>N° billet :</b> ${escapeHTML(w.ticketNumber || "—")}</div>
-    ${w.workshopKey ? `<div style="opacity:.75;font-weight:800;margin-top:6px;">Key: ${escapeHTML(w.workshopKey)}</div>` : ""}
-  </div>
-`).join("");
+    <div style="border:1px solid var(--line); border-radius:14px; padding:12px; background:#fff;">
+      <div style="font-weight:900; color:#0f4f60;">🧪 ${escapeHTML(w.workshopTitle || "Pack Workshop")}</div>
+      <div style="margin-top:6px;"><b>Nom :</b> ${escapeHTML(w.holderName || "—")}</div>
+      <div><b>N° billet :</b> ${escapeHTML(w.ticketNumber || "—")}</div>
+      ${w.workshopKey ? `<div style="opacity:.75;font-weight:800;margin-top:6px;">Key: ${escapeHTML(w.workshopKey)}</div>` : ""}
+    </div>
+  `).join("");
 
   listBox.innerHTML = `
     <div style="margin-top:6px; font-weight:900; color:var(--tidoc);">🎫 Billets workshop importés</div>
@@ -883,9 +872,15 @@ async function loadSavedTicket() {
 
   const snap = await getDoc(doc(db, "userTickets", u.uid));
 
-  const wsQ = query(collection(db, "userWorkshopTickets"), where("uid", "==", u.uid));
-  const wsSnap = await getDocs(wsQ);
-  const workshops = wsSnap.docs.map(d => d.data() || {}).filter(Boolean);
+  let workshops = [];
+  try {
+    const wsQ = query(collection(db, "userWorkshopTickets"), where("uid", "==", u.uid));
+    const wsSnap = await getDocs(wsQ);
+    workshops = wsSnap.docs.map(d => d.data() || {}).filter(Boolean);
+  } catch (e) {
+    console.warn("workshops load error:", e);
+    workshops = [];
+  }
 
   if (!snap.exists()) {
     setStatus(workshops.length ? "✅ Billets workshop chargés" : "");
@@ -904,7 +899,7 @@ async function loadSavedTicket() {
     return;
   }
 
-    let t = snap.data() || {};
+  const t = snap.data() || {};
   setStatus("✅ Billet chargé");
 
   renderResult({
@@ -925,9 +920,9 @@ async function loadSavedTicket() {
 async function handleFile(file) {
   if (!file) return;
 
-  // ✅ reset UI status (évite message rouge qui reste alors que ticket déjà affiché)
+  // reset UI status
   setStatus("");
-  if (statusEl) statusEl.style.color = ""; // optionnel si tu stylises
+  if (statusEl) statusEl.style.color = "";
 
   try {
     setStatus("⏳ Analyse du billet…");
@@ -936,7 +931,7 @@ async function handleFile(file) {
     let packKey = "";
     let holderName = "";
     let ticketNumber = "";
-    let workshopTitle = ""; 
+    let workshopTitle = "";
 
     // PDF
     if (file.type === "application/pdf") {
@@ -954,10 +949,8 @@ async function handleFile(file) {
     else if (file.type.startsWith("image/")) {
       const canvas = await loadImageToCanvas(file);
 
-      // QR
       qrText = scanCanvasForQR(canvas) || "";
 
-      // OCR top-right
       const crop = cropTopRight(canvas);
       const text = await ocrCanvas(crop);
       const meta = parseMetaFromText(text);
@@ -977,30 +970,32 @@ async function handleFile(file) {
     const v = await verifyPackWithQrOrThrow(qrText, packKey);
     if (v?.finalPackKey) packKey = v.finalPackKey;
 
-    // lock anti double
-    await claimQrOrThrow(qrText);
+    const p = String(packKey || "").toLowerCase();
+
+    // Lock anti-double (selon option métier)
+    if (p !== "workshop" || (typeof CLAIM_WORKSHOP_QR === "undefined" ? true : CLAIM_WORKSHOP_QR)) {
+      await claimQrOrThrow(qrText);
+    }
 
     // Workshop = multi billets
-    const p = String(packKey || "").toLowerCase();
     if (p === "workshop") {
-  const r = await saveWorkshopTicket({ qrText, packKey, holderName, ticketNumber, workshopTitle });
-  await syncNameFromTicket(holderName);
-  await loadSavedTicket();
-  setStatus(r.already ? "ℹ️ Billet workshop déjà importé" : "✅ Billet workshop importé");
-  return;
-}
+      const r = await saveWorkshopTicket({ qrText, packKey, holderName, ticketNumber, workshopTitle });
+      await syncNameFromTicket(holderName);
+      await loadSavedTicket();
+      setStatus(r.already ? "ℹ️ Billet workshop déjà importé" : "✅ Billet workshop importé");
+      return;
+    }
 
-   // billet principal
-await saveTicketToFirestore({ qrText, packKey, holderName, ticketNumber });
+    // Billet principal
+    await saveTicketToFirestore({ qrText, packKey, holderName, ticketNumber });
 
-// ✅ attribution automatique du code promo
-await assignPromoCodeIfNeeded(packKey);
+    // Attribution automatique code promo
+    await assignPromoCodeIfNeeded(packKey);
 
-await syncNameFromTicket(holderName);
+    await syncNameFromTicket(holderName);
 
-await loadSavedTicket();
-setStatus("✅ Billet importé avec succès");
-    
+    await loadSavedTicket();
+    setStatus("✅ Billet importé avec succès");
   } catch (e) {
     console.log("handleFile import error:", e);
     setStatus("❌ " + (e?.message || String(e)));
@@ -1014,7 +1009,7 @@ const ADMIN_EMAIL = "tidoc.congres@gmail.com";
 const ADMIN_UID   = "b831dIbb3xPcn2qhfxUuVqkVSKF3";
 let AUTH_USER = null;
 
-function normEmail(e=""){
+function normEmail(e="") {
   return String(e || "").trim().toLowerCase();
 }
 
@@ -1053,6 +1048,26 @@ const adminClose  = document.getElementById("adminPacksCloseBtn");
 const adminCancel = document.getElementById("adminPacksCancelBtn");
 const adminSave   = document.getElementById("adminPacksSaveBtn");
 
+// ======================
+// ADMIN UI — PROMO CODES (LISTE + AJOUT + SUPPRESSION)
+// ======================
+const promoBtn    = document.getElementById("adminEditPromoBtn");
+const promoModal  = document.getElementById("adminPromoModal");
+const promoClose  = document.getElementById("adminPromoCloseBtn");
+const promoCancel = document.getElementById("adminPromoCancelBtn");
+const promoSave   = document.getElementById("adminPromoSaveBtn");
+const promoMsg    = document.getElementById("adminPromoMsg");
+
+const promoPremiumEl   = document.getElementById("promoPremiumInput");
+const promoStandardEl  = document.getElementById("promoStandardInput");
+const promoEssentielEl = document.getElementById("promoEssentielInput");
+
+function setAdminMsg(t = "") { if (adminMsg) adminMsg.textContent = t; }
+function setPromoMsg(t = "") { if (promoMsg) promoMsg.textContent = t; }
+
+// =====================
+// Modals hard close (bfcache safe)
+// =====================
 function hardCloseModals() {
   const pm = document.getElementById("adminPromoModal");
   const am = document.getElementById("adminPacksModal");
@@ -1063,6 +1078,7 @@ function hardCloseModals() {
     pm.style.visibility = "hidden";
     pm.setAttribute("aria-hidden", "true");
   }
+
   if (am) {
     am.style.display = "none";
     am.style.pointerEvents = "none";
@@ -1073,11 +1089,17 @@ function hardCloseModals() {
   document.body.classList.remove("modal-open");
 }
 
-// au chargement + quand la page revient (iOS/Chrome bfcache)
-window.addEventListener("DOMContentLoaded", hardCloseModals);
-window.addEventListener("pageshow", hardCloseModals);
-window.addEventListener("focus", hardCloseModals);
+function lockBodyScroll() {
+  document.body.classList.add("modal-open");
+}
 
+function unlockBodyScroll() {
+  document.body.classList.remove("modal-open");
+}
+
+// =====================
+// Ticket UI binds
+// =====================
 function bindUI() {
   const uploadBtn = document.getElementById("uploadTicketBtn");
   const fileInput = document.getElementById("ticketFileInput");
@@ -1103,18 +1125,9 @@ function bindUI() {
   deleteBtn?.addEventListener("click", deleteMyTicketAndUnclaim);
 }
 
-function initBilletsPage() {
-  hardCloseModals();
-  bindUI();
-  bindAdminUI();
-}
-
-initBilletsPage();
-window.addEventListener("pageshow", hardCloseModals);
-window.addEventListener("focus", hardCloseModals);
-
-function setAdminMsg(t=""){ if (adminMsg) adminMsg.textContent = t; }
-
+// =====================
+// PACKS editor helpers
+// =====================
 function ensureDefaultPacks(packs) {
   const base = { ...PACKS_FALLBACK, ...(packs || {}) };
   return {
@@ -1122,7 +1135,7 @@ function ensureDefaultPacks(packs) {
     standard:  { ...PACKS_FALLBACK.standard,  ...(base.standard  || {}) },
     essentiel: { ...PACKS_FALLBACK.essentiel, ...(base.essentiel || {}) },
     workshop:  { ...PACKS_FALLBACK.workshop,  ...(base.workshop  || {}) },
-    staff:     { ...PACKS_FALLBACK.staff,     ...(base.staff     || {}) }, // ✅
+    staff:     { ...PACKS_FALLBACK.staff,     ...(base.staff     || {}) },
   };
 }
 
@@ -1138,40 +1151,39 @@ function renderAdminPacksEditor() {
     row.style.cssText = "border:1px solid #eee; border-radius:14px; padding:12px;";
 
     const isWs = key === "workshop";
-    const isStaff = key === "staff";
     const labelPack = escapeHTML(PACKS_FALLBACK[key]?.label || key);
 
     row.innerHTML = `
-  <div style="display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap;">
-    <div style="font-weight:950;">Pack : ${labelPack}</div>
-  </div>
+      <div style="display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap;">
+        <div style="font-weight:950;">Pack : ${labelPack}</div>
+      </div>
 
-  <div style="margin-top:10px; display:flex; gap:10px; flex-wrap:wrap;">
-    
-    <!-- Conférences / Workshops -->
-    <label style="display:flex; gap:8px; align-items:center;">
-      <span style="width:170px; font-weight:800;">${isWs ? "Workshops" : "Conférences"}</span>
-      <input data-pack-main="${escapeHTML(key)}"
-             type="number" min="0"
-             value="${Number(p.conferencesAllowed ?? 0)}"
-             style="width:110px; padding:8px 10px; border:1px solid #ddd; border-radius:10px;">
-    </label>
+      <div style="margin-top:10px; display:flex; gap:10px; flex-wrap:wrap;">
 
-    <!-- Packs Workshop remisés SAUF workshop -->
-    ${
-      isWs
-        ? ""
-        : `
         <label style="display:flex; gap:8px; align-items:center;">
-          <span style="width:170px; font-weight:800;">Workshops</span>
-          <input data-pack-wsd="${escapeHTML(key)}"
+          <span style="width:170px; font-weight:800;">${isWs ? "Workshops" : "Conférences"}</span>
+          <input data-pack-main="${escapeHTML(key)}"
                  type="number" min="0"
-                 value="${Number(p.workshopDiscountPacks ?? 0)}"
+                 value="${Number(p.conferencesAllowed ?? 0)}"
                  style="width:110px; padding:8px 10px; border:1px solid #ddd; border-radius:10px;">
-        </label>`
-    }
-  </div>
-`;
+        </label>
+
+        ${
+          isWs
+            ? ""
+            : `
+              <label style="display:flex; gap:8px; align-items:center;">
+                <span style="width:170px; font-weight:800;">Workshops</span>
+                <input data-pack-wsd="${escapeHTML(key)}"
+                       type="number" min="0"
+                       value="${Number(p.workshopDiscountPacks ?? 0)}"
+                       style="width:110px; padding:8px 10px; border:1px solid #ddd; border-radius:10px;">
+              </label>
+            `
+        }
+
+      </div>
+    `;
 
     adminForm.appendChild(row);
   });
@@ -1187,10 +1199,9 @@ function openAdminModal() {
     adminModal.style.pointerEvents = "auto";
     adminModal.style.visibility = "visible";
     adminModal.setAttribute("aria-hidden", "false");
-    adminModal.scrollTop = 0; // ✅
+    adminModal.scrollTop = 0;
   }
-
-  lockBodyScroll(); // ✅
+  lockBodyScroll();
 }
 
 function closeAdminModal() {
@@ -1200,11 +1211,12 @@ function closeAdminModal() {
     adminModal.style.visibility = "hidden";
     adminModal.setAttribute("aria-hidden", "true");
   }
-  unlockBodyScroll(); // ✅
+  unlockBodyScroll();
 }
-  
+
 async function saveAdminPacks() {
   if (!isAdmin()) return;
+
   try {
     setAdminMsg("⏳ Enregistrement…");
 
@@ -1212,43 +1224,41 @@ async function saveAdminPacks() {
     const out = {};
 
     for (const key of Object.keys(packs)) {
-  const mainEl = document.querySelector(`[data-pack-main="${CSS.escape(key)}"]`);
+      const mainEl = document.querySelector(`[data-pack-main="${CSS.escape(key)}"]`);
+      if (!mainEl) continue;
 
-  // workshop: main = nb workshops
-  if (key === "workshop") {
-    out[key] = {
-      label: PACKS_FALLBACK[key]?.label || key,
-      conferencesAllowed: Math.max(0, Number(mainEl?.value || 0)),
-      workshopDiscountPacks: 0,
-    };
-    if (out[key].conferencesAllowed <= 0) out[key].conferencesAllowed = 1;
-    continue;
-  }
+      // workshop: main = nb workshops
+      if (key === "workshop") {
+        out[key] = {
+          label: PACKS_FALLBACK[key]?.label || key,
+          conferencesAllowed: Math.max(0, Number(mainEl.value || 0)),
+          workshopDiscountPacks: 0,
+        };
+        if (out[key].conferencesAllowed <= 0) out[key].conferencesAllowed = 1;
+        continue;
+      }
 
-  // staff: pas de promo packs
-  if (key === "staff") {
-  const wsdEl = document.querySelector(`[data-pack-wsd="${CSS.escape(key)}"]`);
+      const wsdEl = document.querySelector(`[data-pack-wsd="${CSS.escape(key)}"]`);
 
-  out[key] = {
-    label: PACKS_FALLBACK[key]?.label || key,
-    conferencesAllowed: Math.max(0, Number(mainEl?.value || 0)),
-    workshopDiscountPacks: Math.max(0, Number(wsdEl?.value || 0)),
-  };
+      // staff: valeurs safe
+      if (key === "staff") {
+        out[key] = {
+          label: PACKS_FALLBACK[key]?.label || key,
+          conferencesAllowed: Math.max(0, Number(mainEl.value || 0)),
+          workshopDiscountPacks: Math.max(0, Number(wsdEl?.value || 0)),
+        };
+        if (out[key].conferencesAllowed <= 0) out[key].conferencesAllowed = 999;
+        if (out[key].workshopDiscountPacks <= 0) out[key].workshopDiscountPacks = 999;
+        continue;
+      }
 
-  if (out[key].conferencesAllowed <= 0) out[key].conferencesAllowed = 999;
-  if (out[key].workshopDiscountPacks <= 0) out[key].workshopDiscountPacks = 999;
-
-  continue;
-}
-
-  // autres packs: conf + packs remisés
-  const wsdEl = document.querySelector(`[data-pack-wsd="${CSS.escape(key)}"]`);
-  out[key] = {
-    label: PACKS_FALLBACK[key]?.label || key,
-    conferencesAllowed: Math.max(0, Number(mainEl?.value || 0)),
-    workshopDiscountPacks: Math.max(0, Number(wsdEl?.value || 0)),
-  };
-}
+      // autres packs: conf + packs remisés
+      out[key] = {
+        label: PACKS_FALLBACK[key]?.label || key,
+        conferencesAllowed: Math.max(0, Number(mainEl.value || 0)),
+        workshopDiscountPacks: Math.max(0, Number(wsdEl?.value || 0)),
+      };
+    }
 
     await setDoc(doc(db, "config", "packs"), out, { merge: true });
 
@@ -1263,30 +1273,9 @@ async function saveAdminPacks() {
   }
 }
 
-adminBtn?.addEventListener("click", openAdminModal);
-adminClose?.addEventListener("click", closeAdminModal);
-adminCancel?.addEventListener("click", closeAdminModal);
-adminModal?.addEventListener("click", (e) => { if (e.target === adminModal) closeAdminModal(); });
-adminSave?.addEventListener("click", saveAdminPacks);
-
-// ======================
-// ADMIN UI — PROMO CODES (LISTE + AJOUT + SUPPRESSION)
-// (requiert tes éléments HTML: adminPromoModal, promoPremiumInput, etc.)
-// Si tu ne les as pas sur billets.html, ça n’empêche pas le reste de marcher.
-// ======================
-const promoBtn    = document.getElementById("adminEditPromoBtn");
-const promoModal  = document.getElementById("adminPromoModal");
-const promoClose  = document.getElementById("adminPromoCloseBtn");
-const promoCancel = document.getElementById("adminPromoCancelBtn");
-const promoSave   = document.getElementById("adminPromoSaveBtn");
-const promoMsg    = document.getElementById("adminPromoMsg");
-
-const promoPremiumEl   = document.getElementById("promoPremiumInput");
-const promoStandardEl  = document.getElementById("promoStandardInput");
-const promoEssentielEl = document.getElementById("promoEssentielInput");
-
-function setPromoMsg(t=""){ if (promoMsg) promoMsg.textContent = t; }
-
+// =====================
+// PROMO UI helpers
+// =====================
 function ensurePromoUI(tier, textareaEl) {
   if (!promoModal || !textareaEl) return;
 
@@ -1325,11 +1314,12 @@ function ensurePromoUI(tier, textareaEl) {
     textareaEl.value = merged.join("\n");
     if (addInput) addInput.value = "";
     renderPromoListForTier(tier, textareaEl);
+    schedulePromoAutosave();
   });
 
-    textareaEl.addEventListener("input", () => {
+  textareaEl.addEventListener("input", () => {
     renderPromoListForTier(tier, textareaEl);
-    schedulePromoAutosave(); // ✅
+    schedulePromoAutosave();
   });
 }
 
@@ -1360,25 +1350,24 @@ function renderPromoListForTier(tier, textareaEl) {
       const filtered = codes.filter(x => x.toLowerCase() !== code.toLowerCase());
       textareaEl.value = filtered.join("\n");
       renderPromoListForTier(tier, textareaEl);
+      schedulePromoAutosave();
     });
   });
 }
 
-function lockBodyScroll() {
-  document.body.classList.add("modal-open");
-}
-
-function unlockBodyScroll() {
-  document.body.classList.remove("modal-open");
-}
-  
 function openPromoModal() {
   if (!isAdmin()) return alert("Réservé à l’admin Ti’Doc.");
+
+  // si le HTML n’a pas les inputs promo → on ne casse pas le reste
+  if (!promoModal || !promoPremiumEl || !promoStandardEl || !promoEssentielEl) {
+    return alert("UI promo absente sur cette page (inputs manquants).");
+  }
+
   setPromoMsg("");
 
-  if (promoPremiumEl)   promoPremiumEl.value   = (PROMO_POOLS.premium || []).join("\n");
-  if (promoStandardEl)  promoStandardEl.value  = (PROMO_POOLS.standard || []).join("\n");
-  if (promoEssentielEl) promoEssentielEl.value = (PROMO_POOLS.essentiel || []).join("\n");
+  promoPremiumEl.value   = (PROMO_POOLS.premium || []).join("\n");
+  promoStandardEl.value  = (PROMO_POOLS.standard || []).join("\n");
+  promoEssentielEl.value = (PROMO_POOLS.essentiel || []).join("\n");
 
   ensurePromoUI("premium", promoPremiumEl);
   ensurePromoUI("standard", promoStandardEl);
@@ -1388,17 +1377,16 @@ function openPromoModal() {
   renderPromoListForTier("standard", promoStandardEl);
   renderPromoListForTier("essentiel", promoEssentielEl);
 
-  if (promoModal) {
   promoModal.style.display = "block";
   promoModal.style.pointerEvents = "auto";
   promoModal.style.visibility = "visible";
   promoModal.setAttribute("aria-hidden", "false");
-  promoModal.scrollTop = 0; // ✅
-}
-  lockBodyScroll(); // ✅
+  promoModal.scrollTop = 0;
+
+  lockBodyScroll();
 }
 
-function closePromoModal(){
+function closePromoModal() {
   if (promoModal) {
     promoModal.style.display = "none";
     promoModal.style.pointerEvents = "none";
@@ -1410,12 +1398,14 @@ function closePromoModal(){
 
 async function savePromoPools() {
   if (!isAdmin()) return;
+  if (!promoPremiumEl || !promoStandardEl || !promoEssentielEl) return;
+
   try {
     setPromoMsg("⏳ Enregistrement…");
 
-    const premium   = normalizeCodes(splitCodes(promoPremiumEl?.value || ""));
-    const standard  = normalizeCodes(splitCodes(promoStandardEl?.value || ""));
-    const essentiel = normalizeCodes(splitCodes(promoEssentielEl?.value || ""));
+    const premium   = normalizeCodes(splitCodes(promoPremiumEl.value || ""));
+    const standard  = normalizeCodes(splitCodes(promoStandardEl.value || ""));
+    const essentiel = normalizeCodes(splitCodes(promoEssentielEl.value || ""));
 
     await setDoc(doc(db, "config", "promoPools"), {
       premium, standard, essentiel,
@@ -1432,32 +1422,25 @@ async function savePromoPools() {
   }
 }
 
-promoBtn?.addEventListener("click", openPromoModal);
-promoClose?.addEventListener("click", closePromoModal);
-promoCancel?.addEventListener("click", closePromoModal);
-promoModal?.addEventListener("click", (e) => { if (e.target === promoModal) closePromoModal(); });
-promoSave?.addEventListener("click", savePromoPools);
-
 // ======================
 // ✅ AUTO-SAVE PROMO POOLS (admin)
-// - évite de perdre les codes si refresh
-// - écrit après 600ms sans frappe
 // ======================
 let promoAutosaveTimer = null;
 
 async function autosavePromoPoolsIfAdmin() {
   if (!isAdmin()) return;
+  if (!promoPremiumEl || !promoStandardEl || !promoEssentielEl) return;
+
   try {
-    const premium   = normalizeCodes(splitCodes(promoPremiumEl?.value || ""));
-    const standard  = normalizeCodes(splitCodes(promoStandardEl?.value || ""));
-    const essentiel = normalizeCodes(splitCodes(promoEssentielEl?.value || ""));
+    const premium   = normalizeCodes(splitCodes(promoPremiumEl.value || ""));
+    const standard  = normalizeCodes(splitCodes(promoStandardEl.value || ""));
+    const essentiel = normalizeCodes(splitCodes(promoEssentielEl.value || ""));
 
     await setDoc(doc(db, "config", "promoPools"), {
       premium, standard, essentiel,
       updatedAt: serverTimestamp()
     }, { merge: true });
 
-    // recharge local
     PROMO_POOLS = { premium, standard, essentiel };
     setPromoMsg("✅ Sauvegarde auto");
   } catch (e) {
@@ -1475,9 +1458,41 @@ function schedulePromoAutosave() {
 }
 
 // =====================
-// Admin buttons visibility
+// Bind admin UI (packs + promo)
 // =====================
-function updateAdminButtonsVisibility(){
+function bindAdminUI() {
+  // Packs
+  adminBtn?.addEventListener("click", openAdminModal);
+  adminClose?.addEventListener("click", closeAdminModal);
+  adminCancel?.addEventListener("click", closeAdminModal);
+  adminModal?.addEventListener("click", (e) => { if (e.target === adminModal) closeAdminModal(); });
+  adminSave?.addEventListener("click", saveAdminPacks);
+
+  // Promo
+  promoBtn?.addEventListener("click", openPromoModal);
+  promoClose?.addEventListener("click", closePromoModal);
+  promoCancel?.addEventListener("click", closePromoModal);
+  promoModal?.addEventListener("click", (e) => { if (e.target === promoModal) closePromoModal(); });
+  promoSave?.addEventListener("click", savePromoPools);
+}
+
+// =====================
+// Init page (safe timing)
+// =====================
+function initBilletsPage() {
+  hardCloseModals();
+  bindUI();
+  bindAdminUI();
+}
+
+window.addEventListener("DOMContentLoaded", initBilletsPage);
+window.addEventListener("pageshow", hardCloseModals);
+window.addEventListener("focus", hardCloseModals);
+
+// =====================
+// Admin buttons visibility (tu l’as déjà ailleurs)
+// =====================
+function updateAdminButtonsVisibility() {
   const ok = isAdmin();
 
   if (adminBtn) {
@@ -1494,7 +1509,7 @@ function updateAdminButtonsVisibility(){
 
   console.log("ADMIN CHECK:", {
     ok,
-    uid: (AUTH_USER||auth.currentUser)?.uid || null,
-    email: (AUTH_USER||auth.currentUser)?.email || null
+    uid: (AUTH_USER || auth.currentUser)?.uid || null,
+    email: (AUTH_USER || auth.currentUser)?.email || null
   });
 }
