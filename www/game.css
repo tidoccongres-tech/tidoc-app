@@ -206,3 +206,24 @@ html, body{
     width: min(22vw, 260px);      /* ✅ plus petit */
   }
 }
+/* Par défaut: pas de titre PNG (téléphone) */
+#menuTitle{
+  display: none;
+}
+
+/* ✅ Titre PNG seulement sur tablette en paysage */
+@media (min-width: 900px) and (orientation: landscape){
+  #menuTitle{
+    display: block;
+
+    position: absolute;
+    top: calc(18px + env(safe-area-inset-top));
+    left: 50%;
+    transform: translateX(-50%);
+    width: min(520px, 82vw);
+    height: auto;
+    z-index: 25;
+    pointer-events: none;
+    filter: drop-shadow(0 10px 18px rgba(0,0,0,.35));
+  }
+}
