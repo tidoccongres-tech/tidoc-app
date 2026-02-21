@@ -11,28 +11,19 @@
 
 <body class="game-body">
 
-  <!-- ✅ MENU FULLSCREEN -->
-  <main class="menu-root" id="menuRoot">
-
-    <!-- Fond responsive -->
-    <picture class="menu-bg">
-  <!-- Landscape si écran "large" -->
-  <source media="(min-aspect-ratio: 4/3)" srcset="assets/menu-landscape.png">
-  <!-- Portrait sinon -->
-  <source media="(max-aspect-ratio: 4/3)" srcset="assets/menu-portrait.png">
-  <img src="assets/menu-portrait.png" alt="Menu Ti'Truant" />
-</picture>
-
+ <!-- ✅ MENU FULLSCREEN -->
 <main class="menu-root" id="menuRoot">
 
   <!-- Fond responsive -->
   <picture class="menu-bg">
+    <!-- Landscape si écran "large" -->
     <source media="(min-aspect-ratio: 4/3)" srcset="assets/menu-landscape.png">
+    <!-- Portrait sinon -->
     <source media="(max-aspect-ratio: 4/3)" srcset="assets/menu-portrait.png">
     <img src="assets/menu-portrait.png" alt="Menu Ti'Truant" />
   </picture>
 
-  <!-- ✅ TITRE (uniquement menu principal) -->
+  <!-- ✅ TITRE (menu principal) -->
   <img id="menuTitle"
        src="assets/Titre.png"
        alt="Ti'Doc — Ti'Truant" />
@@ -59,7 +50,17 @@
 
   <!-- Boutons posés par-dessus -->
   <div class="menu-buttons">
-    ...
+    <button id="btnCreate" class="menu-btn btn-create" type="button" aria-label="Créer une partie">
+      <img src="assets/bouton-creer.png" alt="" />
+    </button>
+
+    <button id="btnJoin" class="menu-btn btn-join" type="button" aria-label="Rejoindre une partie">
+      <img src="assets/bouton-rejoindre.png" alt="" />
+    </button>
+
+    <button id="btnHome" class="menu-btn btn-home" type="button" aria-label="Menu home">
+      <img src="assets/bouton-home.png" alt="" />
+    </button>
   </div>
 
 </main>
