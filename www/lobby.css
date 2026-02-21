@@ -377,3 +377,20 @@ canvas{
 .music-fab:active{
   transform: scale(.97);
 }
+
+/* Valeurs par défaut (tablette / desktop) */
+:root{
+  --joy-bottom: 18px;
+}
+
+/* Joystick */
+.joystick{
+  position: fixed;
+  left: 18px; /* ou ce que tu as déjà */
+  bottom: calc(var(--joy-bottom) + env(safe-area-inset-bottom));
+  z-index: 90; /* au-dessus du canvas */
+}
+
+@media (max-width: 900px) and (orientation: landscape) and (pointer: coarse){
+  :root{ --joy-bottom: 34px; }
+}
