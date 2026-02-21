@@ -22,29 +22,44 @@ const btnMusicToggle = document.getElementById("btnMusicToggle");
 const iconOn  = document.getElementById("iconSoundOn");
 const iconOff = document.getElementById("iconSoundOff");
 
-let musicEnabled = localStorage.getItem("musicEnabled") === "true";
+// =======================
+// MUSIC (Lobby) - sync avec menu
+// =======================
+const LS_MUSIC = "tidoc_music_on";
 
-function updateMusicUI(){
-  iconOn.style.display  = musicEnabled ? "block" : "none";
-  iconOff.style.display = musicEnabled ? "none"  : "block";
+function setMusicUI(isOn){
+  if (iconOn)  iconOn.style.display  = isOn ? "" : "none";
+  if (iconOff) iconOff.style.display = isOn ? "none" : "";
 }
 
-function toggleMusic(){
-  musicEnabled = !musicEnabled;
-  localStorage.setItem("musicEnabled", musicEnabled);
-
-  if (musicEnabled){
-    lobbyMusic.volume = 0.4;
-    lobbyMusic.play().catch(()=>{});
-  } else {
-    lobbyMusic.pause();
-  }
-
-  updateMusicUI();
+async function tryPlayAudio(){
+  if (!lobbyMusic) return;
+  try { await lobbyMusic.play(); } catch(e){ /* iOS bloque sans geste */ }
 }
 
-btnMusicToggle?.addEventListener("click", toggleMusic);
-updateMusicUI();
+function setMusicOn(isOn){
+  localStorage.setItem(LS_MUSIC, isOn ? "1" : "0");
+  setMusicUI(isOn);
+
+  if (!lobbyMusic) return;
+  lobbyMusic.volume = 0.4;
+
+  if (isOn) tryPlayAudio();
+  else lobbyMusic.pause();
+}
+
+// init (respecte le choix du menu)
+(function initMusic(){
+  const isOn = (localStorage.getItem(LS_MUSIC) === "1"); // default OFF
+  setMusicUI(isOn);
+  if (lobbyMusic) lobbyMusic.volume = 0.35;
+  if (isOn) tryPlayAudio();
+})();
+
+btnMusicToggle?.addEventListener("click", () => {
+  const isOn = (localStorage.getItem(LS_MUSIC) === "1");
+  setMusicOn(!isOn);
+});
 
 const params = new URLSearchParams(location.search);
 
@@ -113,11 +128,6 @@ if (!canvas || !ctx){
   console.warn("[lobby.js] Canvas introuvable (#gameCanvas). Le lobby ne pourra pas se dessiner.");
 }
 
-function startLobbyMusic(){
-  if (!lobbyMusic) return;
-  lobbyMusic.volume = 0.4;
-  lobbyMusic.play().catch(()=>{});
-}
 // ===================
 // TOASTS
 // ===================
