@@ -22,6 +22,30 @@ const btnMusicToggle = document.getElementById("btnMusicToggle");
 const iconOn  = document.getElementById("iconSoundOn");
 const iconOff = document.getElementById("iconSoundOff");
 
+let musicEnabled = localStorage.getItem("musicEnabled") === "true";
+
+function updateMusicUI(){
+  iconOn.style.display  = musicEnabled ? "block" : "none";
+  iconOff.style.display = musicEnabled ? "none"  : "block";
+}
+
+function toggleMusic(){
+  musicEnabled = !musicEnabled;
+  localStorage.setItem("musicEnabled", musicEnabled);
+
+  if (musicEnabled){
+    lobbyMusic.volume = 0.4;
+    lobbyMusic.play().catch(()=>{});
+  } else {
+    lobbyMusic.pause();
+  }
+
+  updateMusicUI();
+}
+
+btnMusicToggle?.addEventListener("click", toggleMusic);
+updateMusicUI();
+
 const params = new URLSearchParams(location.search);
 
 const roomId = (
