@@ -16,7 +16,11 @@ let myUid = null;
 
 const auth = AuthMod.auth;
 const db   = AuthMod.db;
+
 const lobbyMusic = document.getElementById("lobbyMusic");
+const btnMusicToggle = document.getElementById("btnMusicToggle");
+const iconOn  = document.getElementById("iconSoundOn");
+const iconOff = document.getElementById("iconSoundOff");
 
 const params = new URLSearchParams(location.search);
 
