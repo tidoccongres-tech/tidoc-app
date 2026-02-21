@@ -434,7 +434,7 @@ canvas{
   right: calc(14px + env(safe-area-inset-right));
 
   /* ⬇️ On le met plus bas que le bouton musique */
-  bottom: calc(100px + env(safe-area-inset-bottom));
+  bottom: calc(150px + env(safe-area-inset-bottom));
 
   z-index: 9999;
   display: none;
@@ -445,4 +445,20 @@ canvas{
   border: 0;
   background: rgba(0,0,0,.55);
   color: #fff;
+}
+
+/* Bouton SON (au-dessus) */
+.music-fab{
+  position: fixed;
+  right: calc(14px + env(safe-area-inset-right));
+  bottom: calc(92px + env(safe-area-inset-bottom)) !important;
+  z-index: 220;
+}
+
+/* Diamant ADMIN (en dessous, donc plus près du bas) */
+.admin-fab{
+  position: fixed;
+  right: calc(14px + env(safe-area-inset-right));
+  bottom: calc(20px + env(safe-area-inset-bottom)) !important;
+  z-index: 219; /* un poil en dessous du son */
 }
