@@ -2429,6 +2429,7 @@ let unsubPlayers = null;
 let unsubChat = null;
 
 let startBtnBound = false;
+let adminBtnBound = false;   // ✅ AJOUT
 let leaveBtnBound = false;
 let chatBound = false;
 
@@ -2522,107 +2523,121 @@ if (btnAdminStart){
   if (!unsubMyRole) unsubMyRole = listenMyRole();
 
   // ===================
-  // START button (bind 1 fois)
-  // ===================
-  if (!startBtnBound){
-    startBtnBound = true;
+// START button (bind 1 fois)
+// ===================
+if (!startBtnBound){
+  startBtnBound = true;
 
-    btnStart?.addEventListener("click", async (e) => {
-      e.preventDefault();
+  btnStart?.addEventListener("click", async (e) => {
+    e.preventDefault();
 
-      if (!myIsHost){
-        setStartInfo("Seul l’hôte peut démarrer.");
-        return;
-      }
+    if (!myIsHost){
+      setStartInfo("Seul l’hôte peut démarrer.");
+      return;
+    }
 
-      const n = playersMap.size;
-const allowSmall = isAdmin && forceStart;
+    const n = playersMap.size;
 
-if (n < 4 && !allowSmall){
-  setStartInfo(`Il faut au moins 4 joueurs (actuellement ${n}).`);
-  return;
+    // ✅ Start normal = 4 joueurs minimum
+    if (n < 4){
+      setStartInfo(`Il faut au moins 4 joueurs (actuellement ${n}).`);
+      return;
+    }
+
+    setStartInfo("");
+
+    try{
+      await updateDoc(doc(db, "rooms", roomId), {
+        status: "starting",
+        startingAt: serverTimestamp(),
+        chatEnabled: false,
+        tasksTotal: TASKS_TOTAL,
+        tasksDone: 0,
+        deadUids: [],
+        meetingType: null,
+        meetingAt: null,
+        meetingBy: null,
+        reportedBodyUid: null
+      });
+
+      const snapPlayers = await getDocs(collection(db, "rooms", roomId, "players"));
+      const players = snapPlayers.docs.map(d => d.data());
+
+      await hostAssignRoles(players);
+
+      await sleep(3200);
+
+      await updateDoc(doc(db, "rooms", roomId), {
+        status: "started",
+        startedAt: serverTimestamp()
+      });
+
+    } catch (err){
+      console.log("START ERROR:", err);
+      setStartInfo(`Erreur démarrage: ${err?.code || ""} ${err?.message || err}`);
+    }
+  });
 }
 
-      btnAdminStart?.addEventListener("click", async (e) => {
-  e.preventDefault();
+// ===================
+// ADMIN FORCE START (diamant) (bind 1 fois)
+// ===================
+if (!adminBtnBound){
+  adminBtnBound = true;
 
-  if (!isAdmin){
-    setStartInfo("Réservé admin.");
-    return;
-  }
-  if (!myIsHost){
-    setStartInfo("Tu dois être l’hôte pour forcer le démarrage.");
-    return;
-  }
+  btnAdminStart?.addEventListener("click", async (e) => {
+    e.preventDefault();
 
-  setStartInfo("");
+    if (!isAdmin){
+      setStartInfo("Réservé admin.");
+      return;
+    }
+    if (!myIsHost){
+      setStartInfo("Tu dois être l’hôte pour forcer le démarrage.");
+      return;
+    }
 
-  try{
-    await updateDoc(doc(db, "rooms", roomId), {
-      status: "starting",
-      startingAt: serverTimestamp(),
-      chatEnabled: false,
-      tasksTotal: TASKS_TOTAL,
-      tasksDone: 0,
-      deadUids: [],
-      meetingType: null,
-      meetingAt: null,
-      meetingBy: null,
-      reportedBodyUid: null
-    });
+    const n = playersMap.size;
+    if (n < 1){
+      setStartInfo("Aucun joueur dans la room.");
+      return;
+    }
 
-    const snapPlayers = await getDocs(collection(db, "rooms", roomId, "players"));
-    const players = snapPlayers.docs.map(d => d.data());
+    setStartInfo("");
 
-    // ✅ roles même si 1/2/3 joueurs
-    await hostAssignRoles(players);
+    try{
+      await updateDoc(doc(db, "rooms", roomId), {
+        status: "starting",
+        startingAt: serverTimestamp(),
+        chatEnabled: false,
+        tasksTotal: TASKS_TOTAL,
+        tasksDone: 0,
+        deadUids: [],
+        meetingType: null,
+        meetingAt: null,
+        meetingBy: null,
+        reportedBodyUid: null
+      });
 
-    await sleep(800); // plus court pour tests
+      const snapPlayers = await getDocs(collection(db, "rooms", roomId, "players"));
+      const players = snapPlayers.docs.map(d => d.data());
 
-    await updateDoc(doc(db, "rooms", roomId), {
-      status: "started",
-      startedAt: serverTimestamp()
-    });
+      // ✅ roles même si 1/2/3 joueurs
+      await hostAssignRoles(players);
 
-  } catch (err){
-    console.log("ADMIN FORCE START ERROR:", err);
-    setStartInfo(`Erreur: ${err?.code || ""} ${err?.message || err}`);
-  }
-});
-      
-      setStartInfo("");
+      await sleep(800);
 
-      try{
-        await updateDoc(doc(db, "rooms", roomId), {
-          status: "starting",
-          startingAt: serverTimestamp(),
-          chatEnabled: false,
-          tasksTotal: TASKS_TOTAL,
-          tasksDone: 0,
-          deadUids: [],
-          meetingType: null,
-          meetingAt: null,
-          meetingBy: null,
-          reportedBodyUid: null
-        });
+      await updateDoc(doc(db, "rooms", roomId), {
+        status: "started",
+        startedAt: serverTimestamp()
+      });
 
-        const snapPlayers = await getDocs(collection(db, "rooms", roomId, "players"));
-        const players = snapPlayers.docs.map(d => d.data());
-        await hostAssignRoles(players);
-
-        await sleep(3200);
-
-        await updateDoc(doc(db, "rooms", roomId), {
-          status: "started",
-          startedAt: serverTimestamp()
-        });
-
-      } catch (err){
-        console.log("START ERROR:", err);
-        setStartInfo(`Erreur démarrage: ${err?.code || ""} ${err?.message || err}`);
-      }
-    });
-  }
+    } catch (err){
+      console.log("ADMIN FORCE START ERROR:", err);
+      setStartInfo(`Erreur: ${err?.code || ""} ${err?.message || err}`);
+    }
+  });
+}
 
   // ===================
   // LEAVE button (bind 1 fois)
