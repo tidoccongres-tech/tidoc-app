@@ -434,7 +434,7 @@ canvas{
   right: calc(14px + env(safe-area-inset-right));
 
   /* ⬇️ On le met plus bas que le bouton musique */
-  bottom: calc(150px + env(safe-area-inset-bottom));
+  bottom: calc(100px + env(safe-area-inset-bottom));
 
   z-index: 9999;
   display: none;
