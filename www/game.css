@@ -79,11 +79,36 @@ html, body{
   animation: btnIn .55s ease forwards;
 }
 
+/* ========= TAILLE DES BOUTONS (pilotée par variable) ========= */
+:root{
+  --menuBtnW: min(78vw, 460px);   /* ✅ téléphone : un peu plus petit qu’avant */
+}
+
+/* Boutons image */
 .menu-btn img{
-  width:min(84vw, 520px);
-  height:auto;
-  display:block;
+  width: var(--menuBtnW);
+  height: auto;
+  display: block;
   filter: drop-shadow(0 10px 18px rgba(0,0,0,.35));
+  transition: transform .12s ease, filter .12s ease;
+  transform-origin:center;
+}
+
+/* ========= TABLETTE (paysage) : boutons plus grands et en bas ========= */
+@media (min-width: 900px) and (orientation: landscape){
+  :root{
+    --menuBtnW: min(26vw, 420px);  /* ✅ tablette : plus grand */
+  }
+
+  .menu-buttons{
+    flex-direction: row;
+    justify-content: center;
+    align-items: flex-end;
+    gap: 18px;
+
+    padding: 0 4vw calc(18px + env(safe-area-inset-bottom));
+  }
+}
 
   /* tap */
   transition: transform .12s ease, filter .12s ease;
