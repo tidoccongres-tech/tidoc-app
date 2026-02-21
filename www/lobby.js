@@ -2693,7 +2693,7 @@ if (!adminBtnBound){
       // ✅ roles même si 1/2/3 joueurs
       await hostAssignRoles(players);
 
-      await sleep(800);
+      await sleep(3200);
 
       await updateDoc(doc(db, "rooms", roomId), {
         status: "started",
