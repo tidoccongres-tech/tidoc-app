@@ -40,6 +40,54 @@ const gameMsg        = document.getElementById("gameMsg");
 function msg(t=""){ if (gameMsg) gameMsg.textContent = t; }
 
 // =======================
+// MUSIC (Menu principal)
+// =======================
+const LS_MUSIC = "tidoc_music_on";
+
+const audioEl = document.getElementById("menuMusic");
+const btnMusic = document.getElementById("btnMusicToggle");
+const iconOn = document.getElementById("iconSoundOn");
+const iconOff = document.getElementById("iconSoundOff");
+
+function setMusicUI(isOn){
+  if (iconOn) iconOn.style.display = isOn ? "" : "none";
+  if (iconOff) iconOff.style.display = isOn ? "none" : "";
+}
+
+async function tryPlayAudio(){
+  if (!audioEl) return;
+  try{
+    await audioEl.play();
+  } catch (e){
+    // iOS / navigateurs: play bloqué tant que pas de geste user -> ok
+  }
+}
+
+function setMusicOn(isOn){
+  localStorage.setItem(LS_MUSIC, isOn ? "1" : "0");
+  setMusicUI(isOn);
+
+  if (!audioEl) return;
+  audioEl.volume = 0.35;
+
+  if (isOn) tryPlayAudio();
+  else audioEl.pause();
+}
+
+// init
+(function initMusic(){
+  const saved = localStorage.getItem(LS_MUSIC);
+  const isOn = (saved === "1");     // par défaut OFF
+  setMusicUI(isOn);
+  if (audioEl) audioEl.volume = 0.35;
+})();
+
+btnMusic?.addEventListener("click", async () => {
+  const isOn = localStorage.getItem(LS_MUSIC) === "1";
+  setMusicOn(!isOn);
+});
+
+// =======================
 // STATE
 // =======================
 let currentRoomId = null;
