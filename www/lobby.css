@@ -341,13 +341,6 @@ canvas{
   }
 }
 
-.music-fab svg{
-  width: 24px;
-  height: 24px;
-  display: block;
-  fill: currentColor; /* <- rend le SVG blanc car .music-fab { color:#fff } */
-}
-
 .music-fab{
   position:absolute;
   right: 14px;
@@ -395,10 +388,15 @@ canvas{
   :root{ --joy-bottom: 34px; }
 }
 
+/* =========================
+   ADMIN FORCE START (Diamant)
+   - caché par défaut (JS l'affiche si admin)
+   - placé à côté du bouton musique
+========================= */
 .admin-fab{
-  position: absolute;
-  right: 76px; /* à côté du bouton musique */
-  top: calc(14px + env(safe-area-inset-top));
+  position: fixed;
+  right: 76px; /* à gauche du bouton musique (music est à right:14px) */
+  top: calc(80px + env(safe-area-inset-top)); /* même hauteur que .music-fab */
   width: 54px;
   height: 54px;
   border: 0;
@@ -413,18 +411,20 @@ canvas{
   -webkit-backdrop-filter: blur(10px);
   box-shadow: 0 14px 26px rgba(0,0,0,.25);
 
-  display: grid;
+  display: none;              /* ✅ IMPORTANT : caché par défaut */
   place-items: center;
+
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
 
   transition: transform .12s ease;
 }
 
-.admin-fab:active{
-  transform: scale(.96);
-}
+.admin-fab:active{ transform: scale(.97); }
 
 .admin-fab svg{
   width: 26px;
   height: 26px;
+  display: block;
   fill: currentColor;
 }
