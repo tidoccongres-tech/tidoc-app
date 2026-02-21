@@ -75,7 +75,7 @@ function setMusicOn(isOn){
 }
 
 // init
-function initMusic(){
+(function initMusic(){
   const saved = localStorage.getItem(LS_MUSIC);
   const isOn = (saved === "1");     // par défaut OFF
   setMusicUI(isOn);
