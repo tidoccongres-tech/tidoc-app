@@ -27,7 +27,7 @@ const btnAdminStart = document.getElementById("btnAdminStart");
 
 // Mets ton UID Firebase ici (ou ceux de ton équipe)
 const ADMIN_UIDS = new Set([
-  "TON_UID_ICI"
+  "b831dIbb3xPcn2qhfxUuVqkVSKF3"
 ]);
 
 let isAdmin = false;
