@@ -2671,7 +2671,7 @@ if (!adminBtnBound){
       return;
     }
 
-    setStartInfo("");
+    setStartInfo("🧪 Mode test : démarrage forcé (même si vous êtes moins de 4). Le jeu se comporte ensuite comme une partie normale.");
 
     try{
       await updateDoc(doc(db, "rooms", roomId), {
