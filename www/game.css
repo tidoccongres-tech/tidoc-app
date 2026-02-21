@@ -189,3 +189,20 @@ html, body{
     width: min(36vw, 380px);
   }
 }
+
+/* ✅ Tablette landscape : boutons en bas, en ligne */
+@media (min-width: 900px) and (orientation: landscape){
+  .menu-buttons{
+    flex-direction: row;          /* ✅ plus en colonne */
+    justify-content: center;      /* centrés horizontalement */
+    align-items: flex-end;        /* alignés en bas */
+    gap: 14px;                    /* espace entre boutons */
+
+    /* en bas + safe area */
+    padding: 0 4vw calc(18px + env(safe-area-inset-bottom));
+  }
+
+  .menu-btn img{
+    width: min(22vw, 260px);      /* ✅ plus petit */
+  }
+}
