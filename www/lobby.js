@@ -1295,6 +1295,46 @@ canvas?.addEventListener("pointercancel", endSpecDrag);
 window.addEventListener("blur", endSpecDrag);
 
 // ===================
+// LOBBY DEAD ZONE (tablette)
+// ===================
+// % de l’écran (monde visible) qui reste “stable” au centre
+// Plus c'est petit => caméra bouge plus tôt
+const LOBBY_DEADZONE_X = 0.55; // 55% de la largeur visible
+const LOBBY_DEADZONE_Y = 0.55; // 55% de la hauteur visible
+
+function applyDeadZoneToCam(targetCam, playerPos, halfView, deadZoneRatio){
+  // dead zone en “half” (ex: si ratio=0.55, deadHalf = 0.275 * view)
+  const deadHalf = halfView * deadZoneRatio;
+
+  const minFollow = targetCam - deadHalf;
+  const maxFollow = targetCam + deadHalf;
+
+  if (playerPos < minFollow) targetCam = playerPos + deadHalf;
+  else if (playerPos > maxFollow) targetCam = playerPos - deadHalf;
+
+  return targetCam;
+}// ===================
+// LOBBY DEAD ZONE (tablette)
+// ===================
+// % de l’écran (monde visible) qui reste “stable” au centre
+// Plus c'est petit => caméra bouge plus tôt
+const LOBBY_DEADZONE_X = 0.55; // 55% de la largeur visible
+const LOBBY_DEADZONE_Y = 0.55; // 55% de la hauteur visible
+
+function applyDeadZoneToCam(targetCam, playerPos, halfView, deadZoneRatio){
+  // dead zone en “half” (ex: si ratio=0.55, deadHalf = 0.275 * view)
+  const deadHalf = halfView * deadZoneRatio;
+
+  const minFollow = targetCam - deadHalf;
+  const maxFollow = targetCam + deadHalf;
+
+  if (playerPos < minFollow) targetCam = playerPos + deadHalf;
+  else if (playerPos > maxFollow) targetCam = playerPos - deadHalf;
+
+  return targetCam;
+}
+
+// ===================
 // ZONES (sur collisions.png)
 // ===================
 const ZONE_COLORS = {
