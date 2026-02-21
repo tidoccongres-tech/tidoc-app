@@ -316,3 +316,27 @@ canvas{
   height: 26px;
   display: block;
 }
+
+/* Titre tablette */
+#menuTitleTablet{
+  position: absolute;
+  top: 50px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: min(520px, 55vw);
+  display: none;
+  z-index: 5;
+  pointer-events: none;
+}
+
+/* Visible uniquement tablette paysage */
+@media (orientation: landscape) and (min-width: 900px){
+  #menuTitleTablet{
+    display: block;
+  }
+}/* Visible uniquement tablette paysage */
+@media (orientation: landscape) and (min-width: 900px){
+  #menuTitleTablet{
+    display: block;
+  }
+}
