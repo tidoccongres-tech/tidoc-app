@@ -377,3 +377,21 @@ canvas{
 .music-fab:active{
   transform: scale(.97);
 }
+
+/* Titre tablette au-dessus du canvas */
+#menuTitleTablet{
+  position: fixed;
+  top: calc(14px + env(safe-area-inset-top));
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 40;              /* > canvas (0/1) et > ui (20) si tu veux */
+  width: min(520px, 70vw);
+  height: auto;
+  display: none;            /* caché par défaut */
+  pointer-events: none;     /* ne bloque pas les clics */
+}
+
+/* Affiché seulement tablette (à ajuster si besoin) */
+@media (min-width: 768px) and (orientation: landscape){
+  #menuTitleTablet{ display: block; }
+}
