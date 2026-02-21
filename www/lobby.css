@@ -340,3 +340,10 @@ canvas{
     display: block;
   }
 }
+
+.music-fab svg{
+  width: 24px;
+  height: 24px;
+  display: block;
+  fill: currentColor; /* <- rend le SVG blanc car .music-fab { color:#fff } */
+}
