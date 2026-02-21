@@ -2584,7 +2584,12 @@ onAuthStateChanged(auth, async (u) => {
 
 // Affiche le diamant seulement si admin (mais on attend aussi de savoir si host via room snapshot)
 if (btnAdminStart){
-  btnAdminStart.style.display = "none"; // safe par défaut
+  // ✅ admin voit toujours le diamant, même si pas host
+  btnAdminStart.style.display = isAdmin ? "grid" : "none";
+
+  // ✅ au cas où un CSS le met derrière
+  btnAdminStart.style.zIndex = "999";
+  btnAdminStart.style.pointerEvents = "auto";
 }
   
   // écoute mon rôle (1 fois)
@@ -2598,11 +2603,6 @@ if (!startBtnBound){
 
   btnStart?.addEventListener("click", async (e) => {
     e.preventDefault();
-
-    if (!myIsHost){
-      setStartInfo("Seul l’hôte peut démarrer.");
-      return;
-    }
 
     const n = playersMap.size;
 
