@@ -2185,10 +2185,11 @@ if (!gameStarted){
   const bw = bg.naturalWidth;
   const bh = bg.naturalHeight;
 
-  const s  = Math.max(window.innerWidth / bw, window.innerHeight / bh);
+    // ✅ FIT HEIGHT (même hauteur visible, pas d'étirement)
+  const s  = window.innerHeight / bh;
   const ox = (window.innerWidth  - bw * s) / 2;
   const oy = (window.innerHeight - bh * s) / 2;
-
+  
   ctx.save();
   ctx.translate(ox, oy);
   ctx.scale(s, s);
