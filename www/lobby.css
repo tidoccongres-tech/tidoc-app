@@ -347,3 +347,33 @@ canvas{
   display: block;
   fill: currentColor; /* <- rend le SVG blanc car .music-fab { color:#fff } */
 }
+
+.music-fab{
+  position:absolute;
+  right: 14px;
+  top: calc(80px + env(safe-area-inset-top));
+  width: 54px;
+  height: 54px;
+  border-radius: 999px;
+  border: 1px solid rgba(255,255,255,.15);
+  background: rgba(0,0,0,.35);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  color:#fff;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  cursor:pointer;
+  z-index: 70;
+  box-shadow: 0 14px 26px rgba(0,0,0,.25);
+}
+
+.music-fab svg{
+  width: 24px;
+  height: 24px;
+  fill: currentColor;
+}
+
+.music-fab:active{
+  transform: scale(.97);
+}
