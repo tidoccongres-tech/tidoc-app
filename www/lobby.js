@@ -2185,10 +2185,16 @@ if (!gameStarted){
   const bw = bg.naturalWidth;
   const bh = bg.naturalHeight;
 
-    // ✅ FIT HEIGHT (même hauteur visible, pas d'étirement)
-  const s  = window.innerHeight / bh;
-  const ox = (window.innerWidth  - bw * s) / 2;
-  const oy = (window.innerHeight - bh * s) / 2;
+    const isTabletLandscape = window.matchMedia("(min-width: 900px) and (orientation: landscape)").matches;
+
+// téléphone = cover (remplit tout, pas de bandes, crop intelligent)
+// tablette paysage = fit WIDTH (pas de bandes sur les côtés, crop haut/bas si besoin)
+const s = isTabletLandscape
+  ? (window.innerWidth / bw)
+  : Math.max(window.innerWidth / bw, window.innerHeight / bh);
+
+const ox = isTabletLandscape ? 0 : (window.innerWidth - bw * s) / 2;
+const oy = (window.innerHeight - bh * s) / 2;
   
   ctx.save();
   ctx.translate(ox, oy);
