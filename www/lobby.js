@@ -16,6 +16,7 @@ let myUid = null;
 
 const auth = AuthMod.auth;
 const db   = AuthMod.db;
+const lobbyMusic = document.getElementById("lobbyMusic");
 
 const params = new URLSearchParams(location.search);
 
@@ -82,6 +83,12 @@ if (canvas){
 
 if (!canvas || !ctx){
   console.warn("[lobby.js] Canvas introuvable (#gameCanvas). Le lobby ne pourra pas se dessiner.");
+}
+
+function startLobbyMusic(){
+  if (!lobbyMusic) return;
+  lobbyMusic.volume = 0.4;
+  lobbyMusic.play().catch(()=>{});
 }
 // ===================
 // TOASTS
