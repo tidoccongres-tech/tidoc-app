@@ -2509,9 +2509,9 @@ onAuthStateChanged(auth, async (u) => {
 
   isAdmin = ADMIN_UIDS.has(myUid);
 
-// Affiche le diamant seulement si admin
+// Affiche le diamant seulement si admin (mais on attend aussi de savoir si host via room snapshot)
 if (btnAdminStart){
-  btnAdminStart.style.display = isAdmin ? "" : "none";
+  btnAdminStart.style.display = "none"; // safe par défaut
 }
   
   // écoute mon rôle (1 fois)
@@ -2724,7 +2724,11 @@ if (!adminBtnBound){
       // host
       myIsHost = (room.hostUid === myUid);
       if (btnStart) btnStart.style.display = myIsHost ? "" : "none";
-      if (btnAdminStart) btnAdminStart.style.display = (isAdmin && myIsHost) ? "" : "none";
+
+// IMPORTANT: admin-fab est display:none en CSS, donc pour l'afficher il faut "grid"
+if (btnAdminStart){
+  btnAdminStart.style.display = (isAdmin && myIsHost) ? "grid" : "none";
+}
 
       // meeting/report (lock + splash)
       handleMeetingState(room, status);
