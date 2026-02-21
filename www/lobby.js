@@ -1648,17 +1648,29 @@ async function playSpinThenReveal(finalRole){
   spinRunning = true;
 
   let flip = false;
-  let delay = 45;
+  let delay = 55;
+
+  // ✅ spin minimum (même si role déjà connu)
+  const minSpinMs = 1300;
+  const endMin = performance.now() + minSpinMs;
+
+  // si rôle pas encore connu, on attend jusqu'à 6s max
   const timeoutMs = 6000;
   const deadline = performance.now() + timeoutMs;
 
-  while (performance.now() < deadline && !finalRole){
+  while (performance.now() < deadline){
+    // animation flip
     flip = !flip;
     setOverlayFace(flip ? "titruant" : "tinocent");
     await sleep(delay);
+
+    // si on a déjà spin le minimum ET qu'on a le rôle => on sort
+    if (performance.now() >= endMin && (finalRole || myRole)) break;
   }
 
-  if (!finalRole){
+  const roleToShow = finalRole || myRole;
+
+  if (!roleToShow){
     roleTitle.textContent = "Erreur";
     roleSub.textContent = "Aucun rôle reçu";
     setOverlayFace("tinocent");
@@ -1668,12 +1680,11 @@ async function playSpinThenReveal(finalRole){
     return;
   }
 
-  setOverlayFinal(finalRole);
+  setOverlayFinal(roleToShow);
   await sleep(900);
   hideRoleOverlay();
   spinRunning = false;
 }
-
 // écoute mon privateRole
 function listenMyRole(){
   if (!myUid || !roomId) return () => {};
@@ -1692,7 +1703,7 @@ function listenMyRole(){
       updateMyTaskHud();
 
     if (phase === "starting" && !spinRunning){
-  playSpinThenReveal(myRole);
+  playSpinThenReveal(null);
 }
     }
   });
@@ -2813,6 +2824,7 @@ if (btnAdminStart){
       if (status === "starting"){
         if (lastRoomStatus !== "starting"){
           setStartingMode();
+          if (!spinRunning) playSpinThenReveal(null);
         }
       } else if (status === "started"){
         spinRunning = false;
