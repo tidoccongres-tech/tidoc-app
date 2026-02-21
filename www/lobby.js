@@ -22,6 +22,17 @@ const btnMusicToggle = document.getElementById("btnMusicToggle");
 const iconOn  = document.getElementById("iconSoundOn");
 const iconOff = document.getElementById("iconSoundOff");
 
+// ✅ ADMIN OVERRIDE
+const btnAdminStart = document.getElementById("btnAdminStart");
+
+// Mets ton UID Firebase ici (ou ceux de ton équipe)
+const ADMIN_UIDS = new Set([
+  "TON_UID_ICI"
+]);
+
+let isAdmin = false;
+let forceStart = false;
+
 // =======================
 // MUSIC (Lobby) - sync avec menu
 // =======================
@@ -1671,26 +1682,28 @@ function listenMyRole(){
 // HOST: crée les roles (1 truant si 4-8, sinon 2) — ÉQUITABLE
 async function hostAssignRoles(players){
   const uids = players.map(p => p.uid).filter(Boolean);
-  if (uids.length < 4) throw new Error("not_enough_players");
+
+  if (uids.length < 1) throw new Error("no_players");
 
   const nbPlayers = uids.length;
-  const truantsCount = (nbPlayers >= 4 && nbPlayers <= 8) ? 1 : 2;
+
+  // ✅ règle simple :
+  // 1 truant si 1 à 8 joueurs, 2 truants au-dessus
+  const truantsCount = (nbPlayers <= 8) ? 1 : 2;
 
   const pool = shuffleCryptoInPlace([...uids]);
-  const truants = new Set(pool.slice(0, truantsCount));
+  const truants = new Set(pool.slice(0, Math.min(truantsCount, nbPlayers)));
 
   for (const uid of uids){
     const role = truants.has(uid) ? "titruant" : "tinocent";
     await setDoc(doc(db, "rooms", roomId, "privateRoles", uid), {
-      uid,
-      role,
-      updatedAt: serverTimestamp()
+      uid, role, updatedAt: serverTimestamp()
     }, { merge: true });
   }
 
   await updateDoc(doc(db, "rooms", roomId), {
     playersCount: nbPlayers,
-    truantsCount: truantsCount,
+    truantsCount: Math.min(truantsCount, nbPlayers),
     tasksTotal: TASKS_TOTAL,
     tasksDone: 0,
     deadUids: []
@@ -2493,6 +2506,18 @@ onAuthStateChanged(auth, async (u) => {
 
   myUid = u.uid;
 
+  isAdmin = ADMIN_UIDS.has(myUid);
+
+// tu peux aussi autoriser via email si tu veux :
+// isAdmin = ADMIN_UIDS.has(myUid) || (u.email && u.email.endsWith("@tidoc.fr"));
+
+forceStart = (new URLSearchParams(location.search).get("force") === "1");
+
+// Affiche le diamant seulement si admin
+if (btnAdminStart){
+  btnAdminStart.style.display = isAdmin ? "" : "none";
+}
+  
   // écoute mon rôle (1 fois)
   if (!unsubMyRole) unsubMyRole = listenMyRole();
 
@@ -2511,11 +2536,60 @@ onAuthStateChanged(auth, async (u) => {
       }
 
       const n = playersMap.size;
-      if (n < 4){
-        setStartInfo(`Il faut au moins 4 joueurs pour démarrer (actuellement ${n}).`);
-        return;
-      }
+const allowSmall = isAdmin && forceStart;
 
+if (n < 4 && !allowSmall){
+  setStartInfo(`Il faut au moins 4 joueurs (actuellement ${n}).`);
+  return;
+}
+
+      btnAdminStart?.addEventListener("click", async (e) => {
+  e.preventDefault();
+
+  if (!isAdmin){
+    setStartInfo("Réservé admin.");
+    return;
+  }
+  if (!myIsHost){
+    setStartInfo("Tu dois être l’hôte pour forcer le démarrage.");
+    return;
+  }
+
+  setStartInfo("");
+
+  try{
+    await updateDoc(doc(db, "rooms", roomId), {
+      status: "starting",
+      startingAt: serverTimestamp(),
+      chatEnabled: false,
+      tasksTotal: TASKS_TOTAL,
+      tasksDone: 0,
+      deadUids: [],
+      meetingType: null,
+      meetingAt: null,
+      meetingBy: null,
+      reportedBodyUid: null
+    });
+
+    const snapPlayers = await getDocs(collection(db, "rooms", roomId, "players"));
+    const players = snapPlayers.docs.map(d => d.data());
+
+    // ✅ roles même si 1/2/3 joueurs
+    await hostAssignRoles(players);
+
+    await sleep(800); // plus court pour tests
+
+    await updateDoc(doc(db, "rooms", roomId), {
+      status: "started",
+      startedAt: serverTimestamp()
+    });
+
+  } catch (err){
+    console.log("ADMIN FORCE START ERROR:", err);
+    setStartInfo(`Erreur: ${err?.code || ""} ${err?.message || err}`);
+  }
+});
+      
       setStartInfo("");
 
       try{
