@@ -394,3 +394,37 @@ canvas{
 @media (max-width: 900px) and (orientation: landscape) and (pointer: coarse){
   :root{ --joy-bottom: 34px; }
 }
+
+.admin-fab{
+  position: absolute;
+  right: 76px; /* à côté du bouton musique */
+  top: calc(14px + env(safe-area-inset-top));
+  width: 54px;
+  height: 54px;
+  border: 0;
+  border-radius: 999px;
+  cursor: pointer;
+  z-index: 130;
+  color: #ffffff;
+
+  background: rgba(0,0,0,.35);
+  border: 1px solid rgba(255,255,255,.15);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  box-shadow: 0 14px 26px rgba(0,0,0,.25);
+
+  display: grid;
+  place-items: center;
+
+  transition: transform .12s ease;
+}
+
+.admin-fab:active{
+  transform: scale(.96);
+}
+
+.admin-fab svg{
+  width: 26px;
+  height: 26px;
+  fill: currentColor;
+}
