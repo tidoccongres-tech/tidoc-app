@@ -2509,11 +2509,6 @@ onAuthStateChanged(auth, async (u) => {
 
   isAdmin = ADMIN_UIDS.has(myUid);
 
-// tu peux aussi autoriser via email si tu veux :
-// isAdmin = ADMIN_UIDS.has(myUid) || (u.email && u.email.endsWith("@tidoc.fr"));
-
-forceStart = (new URLSearchParams(location.search).get("force") === "1");
-
 // Affiche le diamant seulement si admin
 if (btnAdminStart){
   btnAdminStart.style.display = isAdmin ? "" : "none";
@@ -2729,6 +2724,7 @@ if (!adminBtnBound){
       // host
       myIsHost = (room.hostUid === myUid);
       if (btnStart) btnStart.style.display = myIsHost ? "" : "none";
+      if (btnAdminStart) btnAdminStart.style.display = (isAdmin && myIsHost) ? "" : "none";
 
       // meeting/report (lock + splash)
       handleMeetingState(room, status);
