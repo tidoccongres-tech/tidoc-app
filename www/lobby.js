@@ -2271,8 +2271,17 @@ if (!gameStarted){
       lobbyCamY = player.y;
     }
 
-    const targetCamX = clamp(player.x, halfW, WORLD_W - halfW);
-    const targetCamY = clamp(player.y, halfH, WORLD_H - halfH);
+    // Cam brute (au début, centre sur le joueur)
+let targetCamX = lobbyCamX ?? player.x;
+let targetCamY = lobbyCamY ?? player.y;
+
+// dead zone : la cam ne bouge que si le joueur sort du “centre”
+targetCamX = applyDeadZoneToCam(targetCamX, player.x, halfW, LOBBY_DEADZONE_X);
+targetCamY = applyDeadZoneToCam(targetCamY, player.y, halfH, LOBBY_DEADZONE_Y);
+
+// clamp final pour ne jamais sortir du lobby
+targetCamX = clamp(targetCamX, halfW, WORLD_W - halfW);
+targetCamY = clamp(targetCamY, halfH, WORLD_H - halfH);
 
     lobbyCamX = lerp(lobbyCamX, targetCamX, LOBBY_CAM_LERP);
     lobbyCamY = lerp(lobbyCamY, targetCamY, LOBBY_CAM_LERP);
