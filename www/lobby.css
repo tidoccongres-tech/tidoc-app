@@ -481,3 +481,26 @@ canvas{
   position: static !important;
   margin: 0 !important;
 }
+
+/* Base commune */
+.chat-fab, .admin-fab, .music-fab{
+  position: fixed;
+  right: calc(16px + env(safe-area-inset-right));
+  z-index: 120;
+}
+
+/* 1) Chat en haut */
+.chat-fab{
+  top: calc(16px + env(safe-area-inset-top));
+}
+
+/* 2) Admin juste sous le chat */
+.admin-fab{
+  top: calc(16px + env(safe-area-inset-top) + 72px);
+  display: none; /* ton JS met "grid" quand admin */
+}
+
+/* 3) Son sous admin */
+.music-fab{
+  top: calc(16px + env(safe-area-inset-top) + 144px);
+}
