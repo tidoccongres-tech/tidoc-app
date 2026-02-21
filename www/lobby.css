@@ -462,3 +462,22 @@ canvas{
   bottom: calc(20px + env(safe-area-inset-bottom)) !important;
   z-index: 219; /* un poil en dessous du son */
 }
+
+.right-fabs{
+  position: fixed;
+  right: calc(14px + env(safe-area-inset-right));
+  bottom: calc(18px + env(safe-area-inset-bottom));
+  z-index: 220;
+
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  align-items: flex-end;
+}
+
+/* Les boutons ne gèrent plus leur position eux-mêmes */
+.music-fab,
+.admin-fab{
+  position: static !important;
+  margin: 0 !important;
+}
