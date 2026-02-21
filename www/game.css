@@ -220,3 +220,44 @@ html, body{
   display: block;
   fill: currentColor;
 }
+
+/* =========================
+   TABLETTE LANDSCAPE UI
+========================= */
+@media (min-width: 900px) and (orientation: landscape){
+
+  .ui{
+    position: fixed;
+    bottom: calc(20px + env(safe-area-inset-bottom));
+    top: auto;
+    left: 50%;
+    transform: translateX(-50%);
+    width: auto;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    z-index: 50;
+    background: rgba(0,0,0,.35);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    padding: 12px 18px;
+    border-radius: 999px;
+  }
+
+  /* On cache le code et la liste joueurs si tu veux plus clean */
+  .ui .code,
+  .ui .players,
+  #startInfo{
+    display: none;
+  }
+
+  /* Boutons plus petits */
+  .btn-start,
+  .btn-leave{
+    margin: 0;
+    padding: 10px 16px;
+    font-size: 13px;
+  }
+
+}
+
