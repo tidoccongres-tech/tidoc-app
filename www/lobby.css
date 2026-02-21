@@ -428,3 +428,15 @@ canvas{
   display: block;
   fill: currentColor;
 }
+
+.admin-fab{
+  position: fixed;
+  right: calc(14px + env(safe-area-inset-right));
+  bottom: calc(14px + env(safe-area-inset-bottom));
+  z-index: 999;           /* IMPORTANT : au-dessus du canvas/UI */
+  display: none;          /* OK (sans !important) */
+  place-items: center;
+  width: 54px;
+  height: 54px;
+  border-radius: 16px;
+}
