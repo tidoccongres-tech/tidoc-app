@@ -75,17 +75,19 @@ function setMusicOn(isOn){
 }
 
 // init
-(function initMusic(){
+function initMusic(){
   const saved = localStorage.getItem(LS_MUSIC);
   const isOn = (saved === "1");     // par défaut OFF
   setMusicUI(isOn);
   if (audioEl) audioEl.volume = 0.35;
+  if (isOn) tryPlayAudio();        // ✅ tente (sera bloqué iOS sans geste)
 })();
 
 btnMusic?.addEventListener("click", async () => {
   const isOn = localStorage.getItem(LS_MUSIC) === "1";
   setMusicOn(!isOn);
 });
+
 
 // =======================
 // STATE
