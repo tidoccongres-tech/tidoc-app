@@ -2173,18 +2173,26 @@ function update(dt){
   setActionUI({ show:false });
 }
 
+// ===================
+// LOBBY CAMERA (tablette) : suit le joueur + clamp
+// ===================
+let lobbyCamX = null;
+let lobbyCamY = null;
+const LOBBY_CAM_LERP = 0.14; // 0.10-0.18 selon feeling
+
+function lerp(a, b, t){ return a + (b - a) * t; }
+
 function draw(){
   if (!ctx) return;
 
   ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
   ctx.clearRect(0,0,window.innerWidth, window.innerHeight);
 
-  // LOBBY
+// LOBBY
 if (!gameStarted){
   const bgOk = lobbyBgImg.complete && lobbyBgImg.naturalWidth > 0;
 
   if (!bgOk){
-    // ✅ PAS de fallback map => pas de flash
     ctx.fillStyle = "#0b3440";
     ctx.fillRect(0, 0, window.innerWidth, window.innerHeight);
     ctx.fillStyle = "rgba(255,255,255,.85)";
@@ -2194,52 +2202,205 @@ if (!gameStarted){
   }
 
   const bg = lobbyBgImg;
-
   const bw = bg.naturalWidth;
   const bh = bg.naturalHeight;
 
-    const isTabletLandscape = window.matchMedia("(min-width: 900px) and (orientation: landscape)").matches;
+  const isTabletLandscape =
+    window.matchMedia("(min-width: 900px) and (orientation: landscape)").matches;
 
-// téléphone = cover (remplit tout, pas de bandes, crop intelligent)
-// tablette paysage = fit WIDTH (pas de bandes sur les côtés, crop haut/bas si besoin)
-const s = isTabletLandscape
-  ? (window.innerWidth / bw)
-  : Math.max(window.innerWidth / bw, window.innerHeight / bh);
+  // téléphone = cover
+  // tablette paysage = fit WIDTH (mais caméra qui pan vertical/horizontal)
+  const s = isTabletLandscape
+    ? (window.innerWidth / bw)
+    : Math.max(window.innerWidth / bw, window.innerHeight / bh);
 
-const ox = isTabletLandscape ? 0 : (window.innerWidth - bw * s) / 2;
-const oy = (window.innerHeight - bh * s) / 2;
-  
+  // mapping WORLD -> IMAGE
+  const scaleX = bw / WORLD_W;
+  const scaleY = bh / WORLD_H;
+
+  // Visible en WORLD (selon le scale total)
+  const viewWorldW = window.innerWidth  / (scaleX * s);
+  const viewWorldH = window.innerHeight / (scaleY * s);
+  const halfW = viewWorldW / 2;
+  const halfH = viewWorldH / 2;
+
+  // Caméra lobby uniquement sur tablette paysage
+  if (isTabletLandscape){
+    if (lobbyCamX == null || lobbyCamY == null){
+      lobbyCamX = player.x;
+      lobbyCamY = player.y;
+    }
+
+    const targetCamX = clamp(player.x, halfW, WORLD_W - halfW);
+    const targetCamY = clamp(player.y, halfH, WORLD_H - halfH);
+
+    lobbyCamX = lerp(lobbyCamX, targetCamX, LOBBY_CAM_LERP);
+    lobbyCamY = lerp(lobbyCamY, targetCamY, LOBBY_CAM_LERP);
+  } else {
+    // en phone/portrait on revient à ton centrage simple
+    lobbyCamX = null;
+    lobbyCamY = null;
+  }
+
+  // Calcul de ox/oy :
+  // - tablette: caméra suit le joueur (pan)
+  // - sinon: centrage classique
+  let ox, oy;
+
+  if (isTabletLandscape){
+    const camIx = lobbyCamX * scaleX;
+    const camIy = lobbyCamY * scaleY;
+
+    ox = window.innerWidth  / 2 - camIx * s;
+    oy = window.innerHeight / 2 - camIy * s;
+
+    // clamp pour ne jamais voir du vide autour
+    const minOx = window.innerWidth  - bw * s;
+    const minOy = window.innerHeight - bh * s;
+    ox = clamp(ox, minOx, 0);
+    oy = clamp(oy, minOy, 0);
+  } else {
+    ox = (window.innerWidth  - bw * s) / 2;
+    oy = (window.innerHeight - bh * s) / 2;
+  }
+
   ctx.save();
   ctx.translate(ox, oy);
   ctx.scale(s, s);
+
+  // background
   ctx.drawImage(bg, 0, 0, bw, bh);
 
-    const scaleX = bw / WORLD_W;
-    const scaleY = bh / WORLD_H;
+  // players (tri Y world)
+  const arr = Array.from(playersMap.values())
+    .map(p => ({
+      ...p,
+      wx: (p.uid === myUid) ? player.x : (typeof p.x === "number" ? p.x : player.x),
+      wy: (p.uid === myUid) ? player.y : (typeof p.y === "number" ? p.y : player.y),
+    }))
+    .sort((a,b) => a.wy - b.wy);
 
-    const arr = Array.from(playersMap.values())
-      .map(p => ({
-        ...p,
-        wx: (p.uid === myUid) ? player.x : (typeof p.x === "number" ? p.x : player.x),
-        wy: (p.uid === myUid) ? player.y : (typeof p.y === "number" ? p.y : player.y),
-      }))
-      .sort((a,b) => a.wy - b.wy);
+  for (const p of arr){
+    const ix = p.wx * scaleX;
+    const iy = p.wy * scaleY;
 
-    for (const p of arr){
-      const ix = p.wx * scaleX;
-      const iy = p.wy * scaleY;
+    const sprite = (p.isDead)
+      ? pleurImg
+      : ((p.uid === myUid) ? getLocalSprite() : getRemoteSprite(p));
 
-      const sprite = (p.isDead)
-        ? pleurImg
-        : ((p.uid === myUid) ? getLocalSprite() : getRemoteSprite(p));
+    drawPlayerSprite(ix, iy, sprite);
+    drawNameTag(ix, iy, p.name, !!p.isHost, !!p.isDead);
+  }
 
-      drawPlayerSprite(ix, iy, sprite);
-      drawNameTag(ix, iy, p.name, !!p.isHost, !!p.isDead);
-    }
+  ctx.restore();
+  return;
+}// LOBBY
+if (!gameStarted){
+  const bgOk = lobbyBgImg.complete && lobbyBgImg.naturalWidth > 0;
 
-    ctx.restore();
+  if (!bgOk){
+    ctx.fillStyle = "#0b3440";
+    ctx.fillRect(0, 0, window.innerWidth, window.innerHeight);
+    ctx.fillStyle = "rgba(255,255,255,.85)";
+    ctx.font = "900 22px system-ui";
+    ctx.fillText("Chargement lobby…", 24, 46);
     return;
   }
+
+  const bg = lobbyBgImg;
+  const bw = bg.naturalWidth;
+  const bh = bg.naturalHeight;
+
+  const isTabletLandscape =
+    window.matchMedia("(min-width: 900px) and (orientation: landscape)").matches;
+
+  // téléphone = cover
+  // tablette paysage = fit WIDTH (mais caméra qui pan vertical/horizontal)
+  const s = isTabletLandscape
+    ? (window.innerWidth / bw)
+    : Math.max(window.innerWidth / bw, window.innerHeight / bh);
+
+  // mapping WORLD -> IMAGE
+  const scaleX = bw / WORLD_W;
+  const scaleY = bh / WORLD_H;
+
+  // Visible en WORLD (selon le scale total)
+  const viewWorldW = window.innerWidth  / (scaleX * s);
+  const viewWorldH = window.innerHeight / (scaleY * s);
+  const halfW = viewWorldW / 2;
+  const halfH = viewWorldH / 2;
+
+  // Caméra lobby uniquement sur tablette paysage
+  if (isTabletLandscape){
+    if (lobbyCamX == null || lobbyCamY == null){
+      lobbyCamX = player.x;
+      lobbyCamY = player.y;
+    }
+
+    const targetCamX = clamp(player.x, halfW, WORLD_W - halfW);
+    const targetCamY = clamp(player.y, halfH, WORLD_H - halfH);
+
+    lobbyCamX = lerp(lobbyCamX, targetCamX, LOBBY_CAM_LERP);
+    lobbyCamY = lerp(lobbyCamY, targetCamY, LOBBY_CAM_LERP);
+  } else {
+    // en phone/portrait on revient à ton centrage simple
+    lobbyCamX = null;
+    lobbyCamY = null;
+  }
+
+  // Calcul de ox/oy :
+  // - tablette: caméra suit le joueur (pan)
+  // - sinon: centrage classique
+  let ox, oy;
+
+  if (isTabletLandscape){
+    const camIx = lobbyCamX * scaleX;
+    const camIy = lobbyCamY * scaleY;
+
+    ox = window.innerWidth  / 2 - camIx * s;
+    oy = window.innerHeight / 2 - camIy * s;
+
+    // clamp pour ne jamais voir du vide autour
+    const minOx = window.innerWidth  - bw * s;
+    const minOy = window.innerHeight - bh * s;
+    ox = clamp(ox, minOx, 0);
+    oy = clamp(oy, minOy, 0);
+  } else {
+    ox = (window.innerWidth  - bw * s) / 2;
+    oy = (window.innerHeight - bh * s) / 2;
+  }
+
+  ctx.save();
+  ctx.translate(ox, oy);
+  ctx.scale(s, s);
+
+  // background
+  ctx.drawImage(bg, 0, 0, bw, bh);
+
+  // players (tri Y world)
+  const arr = Array.from(playersMap.values())
+    .map(p => ({
+      ...p,
+      wx: (p.uid === myUid) ? player.x : (typeof p.x === "number" ? p.x : player.x),
+      wy: (p.uid === myUid) ? player.y : (typeof p.y === "number" ? p.y : player.y),
+    }))
+    .sort((a,b) => a.wy - b.wy);
+
+  for (const p of arr){
+    const ix = p.wx * scaleX;
+    const iy = p.wy * scaleY;
+
+    const sprite = (p.isDead)
+      ? pleurImg
+      : ((p.uid === myUid) ? getLocalSprite() : getRemoteSprite(p));
+
+    drawPlayerSprite(ix, iy, sprite);
+    drawNameTag(ix, iy, p.name, !!p.isHost, !!p.isDead);
+  }
+
+  ctx.restore();
+  return;
+}
 
     // GAME: map + camera
   const targetX = myDead ? (specCamX ?? player.x) : player.x;
