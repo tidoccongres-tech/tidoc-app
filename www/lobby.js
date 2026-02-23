@@ -9,6 +9,9 @@ import {
 
 function asset(p){ return new URL(p, import.meta.url).href; }
 
+// ===================
+// STATE
+// ===================
 let phase = "lobby";
 let myRole = null;
 let myDead = false;
@@ -18,13 +21,15 @@ let voteSkipBound = false;
 const auth = AuthMod.auth;
 const db   = AuthMod.db;
 
-const lobbyMusic = document.getElementById("lobbyMusic");
+// ===================
+// DOM (base)
+// ===================
+const lobbyMusic     = document.getElementById("lobbyMusic");
 const btnMusicToggle = document.getElementById("btnMusicToggle");
-const iconOn  = document.getElementById("iconSoundOn");
-const iconOff = document.getElementById("iconSoundOff");
+const iconOn         = document.getElementById("iconSoundOn");
+const iconOff        = document.getElementById("iconSoundOff");
 
 const uiPanel = document.querySelector(".ui");
-
 function setUiPanelVisible(show){
   if (!uiPanel) return;
   uiPanel.style.display = show ? "" : "none";
@@ -32,14 +37,27 @@ function setUiPanelVisible(show){
 
 // ✅ ADMIN OVERRIDE
 const btnAdminStart = document.getElementById("btnAdminStart");
-
-// Mets ton UID Firebase ici (ou ceux de ton équipe)
-const ADMIN_UIDS = new Set([
-  "b831dIbb3xPcn2qhfxUuVqkVSKF3"
-]);
-
+const ADMIN_UIDS = new Set(["b831dIbb3xPcn2qhfxUuVqkVSKF3"]);
 let isAdmin = false;
 let forceStart = false;
+
+// =======================
+// HELPERS (⚠️ UNE SEULE FOIS)
+// =======================
+function clamp(v, a, b){ return Math.max(a, Math.min(b, v)); }
+
+function escapeHTML(s=""){
+  return String(s)
+    .replaceAll("&","&amp;")
+    .replaceAll("<","&lt;")
+    .replaceAll(">","&gt;")
+    .replaceAll('"',"&quot;")
+    .replaceAll("'","&#039;");
+}
+
+function sleep(ms){ return new Promise(r => setTimeout(r, ms)); }
+
+function dist(a,b,c,d){ return Math.hypot(a-c, b-d); }
 
 // =======================
 // MUSIC (Lobby) - sync avec menu
@@ -80,8 +98,10 @@ btnMusicToggle?.addEventListener("click", () => {
   setMusicOn(!isOn);
 });
 
+// ===================
+// URL / ROOM
+// ===================
 const params = new URLSearchParams(location.search);
-
 const roomId = (
   params.get("room") ||
   params.get("code") ||
@@ -96,20 +116,18 @@ console.log("[LOBBY] roomId =", roomId);
 window.addEventListener("error", (e) => {
   console.error("[WINDOW ERROR]", e?.message, e?.filename, e?.lineno, e?.colno, e?.error);
 });
-
 window.addEventListener("unhandledrejection", (e) => {
   console.error("[UNHANDLED PROMISE]", e?.reason);
 });
 
 // ===================
-// DOM
+// DOM (suite)
 // ===================
 const roomCodeEl = document.getElementById("roomCode");
 const playersEl  = document.getElementById("playersList");
 const btnStart   = document.getElementById("btnStart");
 const btnLeave   = document.getElementById("btnLeave");
 
-// message start (si absent => alert fallback)
 const startInfo = document.getElementById("startInfo");
 function setStartInfo(msg){
   console.log("[START INFO]", msg || "");
@@ -117,26 +135,25 @@ function setStartInfo(msg){
   else if (msg) alert(msg);
 }
 
-// ROLE OVERLAY (déjà dans ton HTML)
+// ROLE overlay
 const roleOverlay = document.getElementById("roleOverlay");
 const roleImg     = document.getElementById("roleImg");
 const roleTitle   = document.getElementById("roleTitle");
 const roleSub     = document.getElementById("roleSub");
-const btnRoleOk   = document.getElementById("btnRoleOk"); // pas utilisé (auto)
+const btnRoleOk   = document.getElementById("btnRoleOk");
 
-// chat
+// Chat
 const chatFab      = document.getElementById("btnChatToggle");
 const chatBadge    = document.getElementById("chatBadge");
 const chatOverlay  = document.getElementById("chatOverlay");
 const btnChatClose = document.getElementById("btnChatClose");
 
-// chat DOM
 const chatMessagesEl = document.getElementById("chatMessages");
 const chatForm  = document.getElementById("chatForm");
 const chatInput = document.getElementById("chatInput");
 
 // ===================
-// DEBATE BANNER (uniquement pendant "Dénoncer")
+// DEBATE BANNER (injection safe)
 // ===================
 let debateUiActive = false;
 
@@ -155,23 +172,26 @@ debateBanner.style.cssText = `
   border-bottom: 1px solid rgba(255,255,255,.12);
   display: none;
 `;
-debateBanner.textContent = "";
-// on l’injecte en haut de l’overlay du chat
-const chatPanel = chatOverlay?.querySelector(".chat-panel");
-const chatHead  = chatOverlay?.querySelector(".chat-head");
 
-if (chatPanel){
-  // place le banner juste SOUS le header du chat
-  if (chatHead?.nextSibling) chatPanel.insertBefore(debateBanner, chatHead.nextSibling);
-  else chatPanel.appendChild(debateBanner);
-}
+(function mountDebateBanner(){
+  if (!chatOverlay) return;
+  const chatPanel = chatOverlay.querySelector(".chat-panel");
+  if (!chatPanel) return;
+
+  const chatHead = chatOverlay.querySelector(".chat-head");
+  if (chatHead && chatHead.parentElement === chatPanel){
+    chatPanel.insertBefore(debateBanner, chatHead.nextSibling);
+  } else {
+    // fallback : tout en haut
+    chatPanel.insertBefore(debateBanner, chatPanel.firstChild);
+  }
+})();
 
 let debateEndMs = 0;
 let debateRaf = null;
 
 function setDebateUI(on, { title = "Débat", subtitle = "", endMs = 0 } = {}){
   debateUiActive = !!on;
-
   if (!debateBanner) return;
 
   if (!debateUiActive){
@@ -180,12 +200,10 @@ function setDebateUI(on, { title = "Débat", subtitle = "", endMs = 0 } = {}){
     debateEndMs = 0;
     if (debateRaf) cancelAnimationFrame(debateRaf);
     debateRaf = null;
-
     if (btnChatClose) btnChatClose.style.display = "";
     return;
   }
 
-  // lock close
   if (btnChatClose) btnChatClose.style.display = "none";
 
   debateEndMs = endMs || (Date.now() + 60_000);
@@ -207,14 +225,16 @@ function setDebateUI(on, { title = "Débat", subtitle = "", endMs = 0 } = {}){
     if (!debateUiActive) return;
     const s = Math.max(0, Math.ceil((debateEndMs - Date.now()) / 1000));
     if (timerEl) timerEl.textContent = `${s}s`;
-    if (s <= 0) return; // fini, le room snapshot va couper le lock
+    if (s <= 0) return;
     debateRaf = requestAnimationFrame(tick);
   };
 
   debateRaf = requestAnimationFrame(tick);
 }
 
+// ===================
 // CANVAS (SAFE)
+// ===================
 const canvas = document.getElementById("gameCanvas");
 const ctx = canvas?.getContext?.("2d") || null;
 
@@ -227,12 +247,17 @@ if (canvas){
   canvas.style.position = "fixed";
   canvas.style.inset = "0";
   canvas.style.zIndex = "0";
-  setCanvasInteract(false); // ✅ par défaut: laisse passer les clics UI
+  setCanvasInteract(false);
+}
+if (!canvas || !ctx){
+  console.warn("[lobby.js] Canvas introuvable (#gameCanvas).");
 }
 
-if (!canvas || !ctx){
-  console.warn("[lobby.js] Canvas introuvable (#gameCanvas). Le lobby ne pourra pas se dessiner.");
-}
+// ===================
+// INIT room code
+// ===================
+if (roomCodeEl) roomCodeEl.textContent = roomId || "----";
+if (!roomId) setStartInfo("⚠️ Aucun code room dans l’URL (ex: lobby.html?room=ABCD).");
 
 // ===================
 // TOASTS
@@ -302,70 +327,6 @@ function showLeaveToast(text, ms = 2800){
   leaveToastTimer = setTimeout(() => {
     leaveToast.style.display = "none";
   }, ms);
-}
-
-// ===================
-// HELPERS
-// ===================
-function clamp(v, a, b){ return Math.max(a, Math.min(b, v)); }
-
-function escapeHTML(s=""){
-  return String(s)
-    .replaceAll("&","&amp;")
-    .replaceAll("<","&lt;")
-    .replaceAll(">","&gt;")
-    .replaceAll('"',"&quot;")
-    .replaceAll("'","&#039;");
-}
-
-function renderPlayers(players){
-  if (!playersEl) return;
-  playersEl.innerHTML = players.map(p => {
-    const crown = p.isHost ? " 👑" : "";
-    return `<div class="player">${escapeHTML(p.name || "Joueur")}${crown}</div>`;
-  }).join("");
-}
-
-function sleep(ms){ return new Promise(r => setTimeout(r, ms)); }
-
-if (!globalThis.crypto?.getRandomValues){
-  console.warn("crypto.getRandomValues indisponible → tirage moins fiable");
-}
-
-function cryptoRandInt(maxExclusive){
-  if (maxExclusive <= 0) return 0;
-
-  const arr = new Uint32Array(1);
-  const range = 0x100000000; // 2^32
-  const limit = Math.floor(range / maxExclusive) * maxExclusive;
-
-  let x;
-  do{
-    crypto.getRandomValues(arr);
-    x = arr[0];
-  } while (x >= limit);
-
-  return x % maxExclusive;
-}
-
-function shuffleCryptoInPlace(arr){
-  for (let i = arr.length - 1; i > 0; i--){
-    const j = cryptoRandInt(i + 1);
-    [arr[i], arr[j]] = [arr[j], arr[i]];
-  }
-  return arr;
-}
-
-function dist(a,b,c,d){ return Math.hypot(a-c, b-d); }
-
-function setChatFabVisible(show){
-  if (!chatFab) return;
-  chatFab.style.display = show ? "" : "none";
-  if (!show){
-    chatFab.classList.remove("has-unread");
-    if (chatBadge) chatBadge.hidden = true;
-    if (chatOverlay?.classList.contains("open") && typeof closeChat === "function") closeChat(true);
-  }
 }
 
 // ===================
@@ -947,10 +908,10 @@ async function completeCurrentTask(){
   if (myDead) return;
   if (myRole !== "tinocent") return;
 
-  if (!Array.isArray(zones) || !player){
-    setStartInfo("Zones/joueur non prêts.");
-    return;
-  }
+  if (typeof zones === "undefined" || typeof player === "undefined" || !Array.isArray(zones) || !player){
+  setStartInfo("Zones/joueur non prêts.");
+  return;
+}
 
   const t = currentTask();
   if (!t) return;
