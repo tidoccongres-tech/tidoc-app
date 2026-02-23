@@ -2,75 +2,68 @@
    BASE + ROOT
 ========================= */
 html, body{
-  margin:0;
-  padding:0;
-  width:100%;
-  height:100%;
-  overflow:hidden;
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: #0b3440; /* anti écran noir */
 }
 
 .lobby-root{
   position: relative;
   width: 100vw;
-  height: 100vh;     /* fallback */
-  height: 100svh;    /* iOS stable viewport */
-  background: #0b3440;  /* pas noir */
-}
-html, body{
-  background:#0b3440;
-}
-#gameCanvas{
-  background:#0b3440;
-  display:block;
+  height: 100vh;   /* fallback */
+  height: 100svh;  /* iOS stable viewport */
+  background: #0b3440;
 }
 
 /* Canvas plein écran */
-canvas{
-  position:absolute;
-  inset:0;
-  z-index: 1;
-  pointer-events:none; /* le canvas ne capte rien, joystick OK */
+#gameCanvas{
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  display: block;
+  background: #0b3440;
+  pointer-events: none; /* laisse passer les clics UI/joystick */
 }
 
 /* =========================
    UI TOP LEFT
 ========================= */
 .ui{
-  position:absolute;
+  position: absolute;
   top: calc(12px + env(safe-area-inset-top));
   left: 12px;
   z-index: 20;
-  color:#fff;
+  color: #fff;
   font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
   text-shadow: 0 2px 6px rgba(0,0,0,.35);
 }
 
 .players{
-  margin-top:10px;
-  font-size:14px;
+  margin-top: 10px;
+  font-size: 14px;
 }
 
 /* Buttons */
 .btn-start,
 .btn-leave{
-  margin-top:10px;
-  border:0;
+  margin-top: 10px;
+  border: 0;
   padding: 12px 18px;
   border-radius: 999px;
   font-weight: 900;
   letter-spacing: .2px;
-  color:#fff;
-  cursor:pointer;
+  color: #fff;
+  cursor: pointer;
   box-shadow:
     0 10px 18px rgba(0,0,0,.28),
     inset 0 2px 0 rgba(255,255,255,.25);
 }
-.btn-start{
-  background: linear-gradient(180deg, #48c6ff 0%, #1479ff 100%);
-}
-.btn-leave{
-  background: linear-gradient(180deg, #ff6b6b 0%, #d81b60 100%);
-}
+.btn-start{ background: linear-gradient(180deg, #48c6ff 0%, #1479ff 100%); }
+.btn-leave{ background: linear-gradient(180deg, #ff6b6b 0%, #d81b60 100%); }
+
 .btn-start:active,
 .btn-leave:active{
   transform: translateY(1px) scale(.98);
@@ -80,59 +73,41 @@ canvas{
 }
 
 /* =========================
-   JOYSTICK
+   FABs (CHAT / MUSIC / ADMIN)
 ========================= */
-.joystick{
-  position:absolute;
-  left: 18px;
-  bottom: calc(140px + env(safe-area-inset-bottom));
-  width:120px;
-  height:120px;
-  border-radius:50%;
-  background: rgba(255,255,255,0.10);
-  backdrop-filter: blur(6px);
-  -webkit-backdrop-filter: blur(6px);
-  touch-action:none;
-  z-index: 30;
-  pointer-events:auto;
-}
-.stick{
-  position:absolute;
-  width:52px;
-  height:52px;
-  background: rgba(255,255,255,0.90);
-  border-radius:50%;
-  left:34px;
-  top:34px;
-  box-shadow: 0 10px 18px rgba(0,0,0,.25);
-}
-
-/* =========================
-   CHAT BUTTON (FAB)
-========================= */
-.chat-fab{
-  position:absolute;
-  right: 14px;
-  top: calc(14px + env(safe-area-inset-top));
+.chat-fab,
+.music-fab,
+.admin-fab{
+  position: fixed;
+  right: calc(14px + env(safe-area-inset-right));
   width: 54px;
   height: 54px;
   border: 0;
   border-radius: 999px;
   cursor: pointer;
-  z-index: 70;
-  color:#fff;
+  color: #fff;
 
   background: rgba(0,0,0,.35);
   border: 1px solid rgba(255,255,255,.15);
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
   box-shadow: 0 14px 26px rgba(0,0,0,.25);
+
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+}
+
+.chat-fab{
+  top: calc(14px + env(safe-area-inset-top));
+  z-index: 130;
+  display: grid;
+  place-items: center;
 }
 .chat-fab:active{ transform: scale(.98); }
-.chat-fab svg{ display:block; margin:auto; }
+.chat-fab svg{ width: 26px; height: 26px; display: block; }
 
 .chat-fab .badge{
-  position:absolute;
+  position: absolute;
   top: 9px;
   right: 9px;
   width: 12px;
@@ -140,54 +115,72 @@ canvas{
   border-radius: 999px;
   background: #ff2d2d;
   border: 2px solid rgba(0,0,0,.6);
-  display:none;
+  display: none;
 }
-.chat-fab.has-unread .badge{ display:block; }
+.chat-fab.has-unread .badge{ display: block; }
+
+.music-fab{
+  top: calc(14px + env(safe-area-inset-top) + 72px);
+  z-index: 129;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.music-fab:active{ transform: scale(.97); }
+.music-fab svg{ width: 24px; height: 24px; fill: currentColor; }
+
+.admin-fab{
+  top: calc(14px + env(safe-area-inset-top) + 144px);
+  z-index: 128;
+  display: none; /* le JS met "grid" si admin */
+  place-items: center;
+}
+.admin-fab:active{ transform: scale(.97); }
+.admin-fab svg{ width: 26px; height: 26px; display: block; fill: currentColor; }
 
 /* =========================
-   OVERLAYS - SINGLE SOURCE OF TRUTH
+   JOYSTICK
 ========================= */
+:root{ --joy-bottom: 50px; } /* plus petit = plus bas */
 
-#roleOverlay{
-  display: none;          /* caché par défaut */
-  opacity: 0;
-  visibility: hidden;
-  pointer-events: none;
-}
-#roleOverlay.open{
-  display: flex;          /* ton JS ajoute .open */
-  opacity: 1;
-  visibility: visible;
+.joystick{
+  position: fixed;
+  left: 18px;
+  bottom: calc(var(--joy-bottom) + env(safe-area-inset-bottom));
+  width: 120px;
+  height: 120px;
+  border-radius: 50%;
+  background: rgba(255,255,255,0.10);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  touch-action: none;
+  z-index: 90;
   pointer-events: auto;
 }
 
-/* REPORT / ACTIVITY / SELF / END : pilotés par display dans ton JS */
-#reportOverlay,
-#activityOverlay,
-#selfExpelOverlay,
-#endOverlay{
-  pointer-events: auto;      /* ok */
-  opacity: 1;
-  visibility: visible;
-  transition: none;
-  display: none;             /* cachés par défaut */
+.stick{
+  position: absolute;
+  width: 52px;
+  height: 52px;
+  background: rgba(255,255,255,0.90);
+  border-radius: 50%;
+  left: 34px;
+  top: 34px;
+  box-shadow: 0 10px 18px rgba(0,0,0,.25);
 }
 
-/* comme ton JS met display:flex */
-#reportOverlay[style*="display: flex"],
-#activityOverlay[style*="display: flex"],
-#selfExpelOverlay[style*="display: flex"],
-#endOverlay[style*="display: flex"]{
-  display: flex;
+/* petit ajustement landscape téléphone */
+@media (max-width: 900px) and (orientation: landscape) and (pointer: coarse){
+  :root{ --joy-bottom: 90px; }
 }
 
 /* =========================
-   CHAT (FULLSCREEN OVERLAY)
+   CHAT OVERLAY (FULLSCREEN)
 ========================= */
 #chatOverlay{
   position: fixed;
   inset: 0;
-  z-index: 200;               /* au-dessus du HUD */
+  z-index: 9999;
   display: none;
   align-items: flex-end;
   justify-content: center;
@@ -196,10 +189,8 @@ canvas{
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
 }
-
 #chatOverlay.open{ display: flex; }
 
-/* le panneau */
 #chatOverlay .chat-panel{
   width: min(560px, calc(100vw - 24px));
   height: min(72vh, 680px);
@@ -212,13 +203,12 @@ canvas{
   box-shadow: 0 18px 50px rgba(0,0,0,.45);
 }
 
-/* header */
 #chatOverlay .chat-head{
-  display:flex;
-  align-items:center;
-  justify-content:space-between;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
   gap: 10px;
-  padding: 12px 12px;
+  padding: 12px;
   border-bottom: 1px solid rgba(255,255,255,.10);
 }
 
@@ -230,25 +220,24 @@ canvas{
 }
 
 #chatOverlay .chat-close{
-  appearance:none;
-  border:0;
+  appearance: none;
+  border: 0;
   width: 40px;
   height: 40px;
   border-radius: 12px;
   background: rgba(255,255,255,.14);
-  color:#fff;
+  color: #fff;
   font: 1000 16px system-ui;
-  cursor:pointer;
+  cursor: pointer;
 }
 #chatOverlay .chat-close:active{ transform: scale(.98); }
 
-/* messages */
 #chatMessages{
   flex: 1;
-  overflow:auto;
+  overflow: auto;
   padding: 12px;
-  display:flex;
-  flex-direction:column;
+  display: flex;
+  flex-direction: column;
   gap: 10px;
 }
 
@@ -258,30 +247,20 @@ canvas{
   border-radius: 14px;
   background: rgba(255,255,255,.10);
   border: 1px solid rgba(255,255,255,.10);
-  color:#fff;
+  color: #fff;
   box-shadow: 0 10px 24px rgba(0,0,0,.18);
 }
-
 .chat-msg.me{
   margin-left: auto;
   background: rgba(255,255,255,.18);
   border: 1px solid rgba(255,255,255,.16);
 }
 
-.chat-meta{
-  font: 900 11px system-ui;
-  opacity: .85;
-  margin-bottom: 4px;
-}
+.chat-meta{ font: 900 11px system-ui; opacity: .85; margin-bottom: 4px; }
+.chat-text{ font: 800 13px system-ui; line-height: 1.25; }
 
-.chat-text{
-  font: 800 13px system-ui;
-  line-height: 1.25;
-}
-
-/* form en bas */
 #chatForm{
-  display:flex;
+  display: flex;
   gap: 10px;
   padding: 12px;
   border-top: 1px solid rgba(255,255,255,.10);
@@ -289,221 +268,74 @@ canvas{
 
 #chatInput{
   flex: 1;
-  padding: 12px 12px;
+  padding: 12px;
   border-radius: 14px;
   border: 1px solid rgba(255,255,255,.14);
   background: rgba(0,0,0,.35);
-  color:#fff;
+  color: #fff;
   outline: none;
   font: 800 13px system-ui;
 }
 
 #chatForm button{
-  appearance:none;
-  border:0;
+  appearance: none;
+  border: 0;
   padding: 12px 14px;
   border-radius: 14px;
   background: rgba(255,255,255,.85);
-  color:#000;
+  color: #000;
   font: 1000 13px system-ui;
-  cursor:pointer;
+  cursor: pointer;
 }
 #chatForm button:active{ transform: scale(.98); }
 
-
-#gameCanvas{ z-index: 0 !important; }
-#chatOverlay{ z-index: 9999 !important; }
-
-.chat-fab{
-  display: grid;
-  place-items: center;
-}
-
-.chat-fab svg{
-  width: 26px;
-  height: 26px;
-  display: block;
-}
-
-/* Titre tablette */
-#menuTitleTablet{
-  position: absolute;
-  top: 50px;
-  left: 50%;
-  transform: translateX(-50%);
-  width: min(520px, 55vw);
-  display: none;
-  z-index: 5;
-  pointer-events: none;
-}
-
-/* Visible uniquement tablette paysage */
-@media (orientation: landscape) and (min-width: 900px){
-  #menuTitleTablet{
-    display: block;
-  }
-}/* Visible uniquement tablette paysage */
-@media (orientation: landscape) and (min-width: 900px){
-  #menuTitleTablet{
-    display: block;
-  }
-}
-
 /* =========================
-   FABs (CHAT / MUSIC / ADMIN) — téléphone OK (pas de trou)
+   ROLE OVERLAY — plein écran
 ========================= */
-
-/* 1) CHAT en haut */
-.chat-fab{
-  position: fixed;
-  right: calc(14px + env(safe-area-inset-right));
-  top:   calc(14px + env(safe-area-inset-top));
-  width: 54px;
-  height: 54px;
-  border: 0;
-  border-radius: 999px;
-  cursor: pointer;
-  z-index: 130;
-  color:#fff;
-
-  background: rgba(0,0,0,.35);
-  border: 1px solid rgba(255,255,255,.15);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
-  box-shadow: 0 14px 26px rgba(0,0,0,.25);
-
-  display: grid;
-  place-items: center;
-
-  -webkit-tap-highlight-color: transparent;
-  touch-action: manipulation;
-}
-.chat-fab:active{ transform: scale(.98); }
-.chat-fab svg{ width:26px; height:26px; display:block; }
-
-/* 2) MUSIC juste sous le chat */
-.music-fab{
-  position: fixed;
-  right: calc(14px + env(safe-area-inset-right));
-  top:   calc(14px + env(safe-area-inset-top) + 72px);
-  width: 54px;
-  height: 54px;
-  border: 0;
-  border-radius: 999px;
-  cursor: pointer;
-  z-index: 129;
-  color:#fff;
-
-  background: rgba(0,0,0,.35);
-  border: 1px solid rgba(255,255,255,.15);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
-  box-shadow: 0 14px 26px rgba(0,0,0,.25);
-
-  display: flex;
-  align-items: center;
-  justify-content: center;
-
-  -webkit-tap-highlight-color: transparent;
-  touch-action: manipulation;
-}
-.music-fab:active{ transform: scale(.97); }
-.music-fab svg{ width:24px; height:24px; fill:currentColor; }
-
-/* 3) ADMIN (Diamant) sous le son */
-.admin-fab{
-  position: fixed;
-  right: calc(14px + env(safe-area-inset-right));
-  top:   calc(14px + env(safe-area-inset-top) + 144px);
-  width: 54px;
-  height: 54px;
-  border: 0;
-  border-radius: 999px;
-  cursor: pointer;
-  z-index: 128;
-  color:#fff;
-
-  background: rgba(0,0,0,.35);
-  border: 1px solid rgba(255,255,255,.15);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
-  box-shadow: 0 14px 26px rgba(0,0,0,.25);
-
-  display: none;          /* ✅ le JS met "grid" si admin */
-  place-items: center;
-
-  -webkit-tap-highlight-color: transparent;
-  touch-action: manipulation;
-}
-.admin-fab:active{ transform: scale(.97); }
-.admin-fab svg{ width:26px; height:26px; display:block; fill:currentColor; }
-
-
-/* =========================
-   JOYSTICK — plus bas
-========================= */
-:root{ --joy-bottom: 50px; }  /* ✅ plus petit = plus bas */
-
-.joystick{
-  position: fixed;
-  left: 18px;
-  bottom: calc(var(--joy-bottom) + env(safe-area-inset-bottom));
-  z-index: 90;
-}
-
-/* petit ajustement landscape téléphone si tu veux */
-@media (max-width: 900px) and (orientation: landscape) and (pointer: coarse){
-  :root{ --joy-bottom: 90px; }
-}
-
-
-/* =========================
-   ROLE OVERLAY — plein écran (sans "case")
-========================= */
-
-/* overlay plein écran */
 #roleOverlay{
   position: fixed;
   inset: 0;
-  z-index: 10000; /* au-dessus de tout */
+  z-index: 10000;
   display: none;
   align-items: center;
   justify-content: center;
   background: rgba(0,0,0,.55);
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
 }
 #roleOverlay.open{
   display: flex;
+  opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
 }
 
-/* on enlève la "carte" */
 #roleOverlay .role-card{
   width: 100vw;
-  height: 100svh;           /* ✅ hauteur écran stable iPhone */
+  height: 100svh;
   max-width: none;
   border-radius: 0;
   padding: 0;
   background: transparent;
   border: 0;
   box-shadow: none;
-
   display: flex;
   align-items: center;
   justify-content: center;
   position: relative;
 }
 
-/* image = hauteur écran */
 #roleOverlay .role-img{
-  height: 100svh;           /* ✅ l’image fait la hauteur de l’écran */
-  width: auto;              /* garde proportions */
-  max-width: 100vw;         /* évite de dépasser sur les côtés */
-  object-fit: contain;      /* pas coupée */
+  height: 100svh;
+  width: auto;
+  max-width: 100vw;
+  object-fit: contain;
   display: block;
 }
 
-/* option : le texte par-dessus (si tu veux le garder) */
 #roleOverlay .role-title,
 #roleOverlay .role-sub{
   position: absolute;
@@ -515,22 +347,36 @@ canvas{
   font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
   pointer-events: none;
 }
-
 #roleOverlay .role-title{
   top: calc(18px + env(safe-area-inset-top));
   font: 1000 18px system-ui;
 }
-
 #roleOverlay .role-sub{
   top: calc(48px + env(safe-area-inset-top));
   font: 900 14px system-ui;
   opacity: .95;
 }
-
-/* bouton OK si jamais tu l’affiches un jour */
 #roleOverlay .role-ok{
   position: absolute;
   bottom: calc(18px + env(safe-area-inset-bottom));
   left: 50%;
   transform: translateX(-50%);
+}
+
+/* =========================
+   TABLET TITLE
+========================= */
+#menuTitleTablet{
+  position: absolute;
+  top: 50px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: min(520px, 55vw);
+  display: none;
+  z-index: 5;
+  pointer-events: none;
+}
+
+@media (orientation: landscape) and (min-width: 900px){
+  #menuTitleTablet{ display: block; }
 }
