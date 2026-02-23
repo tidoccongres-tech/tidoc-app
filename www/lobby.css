@@ -342,12 +342,10 @@ canvas{
 }
 
 /* =========================
-   FABs (CHAT / ADMIN / MUSIC) — VERSION PROPRE
-   ✅ 1 seule source de vérité
-   ✅ identique tel + tablette
+   FABs (CHAT / MUSIC / ADMIN) — téléphone OK (pas de trou)
 ========================= */
 
-/* CHAT (FAB) */
+/* 1) CHAT en haut */
 .chat-fab{
   position: fixed;
   right: calc(14px + env(safe-area-inset-right));
@@ -373,28 +371,10 @@ canvas{
   touch-action: manipulation;
 }
 .chat-fab:active{ transform: scale(.98); }
+.chat-fab svg{ width:26px; height:26px; display:block; }
 
-.chat-fab svg{
-  width: 26px;
-  height: 26px;
-  display: block;
-}
-
-.chat-fab .badge{
-  position:absolute;
-  top: 9px;
-  right: 9px;
-  width: 12px;
-  height: 12px;
-  border-radius: 999px;
-  background: #ff2d2d;
-  border: 2px solid rgba(0,0,0,.6);
-  display:none;
-}
-.chat-fab.has-unread .badge{ display:block; }
-
-/* ADMIN (Diamant) — sous le chat */
-.admin-fab{
+/* 2) MUSIC juste sous le chat */
+.music-fab{
   position: fixed;
   right: calc(14px + env(safe-area-inset-right));
   top:   calc(14px + env(safe-area-inset-top) + 72px);
@@ -412,25 +392,18 @@ canvas{
   -webkit-backdrop-filter: blur(10px);
   box-shadow: 0 14px 26px rgba(0,0,0,.25);
 
-  display: none;          /* ✅ ton JS met "grid" quand admin */
-  place-items: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 
   -webkit-tap-highlight-color: transparent;
   touch-action: manipulation;
-
-  transition: transform .12s ease;
 }
-.admin-fab:active{ transform: scale(.97); }
+.music-fab:active{ transform: scale(.97); }
+.music-fab svg{ width:24px; height:24px; fill:currentColor; }
 
-.admin-fab svg{
-  width: 26px;
-  height: 26px;
-  display: block;
-  fill: currentColor;
-}
-
-/* MUSIC — sous admin */
-.music-fab{
+/* 3) ADMIN (Diamant) sous le son */
+.admin-fab{
   position: fixed;
   right: calc(14px + env(safe-area-inset-right));
   top:   calc(14px + env(safe-area-inset-top) + 144px);
@@ -448,30 +421,21 @@ canvas{
   -webkit-backdrop-filter: blur(10px);
   box-shadow: 0 14px 26px rgba(0,0,0,.25);
 
-  display:flex;
-  align-items:center;
-  justify-content:center;
+  display: none;          /* ✅ le JS met "grid" si admin */
+  place-items: center;
 
   -webkit-tap-highlight-color: transparent;
   touch-action: manipulation;
-
-  transition: transform .12s ease;
 }
-.music-fab:active{ transform: scale(.97); }
-
-.music-fab svg{
-  width: 24px;
-  height: 24px;
-  fill: currentColor;
-}
+.admin-fab:active{ transform: scale(.97); }
+.admin-fab svg{ width:26px; height:26px; display:block; fill:currentColor; }
 
 
 /* =========================
-   JOYSTICK — variable bottom propre (optionnel)
+   JOYSTICK — plus bas
 ========================= */
-:root{
-  --joy-bottom: 140px; /* valeur que tu avais au début */
-}
+:root{ --joy-bottom: 50px; }  /* ✅ plus petit = plus bas */
+
 .joystick{
   position: fixed;
   left: 18px;
