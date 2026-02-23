@@ -918,9 +918,13 @@ async function completeCurrentTask(){
   const z = zones.find(z => z.id === t.zoneId);
   if (!z){ setStartInfo("Zone de mission introuvable."); return; }
 
-  const d = dist(player.x, player.y, z.cx, z.cy);
-  if (d > ZONE_RANGE){ setStartInfo("Va sur la zone indiquée (flèche)."); return; }
-
+  const range = getZoneRange(t.zoneId);
+const d = dist(player.x, player.y, z.cx, z.cy);
+if (d > range){
+  setStartInfo("Va sur la zone indiquée (flèche).");
+  return;
+}
+  
   try{
     const nextIndex = myTaskIndex + 1;
 
@@ -1215,13 +1219,17 @@ function showReportSplash(bodyName, meetingAtMs){
   }, REPORT_SPLASH_MS);
 
   // après débat : on déverrouille
- meetingTimers.debate = setTimeout(async () => {
-  safeStyle(debatePill, "display", "none");
-  setMeetingLock(false);
+  meetingTimers.debate = setTimeout(async () => {
+    safeStyle(debatePill, "display", "none");
+    setMeetingLock(false);
 
-  // ✅ lance le vote après le débat
-  await hostStartVote();
-}, DEBATE_MS);
+    // ✅ lance le vote après le débat
+    if (typeof hostStartVote === "function") {
+      await hostStartVote();
+    }
+  }, DEBATE_MS);
+
+} // ✅ IMPORTANT: fermeture manquante de showReportSplash()
 
 function hideReportSplash(){
   safeStyle(reportOverlay, "display", "none");
@@ -1364,8 +1372,11 @@ function openVoteUI(endVoteMs){
     }
   }
 
-  voteSkipBtn?.addEventListener("click", () => sendVote(null), { once:true });
-
+  let voteSkipBound = false;
+if (!voteSkipBound && voteSkipBtn){
+  voteSkipBound = true;
+  voteSkipBtn.addEventListener("click", () => sendVote(null));
+}
   // timer affiché
   const tick = () => {
     const s = Math.max(0, Math.ceil((endVoteMs - Date.now())/1000));
@@ -1551,9 +1562,10 @@ setDebateUI(true, "Débat : identifiez le Ti’Truant 🕵️‍♀️"); // ✅
 openChat();
 
       meetingTimers.debate = setTimeout(() => {
-        safeStyle(debatePill, "display", "none");
-        setMeetingLock(false);
-      }, DEBATE_MS);
+  safeStyle(debatePill, "display", "none");
+  setDebateUI(false, "");      // ✅ AJOUT
+  setMeetingLock(false);
+}, DEBATE_MS);
     }
   }
 }
