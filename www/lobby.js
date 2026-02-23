@@ -3510,11 +3510,6 @@ if (
 }
       // END screen (safe)
       try { checkEndConditions(room); } catch(_) {}
-
-      // modes (1 seul endroit)
-      if (phase === "starting" && !spinRunning){
-  playSpinThenReveal(null);
-}
       
       else if (status === "started"){
         spinRunning = false;
