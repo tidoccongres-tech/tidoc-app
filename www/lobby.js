@@ -1071,15 +1071,24 @@ function resize(){
   if (!canvas || !ctx) return;
 
   DPR = window.devicePixelRatio || 1;
-  canvas.width  = Math.floor(window.innerWidth * DPR);
-  canvas.height = Math.floor(window.innerHeight * DPR);
-  canvas.style.width = window.innerWidth + "px";
-  canvas.style.height = window.innerHeight + "px";
+  const vv = window.visualViewport;
+
+  const cssW = Math.floor(vv?.width  || window.innerWidth);
+  const cssH = Math.floor(vv?.height || window.innerHeight);
+
+  canvas.width  = Math.floor(cssW * DPR);
+  canvas.height = Math.floor(cssH * DPR);
+
+  canvas.style.width  = cssW + "px";
+  canvas.style.height = cssH + "px";
+
   ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
 }
 
 resize();
 window.addEventListener("resize", resize);
+window.visualViewport?.addEventListener("resize", resize);
+window.visualViewport?.addEventListener("scroll", resize);
 
 // ===================
 // GAME STATE
