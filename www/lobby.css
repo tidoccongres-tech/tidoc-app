@@ -10,10 +10,18 @@ html, body{
 }
 
 .lobby-root{
-  position:relative;
-  width:100vw;
-  height:100vh;
-  background:#000;
+  position: relative;
+  width: 100vw;
+  height: 100vh;     /* fallback */
+  height: 100svh;    /* iOS stable viewport */
+  background: #0b3440;  /* pas noir */
+}
+html, body{
+  background:#0b3440;
+}
+#gameCanvas{
+  background:#0b3440;
+  display:block;
 }
 
 /* Canvas plein écran */
