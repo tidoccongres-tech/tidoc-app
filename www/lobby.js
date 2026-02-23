@@ -1039,7 +1039,7 @@ const ZONE_RANGE_BASE = 92;
 
 // ✅ zone plus facile à atteindre (RCP)
 const ZONE_RANGE_BY_ID = {
-  rcp: 260, // ajuste si tu veux encore plus (ex: 160)
+  rcp: 400, // ajuste si tu veux encore plus (ex: 160)
 };
 
 function getZoneRange(zoneId){
