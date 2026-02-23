@@ -157,8 +157,13 @@ debateBanner.style.cssText = `
 `;
 debateBanner.textContent = "";
 // on l’injecte en haut de l’overlay du chat
-if (chatOverlay){
-  chatOverlay.prepend(debateBanner);
+const chatPanel = chatOverlay?.querySelector(".chat-panel");
+const chatHead  = chatOverlay?.querySelector(".chat-head");
+
+if (chatPanel){
+  // place le banner juste SOUS le header du chat
+  if (chatHead?.nextSibling) chatPanel.insertBefore(debateBanner, chatHead.nextSibling);
+  else chatPanel.appendChild(debateBanner);
 }
 
 let debateEndMs = 0;
@@ -1079,12 +1084,12 @@ function openChat(){
 
   // ✅ Message d'aide si débat et chat vide
   if (chatMessagesEl && debateUiActive && !chatMessagesEl.children.length){
-    chatMessagesEl.innerHTML = `
-      <div style="opacity:.85;padding:14px;font:900 13px system-ui;">
-        Débat en cours… discutez et accusez quelqu’un avant la fin du timer 👀
-      </div>
-    `;
-  }
+  chatMessagesEl.innerHTML = `
+    <div style="opacity:.92;padding:14px;font:900 13px system-ui;color:#fff;">
+      Débat en cours… discutez et accusez quelqu’un avant la fin du timer 👀
+    </div>
+  `;
+}
 
   if (chatCanWriteNow){
     setTimeout(() => chatInput?.focus?.(), 80);
