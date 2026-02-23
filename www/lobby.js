@@ -1630,8 +1630,15 @@ function hideRoleOverlay(){
 }
 function setOverlayFace(which){
   if (!roleImg) return;
+
+  // relance anim même en spam
+  roleImg.classList.remove("spin");
+  void roleImg.offsetWidth;
+
   roleImg.src = (which === "titruant") ? titruantImgSrc : tinocentImgSrc;
+  roleImg.classList.add("spin");
 }
+
 function setOverlayFinal(role){
   const isTruant = (role === "titruant");
   if (roleTitle) roleTitle.textContent = "Ton rôle";
