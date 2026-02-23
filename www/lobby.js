@@ -1460,7 +1460,21 @@ async function resolveVoteAndMaybeExpel(){
     console.log("resolveVoteAndMaybeExpel error:", e);
   }
 }
-  
+
+async function hostClearVotes(){
+  if (!myIsHost) return;
+
+  try{
+    const snapVotes = await getDocs(collection(db, "rooms", roomId, "votes"));
+    await Promise.all(
+      snapVotes.docs.map(d => deleteDoc(d.ref).catch(()=>{}))
+    );
+    console.log("[VOTE] votes nettoyés");
+  }catch(e){
+    console.warn("[VOTE] clear error", e);
+  }
+}
+
 function handleMeetingState(room, status){
   if (status !== "started"){
     setMeetingLock(false);
