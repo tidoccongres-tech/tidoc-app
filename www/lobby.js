@@ -1805,7 +1805,8 @@ function setLobbyMode(){
   setCanvasInteract(false);
   setMeetingLock(false);
   hideReportSplash();
-  safeStyle(debatePill, "display", "none");
+  const pill = ensureDebatePill();
+  pill.style.display = "none";
   clearMeetingTimers();
   meetingAtMsLocal = 0;
 
@@ -1837,7 +1838,8 @@ function setStartingMode(){
 
   setMeetingLock(false);
   hideReportSplash();
-  safeStyle(debatePill, "display", "none");
+  const pill = ensureDebatePill();
+  pill.style.display = "none";
   clearMeetingTimers();
   meetingAtMsLocal = 0;
 
@@ -3376,7 +3378,28 @@ async function ensureSpawnCenter(){
   }
 }
 
-function refreshChatGating(){ /* TODO */ }
+function refreshChatGating(status){
+  if (!chatOverlay) return;
+
+  // Lobby / Starting => chat libre
+  if (status !== "started"){
+    chatCanViewNow = true;
+    chatCanWriteNow = true;
+  }
+  else {
+    // En jeu
+    chatCanViewNow = !!roomChatEnabled;
+    chatCanWriteNow = !!roomChatEnabled && !myDead;
+  }
+
+  setChatFabVisible(chatCanViewNow);
+  applyChatWriteLock();
+
+  if (!chatCanViewNow && chatOverlay.classList.contains("open")){
+    closeChat(true);
+  }
+}
+
 function checkEndConditions(){ /* TODO */ }
 
 onAuthStateChanged(auth, async (u) => {
