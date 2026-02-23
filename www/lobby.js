@@ -10,6 +10,42 @@ import {
 function asset(p){ return new URL(p, import.meta.url).href; }
 
 // ===================
+// DEBUG OVERLAY (affiche les erreurs à l'écran)
+// ===================
+(function installDebugOverlay(){
+  const box = document.createElement("div");
+  box.id = "debugOverlay";
+  box.style.cssText = `
+    position:fixed; inset:auto 10px 10px 10px;
+    z-index:999999;
+    padding:10px 12px;
+    border-radius:12px;
+    background:rgba(0,0,0,.78);
+    border:1px solid rgba(255,255,255,.18);
+    color:#fff;
+    font:900 12px system-ui;
+    white-space:pre-wrap;
+    display:none;
+  `;
+  document.body.appendChild(box);
+
+  function show(msg){
+    box.style.display = "block";
+    box.textContent = String(msg || "Erreur inconnue");
+  }
+
+  window.addEventListener("error", (e) => {
+    show(`❌ JS ERROR:\n${e?.message}\n${e?.filename}:${e?.lineno}:${e?.colno}`);
+    console.error("[WINDOW ERROR]", e?.message, e?.filename, e?.lineno, e?.colno, e?.error);
+  });
+
+  window.addEventListener("unhandledrejection", (e) => {
+    show(`❌ PROMISE REJECT:\n${e?.reason?.message || e?.reason || "rejection"}`);
+    console.error("[UNHANDLED PROMISE]", e?.reason);
+  });
+})();
+
+// ===================
 // STATE
 // ===================
 let phase = "lobby";
