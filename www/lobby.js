@@ -1372,7 +1372,10 @@ function openVoteUI(endVoteMs){
     }
   }
 
-  let voteSkipBound = false;
+  // en global
+let voteSkipBound = false;
+
+// dans openVoteUI
 if (!voteSkipBound && voteSkipBtn){
   voteSkipBound = true;
   voteSkipBtn.addEventListener("click", () => sendVote(null));
@@ -3520,20 +3523,25 @@ if (
 ){
   hostTallyAndApplyVote({ room, voteAtMs, voteDurMs, voteRound });
 }
-      // END screen (safe)
-      try { checkEndConditions(room); } catch(_) {}
-      
-      else if (status === "started"){
-        spinRunning = false;
-        hideRoleOverlay();
-        setGameMode();
-      } 
-      
-      else {
-        spinRunning = false;
-        hideRoleOverlay();
-        setLobbyMode();
-      }
+     // END screen (safe)
+try { checkEndConditions(room); } catch(_) {}
+
+// ✅ switch d'état propre
+if (status === "starting") {
+  spinRunning = false;
+  hideRoleOverlay();
+  setStartingMode();
+}
+else if (status === "started") {
+  spinRunning = false;
+  hideRoleOverlay();
+  setGameMode();
+}
+else {
+  spinRunning = false;
+  hideRoleOverlay();
+  setLobbyMode();
+}
 
       // gating chat
       refreshChatGating(status);
