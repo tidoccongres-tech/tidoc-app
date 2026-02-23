@@ -22,6 +22,13 @@ const btnMusicToggle = document.getElementById("btnMusicToggle");
 const iconOn  = document.getElementById("iconSoundOn");
 const iconOff = document.getElementById("iconSoundOff");
 
+const uiPanel = document.querySelector(".ui");
+
+function setUiPanelVisible(show){
+  if (!uiPanel) return;
+  uiPanel.style.display = show ? "" : "none";
+}
+
 // ✅ ADMIN OVERRIDE
 const btnAdminStart = document.getElementById("btnAdminStart");
 
@@ -1069,8 +1076,11 @@ function forceOpenChat(){
 function setLobbyMode(){
   gameStarted = false;
   phase = "lobby";
+
+  // ✅ menu visible
+  setUiPanelVisible(true);
+
   joy?.classList.remove("is-hidden");
-  
 
   setCanvasInteract(false);
   setMeetingLock(false);
@@ -1089,9 +1099,15 @@ function setLobbyMode(){
   try{ closeActivityUI(); } catch(_) {}
 }
 
+
+
 function setStartingMode(){
   gameStarted = false;
   phase = "starting";
+
+  // ✅ menu caché pendant tirage
+  setUiPanelVisible(false);
+
   joy?.classList.add("is-hidden");
 
   setMeetingLock(false);
@@ -1110,20 +1126,27 @@ function setStartingMode(){
   try{ closeActivityUI(); } catch(_) {}
 }
 
+
+
 function setGameMode(){
   gameStarted = true;
   phase = "started";
 
-  // joystick visible en game (vivant = move / mort = pan caméra)
+  // ✅ menu totalement caché en jeu
+  setUiPanelVisible(false);
+
   if (!meetingLockActive) joy?.classList.remove("is-hidden");
 
-  // chat: visible si room.chatEnabled
   chatCanViewNow  = !!roomChatEnabled;
   chatCanWriteNow = !!roomChatEnabled && !myDead;
 
   setCanvasInteract(myDead && !meetingLockActive);
   setChatFabVisible(chatCanViewNow);
-  if (!chatCanViewNow && chatOverlay?.classList.contains("open")) closeChat(true);
+
+  if (!chatCanViewNow && chatOverlay?.classList.contains("open")){
+    closeChat(true);
+  }
+
   applyChatWriteLock();
 
   showTasksHud(true);
