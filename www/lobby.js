@@ -1170,6 +1170,9 @@ window.addEventListener("resize", resize);
 window.visualViewport?.addEventListener("resize", resize);
 window.visualViewport?.addEventListener("scroll", resize);
 
+// ✅ démarre le rendu immédiatement (même avant Firebase)
+startLoopOnce();
+
 // ===================
 // GAME STATE
 // ===================
