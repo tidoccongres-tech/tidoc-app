@@ -947,8 +947,17 @@ function setActionUI({ show=false, label="", disabled=false }){
 }
 
 // Ranges
-const REPORT_RANGE  = 86;
-const ZONE_RANGE    = 92;
+const REPORT_RANGE = 86;
+const ZONE_RANGE_BASE = 92;
+
+// ✅ zone plus facile à atteindre (RCP)
+const ZONE_RANGE_BY_ID = {
+  rcp: 140, // ajuste si tu veux encore plus (ex: 160)
+};
+
+function getZoneRange(zoneId){
+  return ZONE_RANGE_BY_ID[zoneId] ?? ZONE_RANGE_BASE;
+}
 
 // Expulse anti-flicker (hystérésis + lock)
 const EXPEL_SHOW_RANGE = 84;
