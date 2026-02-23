@@ -2489,15 +2489,16 @@ function listenMyRole(){
     const role = d.role;
     if (!role) return;
 
-    if (!myRole){
-      myRole = role;
-      setRoleHud(myRole);
-      updateMyTaskHud();
+   if (!myRole){
+  myRole = role;
+  setRoleHud(myRole);
+  updateMyTaskHud();
 
-    if (phase === "starting" && !spinRunning){
-  playSpinThenReveal(null);
+  // ✅ SAFE : ne relance pas si déjà ouvert/spinning
+  if (phase === "starting" && !spinRunning && roleOverlay && !roleOverlay.classList.contains("open")){
+    playSpinThenReveal(null);
+  }
 }
-    }
   });
 
   return unsub;
@@ -3651,11 +3652,17 @@ try { checkEndConditions(room); } catch(_) {}
 
 // ✅ switch d'état propre
 if (status === "starting") {
-  spinRunning = false;
-  hideRoleOverlay();
+  // ne force PAS spinRunning=false ici, sinon ça casse l'anim si plusieurs snapshots arrivent
   setStartingMode();
+
+  // ✅ IMPORTANT : déclenche le spin dès qu'on ENTRE en starting
+  // (même si myRole a déjà été reçu avant)
+  if (!spinRunning) {
+    playSpinThenReveal(null); // spin + révélation quand myRole arrive
+  }
 }
 else if (status === "started") {
+  // en jeu -> on ferme l'overlay de tirage
   spinRunning = false;
   hideRoleOverlay();
   setGameMode();
