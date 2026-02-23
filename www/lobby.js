@@ -1514,11 +1514,20 @@ const ZOOM_GAME  = 1.7;
 const CAM_LERP   = 0.12;
 let camX = 0, camY = 0;
 
-// FOV plus grand (téléphone)
+// Vision: on utilise une "taille écran de référence" clampée
 const VISION_SCREEN_FACTOR = 0.58;
 
+// Réglages: adapte si tu veux plus/moins de vision
+const VISION_MIN_PX = 360; // évite que petits téléphones aient trop peu
+const VISION_MAX_PX = 520; // empêche tablettes d'avoir trop
+
 function getVisionRadiusWorld(){
-  const rScreen = Math.min(window.innerWidth, window.innerHeight) * VISION_SCREEN_FACTOR;
+  const minWH = Math.min(window.innerWidth, window.innerHeight);
+
+  // clamp écran
+  const ref = Math.max(VISION_MIN_PX, Math.min(VISION_MAX_PX, minWH));
+
+  const rScreen = ref * VISION_SCREEN_FACTOR;
   return rScreen / ZOOM_GAME;
 }
 
