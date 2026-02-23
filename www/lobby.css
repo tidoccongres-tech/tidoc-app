@@ -444,3 +444,13 @@ html, body{
   backdrop-filter: blur(14px);
   -webkit-backdrop-filter: blur(14px);
 }
+
+#chatInput, input, textarea, select, button{
+  font-size:16px;
+}
+
+html, body{
+  touch-action: manipulation;
+}
+
+
