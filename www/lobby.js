@@ -368,6 +368,17 @@ function setChatFabVisible(show){
   }
 }
 
+function isInRoom(roomId) {
+  return exists(/databases/$(database)/documents/rooms/$(roomId)/players/$(uid()));
+}
+
+function onlyIncrementsTasksDoneByOne() {
+  return request.resource.data.diff(resource.data).changedKeys().hasOnly(["tasksDone"])
+    && request.resource.data.tasksDone is int
+    && resource.data.tasksDone is int
+    && request.resource.data.tasksDone == resource.data.tasksDone + 1;
+}
+
 // ===================
 // HUD RÔLE (haut droite)
 // ===================
