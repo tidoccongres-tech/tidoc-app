@@ -588,15 +588,261 @@ function startTapOrderMiniGame({ steps = 6 } = {}){
   setProgress();
 }
 
+function randInt(a, b){ // inclusif
+  return a + cryptoRandInt((b - a + 1));
+}
+
+// ✅ Mini-jeu 1 : TAP ORDER (tu l’as déjà, je le laisse tel quel)
+/// startTapOrderMiniGame ...
+
+// ✅ Mini-jeu 2 : “Tape X fois vite” (spam contrôlé)
+function startRapidTapMiniGame({ taps = 18, timeMs = 4500 } = {}){
+  let count = 0;
+  const endAt = Date.now() + timeMs;
+
+  const box = document.createElement("div");
+  box.style.cssText = `display:flex; flex-direction:column; gap:12px; align-items:center; text-align:center;`;
+
+  const big = document.createElement("button");
+  big.type = "button";
+  big.textContent = "TAPE !";
+  big.style.cssText = `
+    width:min(360px, 92vw); height:110px; border-radius:22px;
+    appearance:none; border:0; font:1000 22px system-ui;
+    color:#000; background:rgba(255,255,255,.88); box-shadow:0 14px 28px rgba(0,0,0,.25);
+  `;
+
+  const info = document.createElement("div");
+  info.style.cssText = `font:900 12px system-ui; opacity:.92;`;
+
+  function tick(){
+    const left = Math.max(0, endAt - Date.now());
+    const pct = Math.max(0, Math.min(1, count / taps)) * 100;
+    activityBarEl.style.width = `${pct}%`;
+    info.textContent = `${count}/${taps} — Temps: ${Math.ceil(left/1000)}s`;
+
+    if (left <= 0){
+      if (count >= taps){
+        activityDone = true;
+        activityBarEl.style.width = "100%";
+        activitySubEl.textContent = "Terminé ✅";
+        setTimeout(async () => { closeActivityUI(); await completeCurrentTask(); }, 250);
+      } else {
+        // reset si échec
+        count = 0;
+        activitySubEl.textContent = "Trop lent… recommence !";
+        activityBarEl.style.width = "0%";
+        setTimeout(() => { activitySubEl.textContent = "Tape vite !"; }, 700);
+      }
+    } else if (!activityDone) {
+      requestAnimationFrame(tick);
+    }
+  }
+
+  big.addEventListener("click", () => {
+    if (activityDone) return;
+    count++;
+  });
+
+  box.appendChild(info);
+  box.appendChild(big);
+  activityBodyEl.appendChild(box);
+
+  activitySubEl.textContent = "Tape vite !";
+  requestAnimationFrame(tick);
+}
+
+// ✅ Mini-jeu 3 : “Maintiens pour remplir” (hold)
+function startHoldToFillMiniGame({ holdMs = 1600 } = {}){
+  let holding = false;
+  let holdStart = 0;
+
+  const box = document.createElement("div");
+  box.style.cssText = `display:flex; flex-direction:column; gap:12px; align-items:center; text-align:center;`;
+
+  const btn = document.createElement("button");
+  btn.type = "button";
+  btn.textContent = "MAINTIENS";
+  btn.style.cssText = `
+    width:min(360px, 92vw); height:110px; border-radius:22px;
+    appearance:none; border:0; font:1000 20px system-ui;
+    color:#000; background:rgba(255,255,255,.88); box-shadow:0 14px 28px rgba(0,0,0,.25);
+    touch-action:none;
+  `;
+
+  const info = document.createElement("div");
+  info.style.cssText = `font:900 12px system-ui; opacity:.92;`;
+  info.textContent = "Reste appuyé jusqu’à 100%";
+
+  function frame(){
+    if (activityDone) return;
+
+    let pct = 0;
+    if (holding){
+      const t = Date.now() - holdStart;
+      pct = Math.max(0, Math.min(1, t / holdMs)) * 100;
+      if (pct >= 100){
+        activityDone = true;
+        activityBarEl.style.width = "100%";
+        activitySubEl.textContent = "Terminé ✅";
+        setTimeout(async () => { closeActivityUI(); await completeCurrentTask(); }, 250);
+        return;
+      }
+    }
+    activityBarEl.style.width = `${pct}%`;
+    requestAnimationFrame(frame);
+  }
+
+  function startHold(e){
+    if (activityDone) return;
+    holding = true;
+    holdStart = Date.now();
+    btn.style.opacity = "0.85";
+    e?.preventDefault?.();
+  }
+  function endHold(e){
+    if (activityDone) return;
+    holding = false;
+    btn.style.opacity = "1";
+    activityBarEl.style.width = "0%";
+    activitySubEl.textContent = "Relâché… recommence";
+    setTimeout(() => { if (!activityDone) activitySubEl.textContent = "Maintiens…"; }, 600);
+    e?.preventDefault?.();
+  }
+
+  btn.addEventListener("pointerdown", startHold, { passive:false });
+  btn.addEventListener("pointerup", endHold, { passive:false });
+  btn.addEventListener("pointercancel", endHold, { passive:false });
+  btn.addEventListener("pointerleave", endHold, { passive:false });
+
+  box.appendChild(info);
+  box.appendChild(btn);
+  activityBodyEl.appendChild(box);
+
+  activitySubEl.textContent = "Maintiens…";
+  requestAnimationFrame(frame);
+}
+
+// ✅ Mini-jeu 4 : “Clique la cible” (cible qui bouge)
+function startMovingTargetMiniGame({ hits = 5 } = {}){
+  let left = hits;
+
+  const area = document.createElement("div");
+  area.style.cssText = `
+    position:relative; width:min(520px, 92vw); height:280px;
+    border-radius:18px; border:1px solid rgba(255,255,255,.14);
+    background: rgba(255,255,255,.06);
+    overflow:hidden; margin: 0 auto;
+  `;
+
+  const target = document.createElement("button");
+  target.type = "button";
+  target.textContent = "●";
+  target.style.cssText = `
+    position:absolute; width:62px; height:62px; border-radius:999px;
+    appearance:none; border:0; font:1000 26px system-ui;
+    color:#000; background:rgba(255,255,255,.88);
+    box-shadow:0 12px 26px rgba(0,0,0,.25);
+  `;
+  area.appendChild(target);
+
+  function place(){
+    const pad = 10;
+    const w = area.clientWidth;
+    const h = area.clientHeight;
+    const x = randInt(pad, Math.max(pad, w - 62 - pad));
+    const y = randInt(pad, Math.max(pad, h - 62 - pad));
+    target.style.left = x + "px";
+    target.style.top  = y + "px";
+  }
+
+  function updateBar(){
+    const done = (hits - left);
+    const pct = (done / hits) * 100;
+    activityBarEl.style.width = `${pct}%`;
+    activitySubEl.textContent = `Cible: ${done}/${hits}`;
+  }
+
+  target.addEventListener("click", async () => {
+    if (activityDone) return;
+
+    left--;
+    if (left <= 0){
+      activityDone = true;
+      activityBarEl.style.width = "100%";
+      activitySubEl.textContent = "Terminé ✅";
+      await sleep(250);
+      closeActivityUI();
+      await completeCurrentTask();
+      return;
+    }
+    updateBar();
+    place();
+  });
+
+  activityBodyEl.appendChild(area);
+  updateBar();
+  place();
+}
+
 function startActivityForZone(zoneId){
-  if (zoneId === "imagerie"){ openActivityUI("Imagerie", "Scanne les repères dans l’ordre"); startTapOrderMiniGame({ steps: 6 }); return; }
-  if (zoneId === "labo"){ openActivityUI("Labo", "Valide la série d’échantillons"); startTapOrderMiniGame({ steps: 5 }); return; }
-  if (zoneId === "pharma"){ openActivityUI("Pharma", "Prépare la séquence de doses"); startTapOrderMiniGame({ steps: 6 }); return; }
-  if (zoneId === "exam"){ openActivityUI("Anamnèse", "Classe les infos dans l’ordre"); startTapOrderMiniGame({ steps: 5 }); return; }
-  if (zoneId === "soins"){ openActivityUI("Soins", "Stabilise le patient (séquence)"); startTapOrderMiniGame({ steps: 6 }); return; }
-  if (zoneId === "admin"){ openActivityUI("Dossiers", "Valide les documents"); startTapOrderMiniGame({ steps: 5 }); return; }
-  if (zoneId === "rcp"){ openActivityUI("RCP", "Confirme les étapes"); startTapOrderMiniGame({ steps: 5 }); return; }
-  openActivityUI("Activité", "Mini-jeu à brancher");
+  // Variations par zone (tu peux ajuster)
+  const variants = {
+    imagerie: () => {
+      openActivityUI("Imagerie", "Activité en cours…");
+      const r = cryptoRandInt(3);
+      if (r === 0) return startTapOrderMiniGame({ steps: randInt(5, 7) });
+      if (r === 1) return startMovingTargetMiniGame({ hits: randInt(4, 6) });
+      return startHoldToFillMiniGame({ holdMs: randInt(1200, 1900) });
+    },
+    labo: () => {
+      openActivityUI("Labo", "Activité en cours…");
+      const r = cryptoRandInt(3);
+      if (r === 0) return startTapOrderMiniGame({ steps: randInt(4, 6) });
+      if (r === 1) return startRapidTapMiniGame({ taps: randInt(14, 22), timeMs: randInt(3500, 5200) });
+      return startMovingTargetMiniGame({ hits: randInt(4, 6) });
+    },
+    pharma: () => {
+      openActivityUI("Pharma", "Activité en cours…");
+      const r = cryptoRandInt(3);
+      if (r === 0) return startTapOrderMiniGame({ steps: randInt(5, 7) });
+      if (r === 1) return startHoldToFillMiniGame({ holdMs: randInt(1400, 2100) });
+      return startRapidTapMiniGame({ taps: randInt(16, 24), timeMs: randInt(3600, 5200) });
+    },
+    exam: () => {
+      openActivityUI("Anamnèse", "Activité en cours…");
+      const r = cryptoRandInt(3);
+      if (r === 0) return startTapOrderMiniGame({ steps: randInt(4, 6) });
+      if (r === 1) return startMovingTargetMiniGame({ hits: randInt(4, 6) });
+      return startHoldToFillMiniGame({ holdMs: randInt(1200, 1800) });
+    },
+    soins: () => {
+      openActivityUI("Soins", "Activité en cours…");
+      const r = cryptoRandInt(3);
+      if (r === 0) return startTapOrderMiniGame({ steps: randInt(5, 7) });
+      if (r === 1) return startRapidTapMiniGame({ taps: randInt(16, 26), timeMs: randInt(3200, 5000) });
+      return startHoldToFillMiniGame({ holdMs: randInt(1300, 2000) });
+    },
+    admin: () => {
+      openActivityUI("Dossiers", "Activité en cours…");
+      const r = cryptoRandInt(3);
+      if (r === 0) return startTapOrderMiniGame({ steps: randInt(4, 6) });
+      if (r === 1) return startHoldToFillMiniGame({ holdMs: randInt(1100, 1700) });
+      return startMovingTargetMiniGame({ hits: randInt(4, 6) });
+    },
+    rcp: () => {
+      openActivityUI("RCP", "Activité en cours…");
+      const r = cryptoRandInt(3);
+      if (r === 0) return startTapOrderMiniGame({ steps: randInt(4, 6) });
+      if (r === 1) return startRapidTapMiniGame({ taps: randInt(14, 22), timeMs: randInt(3500, 5200) });
+      return startMovingTargetMiniGame({ hits: randInt(4, 6) });
+    }
+  };
+
+  const fn = variants[zoneId];
+  if (fn) return fn();
+
+  openActivityUI("Activité", "Mini-jeu…");
   startTapOrderMiniGame({ steps: 5 });
 }
 
