@@ -1077,10 +1077,20 @@ function openChat(){
   chatOverlay.setAttribute("aria-hidden", "false");
   document.body.classList.add("chat-open");
 
+  // ✅ Message d'aide si débat et chat vide
+  if (chatMessagesEl && debateUiActive && !chatMessagesEl.children.length){
+    chatMessagesEl.innerHTML = `
+      <div style="opacity:.85;padding:14px;font:900 13px system-ui;">
+        Débat en cours… discutez et accusez quelqu’un avant la fin du timer 👀
+      </div>
+    `;
+  }
+
   if (chatCanWriteNow){
     setTimeout(() => chatInput?.focus?.(), 80);
   }
 }
+
 function closeChat(force=false){
   if (!force && meetingLockActive) return;
   if (!chatOverlay) return;
