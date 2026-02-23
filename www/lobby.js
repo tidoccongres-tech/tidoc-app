@@ -85,6 +85,52 @@ const ADMIN_UIDS = new Set(["b831dIbb3xPcn2qhfxUuVqkVSKF3"]);
 let isAdmin = false;
 let forceStart = false;
 
+function renderPlayers(players){
+  if (!playersEl) return;
+
+  // Trie : host en premier puis alpha
+  const sorted = [...players].sort((a,b) => {
+    const ah = a?.isHost ? 1 : 0;
+    const bh = b?.isHost ? 1 : 0;
+    if (ah !== bh) return bh - ah;
+    return String(a?.name || "").localeCompare(String(b?.name || ""));
+  });
+
+  playersEl.innerHTML = "";
+
+  for (const p of sorted){
+    const name = p?.name || "Joueur";
+    const isHost = !!p?.isHost;
+    const isDead = !!p?.isDead;
+
+    const row = document.createElement("div");
+    row.className = "player-row";
+    row.style.cssText = `
+      display:flex; align-items:center; justify-content:space-between;
+      gap:10px; padding:8px 10px;
+      border-radius:12px;
+      background: rgba(255,255,255,.06);
+      border: 1px solid rgba(255,255,255,.08);
+      margin: 6px 0;
+      color:#fff;
+      font: 900 12px system-ui;
+    `;
+
+    row.innerHTML = `
+      <div style="display:flex; align-items:center; gap:8px; min-width:0;">
+        <div style="white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">
+          ${escapeHTML(name)}
+        </div>
+        ${isHost ? `<span style="opacity:.9;">👑</span>` : ""}
+        ${isDead ? `<span style="opacity:.85;">(EXPULSÉ)</span>` : ""}
+      </div>
+      <div style="opacity:.7; font: 800 11px system-ui;">${escapeHTML((p?.uid||"").slice(0,6))}</div>
+    `;
+
+    playersEl.appendChild(row);
+  }
+}
+
 // =======================
 // HELPERS (⚠️ UNE SEULE FOIS)
 // =======================
