@@ -1620,6 +1620,227 @@ function forceOpenChat(){
 }
 
 // ===================
+// VOTE OVERLAY (après débat)
+// ===================
+const VOTE_MS_DEFAULT = 30_000;
+
+const voteOverlay = document.createElement("div");
+voteOverlay.id = "voteOverlay";
+voteOverlay.style.cssText = `
+  position: fixed;
+  inset: 0;
+  z-index: 12000;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0,0,0,.62);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+`;
+
+voteOverlay.innerHTML = `
+  <div id="voteCard" style="
+    width: min(640px, calc(100vw - 28px));
+    border-radius: 22px;
+    padding: 14px;
+    background: rgba(0,0,0,.78);
+    border: 1px solid rgba(255,255,255,.14);
+    box-shadow: 0 18px 50px rgba(0,0,0,.45);
+    color:#fff;
+    font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+  ">
+    <div style="display:flex; align-items:center; justify-content:space-between; gap:10px;">
+      <div>
+        <div style="font:1000 16px system-ui; letter-spacing:.2px;">Vote</div>
+        <div id="voteSub" style="margin-top:4px; font:900 12px system-ui; opacity:.92;">Choisis un suspect ou passe</div>
+      </div>
+      <div id="voteTimerPill" style="
+        padding: 8px 10px;
+        border-radius: 999px;
+        font: 1000 12px system-ui;
+        background: rgba(255,255,255,.12);
+        border: 1px solid rgba(255,255,255,.14);
+      ">—</div>
+    </div>
+
+    <div id="voteGrid" style="
+      margin-top: 14px;
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 10px;
+    "></div>
+
+    <div style="margin-top: 12px; display:flex; gap:10px;">
+      <button id="btnVotePass" type="button" style="
+        flex:1;
+        appearance:none; border:0;
+        padding: 12px 14px;
+        border-radius: 16px;
+        font: 1000 13px system-ui;
+        color:#000;
+        background: rgba(255,255,255,.85);
+      ">Passer</button>
+
+      <button id="btnVoteClose" type="button" style="
+        appearance:none; border:0;
+        padding: 12px 14px;
+        border-radius: 16px;
+        font: 1000 13px system-ui;
+        color:#fff;
+        background: rgba(255,255,255,.12);
+        border: 1px solid rgba(255,255,255,.14);
+      ">Fermer</button>
+    </div>
+
+    <div id="voteHint" style="margin-top:10px; font:900 12px system-ui; opacity:.9;">
+      Tu ne peux voter qu’une fois.
+    </div>
+  </div>
+`;
+document.body.appendChild(voteOverlay);
+
+const voteGridEl = voteOverlay.querySelector("#voteGrid");
+const voteSubEl  = voteOverlay.querySelector("#voteSub");
+const voteTimerPillEl = voteOverlay.querySelector("#voteTimerPill");
+const btnVotePass = voteOverlay.querySelector("#btnVotePass");
+const btnVoteClose = voteOverlay.querySelector("#btnVoteClose");
+const voteHintEl = voteOverlay.querySelector("#voteHint");
+
+let voteUiOpen = false;
+let voteChosen = null;     // uid ou "pass"
+let voteRoundLocal = 0;
+let voteEndAtMsLocal = 0;
+let voteTickTimer = null;
+
+function openVoteUI({ round, endAtMs }){
+  voteUiOpen = true;
+  voteRoundLocal = round || 0;
+  voteEndAtMsLocal = endAtMs || (Date.now() + VOTE_MS_DEFAULT);
+
+  voteChosen = null;
+  voteOverlay.style.display = "flex";
+
+  // pendant vote -> on bloque move + activités (comme meeting)
+  setMeetingLock(true);
+  try{ closeActivityUI(); } catch(_) {}
+  joy?.classList.add("is-hidden");
+
+  // génère la grille de pseudos (joueurs vivants uniquement)
+  renderVoteGrid();
+
+  // timer
+  clearInterval(voteTickTimer);
+  voteTickTimer = setInterval(() => {
+    const s = Math.max(0, Math.ceil((voteEndAtMsLocal - Date.now()) / 1000));
+    if (voteTimerPillEl) voteTimerPillEl.textContent = `Vote : ${s}s`;
+    if (s <= 0){
+      clearInterval(voteTickTimer);
+      voteTickTimer = null;
+      // on laisse l’overlay (le host va dépouiller), ou on le ferme :
+      // closeVoteUI();
+    }
+  }, 200);
+}
+
+function closeVoteUI(){
+  voteUiOpen = false;
+  voteOverlay.style.display = "none";
+  clearInterval(voteTickTimer);
+  voteTickTimer = null;
+
+  // on ne déverrouille PAS ici, c'est la room qui décidera (fin vote / retour jeu)
+}
+
+function renderVoteGrid(){
+  if (!voteGridEl) return;
+
+  const alive = Array.from(playersMap.values())
+    .filter(p => p && !p.isDead && p.uid !== myUid);
+
+  voteGridEl.innerHTML = alive.map(p => {
+    const safe = escapeHTML(p.name || "Joueur");
+    return `
+      <button class="vote-btn" data-uid="${p.uid}" type="button" style="
+        padding: 12px 12px;
+        border-radius: 16px;
+        appearance:none;
+        background: rgba(255,255,255,.10);
+        border: 1px solid rgba(255,255,255,.14);
+        color:#fff;
+        font: 1000 13px system-ui;
+        text-align:left;
+      ">
+        ${safe}
+      </button>
+    `;
+  }).join("");
+
+  // bind clicks
+  voteGridEl.querySelectorAll(".vote-btn").forEach(btn => {
+    btn.addEventListener("click", async () => {
+      const uid = btn.getAttribute("data-uid");
+      if (!uid) return;
+      await submitVote(uid);
+      markVoteChosen(uid);
+    });
+  });
+}
+
+function markVoteChosen(uidOrPass){
+  voteChosen = uidOrPass;
+
+  // visuel
+  voteGridEl?.querySelectorAll(".vote-btn").forEach(b => {
+    const uid = b.getAttribute("data-uid");
+    const on = (uid === uidOrPass);
+    b.style.background = on ? "rgba(255,255,255,.24)" : "rgba(255,255,255,.10)";
+    b.style.opacity = (voteChosen && !on) ? "0.7" : "1";
+  });
+
+  if (btnVotePass){
+    const on = (uidOrPass === "pass");
+    btnVotePass.style.opacity = on ? "1" : (voteChosen ? "0.7" : "1");
+  }
+}
+
+btnVotePass?.addEventListener("click", async () => {
+  await submitVote("pass");
+  markVoteChosen("pass");
+});
+
+btnVoteClose?.addEventListener("click", () => {
+  // tu peux autoriser fermer, mais en général on laisse
+  closeVoteUI();
+});
+
+// vote write
+async function submitVote(targetUidOrPass){
+  if (!roomId || !myUid) return;
+  if (!voteRoundLocal) return;
+
+  // une fois
+  if (voteChosen) return;
+
+  try{
+    // doc id unique par round+votant
+    const voteDocId = `${voteRoundLocal}_${myUid}`;
+
+    await setDoc(doc(db, "rooms", roomId, "votes", voteDocId), {
+      round: voteRoundLocal,
+      voterUid: myUid,
+      target: targetUidOrPass, // uid ou "pass"
+      createdAt: serverTimestamp(),
+      createdAtMs: Date.now()
+    }, { merge:true });
+
+    if (voteHintEl) voteHintEl.textContent = "Vote enregistré ✅";
+  } catch(e){
+    console.log("submitVote error:", e);
+    if (voteHintEl) voteHintEl.textContent = "Erreur vote…";
+  }
+}
+  
+// ===================
 // MODES
 // ===================
 function setLobbyMode(){
