@@ -126,6 +126,47 @@ const chatMessagesEl = document.getElementById("chatMessages");
 const chatForm  = document.getElementById("chatForm");
 const chatInput = document.getElementById("chatInput");
 
+// ===================
+// DEBATE BANNER (uniquement pendant "Dénoncer")
+// ===================
+let debateUiActive = false;
+
+const debateBanner = document.createElement("div");
+debateBanner.id = "debateBanner";
+debateBanner.style.cssText = `
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  padding: 10px 12px;
+  margin: 0;
+  font: 1000 12px system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+  letter-spacing: .2px;
+  color: #fff;
+  background: rgba(0,0,0,.72);
+  border-bottom: 1px solid rgba(255,255,255,.12);
+  display: none;
+`;
+debateBanner.textContent = "";
+// on l’injecte en haut de l’overlay du chat
+if (chatOverlay){
+  chatOverlay.prepend(debateBanner);
+}
+
+function setDebateUI(on, text){
+  debateUiActive = !!on;
+
+  // bandeau
+  if (debateBanner){
+    debateBanner.style.display = debateUiActive ? "" : "none";
+    debateBanner.textContent = debateUiActive ? (text || "") : "";
+  }
+
+  // ✅ croix cachée pendant débat uniquement
+  if (btnChatClose){
+    btnChatClose.style.display = debateUiActive ? "none" : "";
+  }
+}
+
 // CANVAS (SAFE)
 const canvas = document.getElementById("gameCanvas");
 const ctx = canvas?.getContext?.("2d") || null;
@@ -1200,23 +1241,25 @@ function handleMeetingState(room, status){
       const bodyName = getPlayerNameByUid(bodyUid) || "Un Ti’Doc";
       showReportSplash(bodyName, meetingAtMs);
     } else {
+      
       // meeting “dénoncer” => chat direct + débat 60s
-      clearMeetingTimers();
+clearMeetingTimers();
 
-      safeStyle(debatePill, "display", "");
-      const endDebate = meetingAtMs + DEBATE_MS;
+safeStyle(debatePill, "display", "");
+const endDebate = meetingAtMs + DEBATE_MS;
 
-      meetingTimers.tick = setInterval(() => {
-        const now = Date.now();
-        const s = Math.max(0, Math.ceil((endDebate - now)/1000));
-        safeSet(debatePill, "textContent", `Débat : ${s}s`);
-        if (s <= 0){
-          safeStyle(debatePill, "display", "none");
-          clearMeetingTimers();
-        }
-      }, 250);
+meetingTimers.tick = setInterval(() => {
+  const now = Date.now();
+  const s = Math.max(0, Math.ceil((endDebate - now)/1000));
+  safeSet(debatePill, "textContent", `Débat : ${s}s`);
+  if (s <= 0){
+    safeStyle(debatePill, "display", "none");
+    clearMeetingTimers();
+  }
+}, 250);
 
-      openChat();
+setDebateUI(true, "Débat : identifiez le Ti’Truant 🕵️‍♀️"); // ✅ AJOUT
+openChat();
 
       meetingTimers.debate = setTimeout(() => {
         safeStyle(debatePill, "display", "none");
