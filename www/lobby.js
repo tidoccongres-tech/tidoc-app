@@ -1099,16 +1099,18 @@ let deadUidsSet = new Set();
 // ===================
 const REPORT_SPLASH_MS = 10_000; // écran expulsion visible (10s)
 const DEBATE_MS        = 60_000; // débat chat forcé (60s)
+const VOTE_MS = 30_000; // ✅ vote 30s (ajuste)
 
 let meetingLockActive = false;
 let meetingAtMsLocal = 0;
-let meetingTimers = { splash:null, debate:null, tick:null };
+let meetingTimers = { splash:null, debate:null, vote:null, tick:null };
 
 function clearMeetingTimers(){
   clearTimeout(meetingTimers.splash);
   clearTimeout(meetingTimers.debate);
+  clearTimeout(meetingTimers.vote);
   clearInterval(meetingTimers.tick);
-  meetingTimers.splash = meetingTimers.debate = meetingTimers.tick = null;
+  meetingTimers.splash = meetingTimers.debate = meetingTimers.vote = meetingTimers.tick = null;
 }
 
 function tsToMs(v){
@@ -1210,6 +1212,242 @@ function hideReportSplash(){
   safeStyle(reportOverlay, "display", "none");
 }
 
+// ===================
+// VOTE UI (après le débat)
+// ===================
+let voteUiOpen = false;
+let myVoteSent = false;
+
+const voteOverlay = document.createElement("div");
+voteOverlay.id = "voteOverlay";
+voteOverlay.style.cssText = `
+  position: fixed;
+  inset: 0;
+  z-index: 260;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0,0,0,.55);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+`;
+
+voteOverlay.innerHTML = `
+  <div style="
+    width: min(560px, calc(100vw - 24px));
+    border-radius: 20px;
+    padding: 14px;
+    background: rgba(0,0,0,.74);
+    border: 1px solid rgba(255,255,255,.14);
+    box-shadow: 0 18px 50px rgba(0,0,0,.40);
+    color: #fff;
+    font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+  ">
+    <div style="display:flex; align-items:flex-start; justify-content:space-between; gap:10px;">
+      <div>
+        <div id="voteTitle" style="font:1000 14px system-ui; letter-spacing:.2px;">
+          Vote : qui est le Ti’Truant ?
+        </div>
+        <div id="voteTimer" style="margin-top:4px; font:900 12px system-ui; opacity:.92;">
+          —
+        </div>
+      </div>
+      <button id="voteSkipBtn" type="button" style="
+        appearance:none; border:0; padding:10px 12px; border-radius:12px;
+        font:900 12px system-ui; color:#000; background: rgba(255,255,255,.88);
+      ">Passer</button>
+    </div>
+
+    <div id="voteList" style="
+      margin-top:12px;
+      display:grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    "></div>
+
+    <div id="voteStatus" style="margin-top:12px; font:900 12px system-ui; opacity:.9;"></div>
+  </div>
+`;
+document.body.appendChild(voteOverlay);
+
+const voteListEl   = voteOverlay.querySelector("#voteList");
+const voteTimerEl  = voteOverlay.querySelector("#voteTimer");
+const voteStatusEl = voteOverlay.querySelector("#voteStatus");
+const voteSkipBtn  = voteOverlay.querySelector("#voteSkipBtn");
+
+function hideVoteUI(){
+  voteUiOpen = false;
+  myVoteSent = false;
+  voteOverlay.style.display = "none";
+  if (voteListEl) voteListEl.innerHTML = "";
+  if (voteStatusEl) voteStatusEl.textContent = "";
+}
+
+function setVoteDisabled(disabled){
+  voteSkipBtn.disabled = !!disabled;
+  voteSkipBtn.style.opacity = disabled ? "0.6" : "1";
+  voteListEl?.querySelectorAll("button")?.forEach(btn => {
+    btn.disabled = !!disabled;
+    btn.style.opacity = disabled ? "0.6" : "1";
+  });
+}
+
+async function sendVote(targetUid){ // targetUid null => skip
+  if (!roomId || !myUid) return;
+  if (myVoteSent) return;
+
+  myVoteSent = true;
+  setVoteDisabled(true);
+  if (voteStatusEl) voteStatusEl.textContent = "Vote enregistré ✅";
+
+  try{
+    const ref = doc(db, "rooms", roomId, "votes", myUid);
+    await setDoc(ref, {
+      uid: myUid,
+      targetUid: targetUid || null,
+      kind: targetUid ? "vote" : "skip",
+      createdAt: serverTimestamp(),
+      createdAtMs: Date.now()
+    }, { merge:true });
+  } catch(e){
+    console.log("sendVote error:", e);
+    // si échec, on permet de re-voter
+    myVoteSent = false;
+    setVoteDisabled(false);
+    if (voteStatusEl) voteStatusEl.textContent = "Erreur envoi vote… réessaie.";
+  }
+}
+
+function openVoteUI(endVoteMs){
+  voteUiOpen = true;
+  myVoteSent = false;
+  voteOverlay.style.display = "flex";
+
+  // construit la liste depuis playersMap (vivants)
+  const alive = Array.from(playersMap.values())
+    .filter(p => p && !p.isDead && p.uid)
+    .sort((a,b) => (a.name||"").localeCompare(b.name||""));
+
+  if (voteListEl){
+    voteListEl.innerHTML = "";
+    for (const p of alive){
+      const b = document.createElement("button");
+      b.type = "button";
+      b.textContent = p.name || "Joueur";
+      b.style.cssText = `
+        appearance:none; border:0;
+        padding: 12px 12px;
+        border-radius: 14px;
+        font: 1000 13px system-ui;
+        color:#000;
+        background: rgba(255,255,255,.9);
+        box-shadow: 0 10px 24px rgba(0,0,0,.25);
+        text-align:center;
+      `;
+      b.addEventListener("click", () => sendVote(p.uid));
+      voteListEl.appendChild(b);
+    }
+  }
+
+  voteSkipBtn?.addEventListener("click", () => sendVote(null), { once:true });
+
+  // timer affiché
+  const tick = () => {
+    const s = Math.max(0, Math.ceil((endVoteMs - Date.now())/1000));
+    if (voteTimerEl) voteTimerEl.textContent = `Temps restant : ${s}s`;
+    if (s <= 0){
+      // auto-skip si rien voté
+      if (!myVoteSent) sendVote(null);
+    } else if (voteUiOpen){
+      requestAnimationFrame(tick);
+    }
+  };
+  requestAnimationFrame(tick);
+}
+
+// ===================
+// Résolution vote (HOST)
+// ===================
+async function resolveVoteAndMaybeExpel(){
+  if (!myIsHost) return;
+  if (!roomId) return;
+
+  try{
+    const snapPlayers = await getDocs(collection(db, "rooms", roomId, "players"));
+    const aliveSet = new Set(
+      snapPlayers.docs
+        .map(d => d.data())
+        .filter(p => p && !p.isDead && p.uid)
+        .map(p => p.uid)
+    );
+
+    const snapVotes = await getDocs(collection(db, "rooms", roomId, "votes"));
+    const tallies = new Map(); // uid -> count
+    let skipCount = 0;
+
+    for (const d of snapVotes.docs){
+      const v = d.data() || {};
+      const voter = v.uid;
+      if (!aliveSet.has(voter)) continue; // ignore vote de morts/déco
+
+      const target = v.targetUid || null;
+      if (!target) { skipCount++; continue; }
+      if (!aliveSet.has(target)) { skipCount++; continue; } // vote invalide -> skip
+
+      tallies.set(target, (tallies.get(target) || 0) + 1);
+    }
+
+    // trouve top
+    let bestUid = null;
+    let best = 0;
+    let tie = false;
+
+    for (const [uid, c] of tallies.entries()){
+      if (c > best){
+        best = c;
+        bestUid = uid;
+        tie = false;
+      } else if (c === best && c > 0){
+        tie = true;
+      }
+    }
+
+    // règle simple :
+    // - si égalité OU aucun vote -> personne expulsée
+    // - sinon bestUid expulsé
+    if (!bestUid || best <= 0 || tie){
+      await updateDoc(doc(db, "rooms", roomId), {
+        meetingType: null,
+        meetingAt: null,
+        meetingBy: null,
+        reportedBodyUid: null,
+        chatEnabled: true
+      }).catch(()=>{});
+      return;
+    }
+
+    const now = Date.now();
+
+    await updateDoc(doc(db, "rooms", roomId), {
+      deadUids: arrayUnion(bestUid),
+      meetingType: null,
+      meetingAt: null,
+      meetingBy: null,
+      reportedBodyUid: null,
+      chatEnabled: true
+    }).catch(()=>{});
+
+    await updateDoc(doc(db, "rooms", roomId, "players", bestUid), {
+      isDead: true,
+      deadAtMs: now,
+      deadBy: "vote"
+    }).catch(()=>{});
+
+  } catch(e){
+    console.log("resolveVoteAndMaybeExpel error:", e);
+  }
+}
+  
 function handleMeetingState(room, status){
   if (status !== "started"){
     setMeetingLock(false);
