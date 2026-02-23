@@ -1124,7 +1124,7 @@ function showReportSplash(bodyName, meetingAtMs){
     if (now < endSplash) return;
 
     if (now < endDebate){
-      const s = Math.max(0, Math.ceil((endDebate - now)/1000));
+      const s = Math.max(window.innerWidth / bw, window.innerHeight / bh);
       safeStyle(debatePill, "display", "");
       safeSet(debatePill, "textContent", `Débat : ${s}s`);
       return;
@@ -2522,6 +2522,8 @@ function draw(){
 
   ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
   ctx.clearRect(0,0,window.innerWidth, window.innerHeight);
+  ctx.fillStyle = "#0b3440";
+  ctx.fillRect(0,0,window.innerWidth, window.innerHeight);
 
   // ======================
   // LOBBY
