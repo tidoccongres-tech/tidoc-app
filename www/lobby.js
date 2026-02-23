@@ -3504,8 +3504,14 @@ if (status === "started" && voteActive && voteAtMs){
   if (voteUiOpen) hideVoteUI();
 }
 
-// Résolution côté host
-if (status === "started" && voteActive && voteAtMs && voteRound){
+if (
+  typeof voteActive !== "undefined" &&
+  typeof voteAtMs !== "undefined" &&
+  typeof voteRound !== "undefined" &&
+  typeof voteDurMs !== "undefined" &&
+  typeof hostTallyAndApplyVote === "function" &&
+  voteActive && voteAtMs && voteRound
+){
   hostTallyAndApplyVote({ room, voteAtMs, voteDurMs, voteRound });
 }
       // END screen (safe)
@@ -3513,15 +3519,20 @@ if (status === "started" && voteActive && voteAtMs && voteRound){
 
       // modes (1 seul endroit)
       if (status === "starting"){
-        if (lastRoomStatus !== "starting"){
-          setStartingMode();
-          if (!spinRunning) playSpinThenReveal(null);
-        }
-      } else if (status === "started"){
+  if (lastRoomStatus !== "starting"){
+    setStartingMode();
+    // ✅ NE PAS lancer le spin ici
+    // il sera lancé quand le rôle arrive via listenMyRole()
+  }
+}
+      
+      else if (status === "started"){
         spinRunning = false;
         hideRoleOverlay();
         setGameMode();
-      } else {
+      } 
+      
+      else {
         spinRunning = false;
         hideRoleOverlay();
         setLobbyMode();
