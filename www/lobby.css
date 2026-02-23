@@ -1,3 +1,39 @@
+:root{
+  background: #0b3440; /* iOS: évite le noir hors viewport */
+}
+
+html, body{
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  height: 100%;
+  background: #0b3440;
+  overflow: hidden;
+}
+
+/* ✅ iOS Safari: empêche la zone noire quand la barre bouge / rubber-band */
+body{
+  position: fixed;
+  inset: 0;
+}
+
+/* ton root */
+.lobby-root{
+  position: fixed;   /* ✅ au lieu de relative */
+  inset: 0;          /* ✅ couvre toujours */
+  background: #0b3440;
+}
+
+/* canvas plein écran */
+#gameCanvas{
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  height: 100vh;     /* OK car on resize en JS derrière */
+  display: block;
+  background: #0b3440;
+}
+
 /* =========================
    BASE + ROOT
 ========================= */
