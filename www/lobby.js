@@ -616,6 +616,7 @@ function openActivityUI(title, sub){
 }
 function closeActivityUI(){
   activityOpen = false;
+  activityDone = false; // ✅ reset
   activityOverlay.style.display = "none";
   activityBodyEl.innerHTML = "";
 }
