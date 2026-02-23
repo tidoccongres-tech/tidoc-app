@@ -1234,7 +1234,36 @@ function setMeetingLock(on){
 const reportOverlay = document.getElementById("reportOverlay");
 const reportCard    = document.getElementById("reportCard");
 const reportLine1   = document.getElementById("reportLine1");
-const debatePill    = document.getElementById("debatePill");
+
+// ✅ debate pill: si absent dans le HTML, on le crée → timer garanti
+let debatePill = document.getElementById("debatePill");
+
+function ensureDebatePill(){
+  if (debatePill) return debatePill;
+
+  debatePill = document.createElement("div");
+  debatePill.id = "debatePill";
+  debatePill.style.cssText = `
+    position: fixed;
+    left: 50%;
+    top: calc(12px + env(safe-area-inset-top));
+    transform: translateX(-50%);
+    z-index: 9999;
+    padding: 10px 12px;
+    border-radius: 999px;
+    font: 1000 12px system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+    letter-spacing: .2px;
+    color: #fff;
+    background: rgba(0,0,0,.70);
+    border: 1px solid rgba(255,255,255,.14);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    display: none;
+    pointer-events: none;
+  `;
+  document.body.appendChild(debatePill);
+  return debatePill;
+}
 
 function safeSet(el, prop, value){
   if (el) el[prop] = value;
@@ -1243,62 +1272,100 @@ function safeStyle(el, prop, value){
   if (el) el.style[prop] = value;
 }
 
-function showReportSplash(bodyName, meetingAtMs){
-  safeSet(reportLine1, "textContent", bodyName ? `${bodyName} a été expulsé` : "Un Ti’Doc a été expulsé…");
-  safeStyle(reportOverlay, "display", "flex");
+// ===================
+// MEETING FLOW UNIQUE (Rapporter + Dénoncer)
+// 1) report => splash 10s
+// 2) débat chat forcé 60s (timer visible)
+// 3) vote 30s (host)
+// ===================
+function startMeetingFlow({ meetingType, meetingAtMs, bodyUid }){
+  // meetingType: "report" ou "meeting"
+  // report => splash 10s puis débat
+  // meeting => débat direct
 
-  requestAnimationFrame(() => {
-    if (reportCard){
-      reportCard.style.transition = "transform 260ms cubic-bezier(.2,.9,.2,1), opacity 260ms ease";
-      reportCard.style.transform = "translateY(0px) scale(1)";
-      reportCard.style.opacity = "1";
-    }
-  });
-
-  const endSplash = meetingAtMs + REPORT_SPLASH_MS; // fin écran expulsion
-  const endDebate = endSplash + DEBATE_MS;          // fin débat
+  const pill = ensureDebatePill();
 
   clearMeetingTimers();
+  setMeetingLock(true);
 
-  // Tick chrono débat (pas le splash)
+  const isReport = (meetingType === "report");
+  const bodyName = getPlayerNameByUid(bodyUid) || "Un Ti’Doc";
+
+  const startDebateAt = meetingAtMs + (isReport ? REPORT_SPLASH_MS : 0);
+  const endDebate     = startDebateAt + DEBATE_MS;
+
+  // --- splash uniquement pour report
+  if (isReport){
+    safeSet(reportLine1, "textContent",
+      bodyUid ? `${bodyName} a été expulsé` : "Un Ti’Doc a été expulsé…"
+    );
+    safeStyle(reportOverlay, "display", "flex");
+
+    requestAnimationFrame(() => {
+      if (reportCard){
+        reportCard.style.transition = "transform 260ms cubic-bezier(.2,.9,.2,1), opacity 260ms ease";
+        reportCard.style.transform = "translateY(0px) scale(1)";
+        reportCard.style.opacity = "1";
+      }
+    });
+
+    meetingTimers.splash = setTimeout(() => {
+      safeStyle(reportOverlay, "display", "none");
+      forceOpenChat(); // ✅ chat forcé après splash
+    }, REPORT_SPLASH_MS);
+  } else {
+    // meeting => chat direct
+    safeStyle(reportOverlay, "display", "none");
+    forceOpenChat();
+  }
+
+  // --- UI débat (bannière dans le chat) => timer garanti
+  setDebateUI(true, {
+    title: "Débat",
+    subtitle: "Identifiez le Ti’Truant 🕵️‍♀️",
+    endMs: endDebate
+  });
+
+  // --- pill timer en haut (maintenant garanti car créé si absent)
   meetingTimers.tick = setInterval(() => {
     const now = Date.now();
 
-    if (now < endSplash){
-      safeStyle(debatePill, "display", "none");
+    // avant le débat (pendant splash report)
+    if (now < startDebateAt){
+      pill.style.display = "none";
       return;
     }
 
+    // pendant débat
     if (now < endDebate){
       const s = Math.max(0, Math.ceil((endDebate - now) / 1000));
-      safeStyle(debatePill, "display", "");
-      safeSet(debatePill, "textContent", `Débat : ${s}s`);
+      pill.style.display = "";
+      pill.textContent = `Débat : ${s}s`;
       return;
     }
 
-    safeStyle(debatePill, "display", "none");
+    // après débat
+    pill.style.display = "none";
     clearMeetingTimers();
   }, 250);
 
-  // après le splash: on cache l’overlay expulsion + on force le chat
-  meetingTimers.splash = setTimeout(() => {
-    safeStyle(reportOverlay, "display", "none");
-    forceOpenChat();
-  }, REPORT_SPLASH_MS);
+  // --- fin débat : unlock + vote (host)
+  const delayToEndDebate = Math.max(0, endDebate - Date.now());
 
-  // après débat : on déverrouille
   meetingTimers.debate = setTimeout(async () => {
-    safeStyle(debatePill, "display", "none");
+    pill.style.display = "none";
+
+    setDebateUI(false);
     setMeetingLock(false);
 
-    // ✅ lance le vote après le débat
+    // ✅ vote pour report ET dénoncer
     if (typeof hostStartVote === "function") {
       await hostStartVote();
     }
-  }, DEBATE_MS);
+  }, delayToEndDebate);
+}
 
-} // ✅ IMPORTANT: fermeture manquante de showReportSplash()
-
+// (on garde ta fonction pour cacher au besoin)
 function hideReportSplash(){
   safeStyle(reportOverlay, "display", "none");
 }
@@ -1588,10 +1655,15 @@ async function hostStartVote(){
 }
 
 function handleMeetingState(room, status){
+  // si pas en jeu => reset meeting UI
   if (status !== "started"){
     setMeetingLock(false);
     hideReportSplash();
-    safeStyle(debatePill, "display", "none");
+
+    const pill = ensureDebatePill();
+    pill.style.display = "none";
+
+    setDebateUI(false);
     clearMeetingTimers();
     meetingAtMsLocal = 0;
     return;
@@ -1600,60 +1672,29 @@ function handleMeetingState(room, status){
   const meetingType = room?.meetingType || "";
   const meetingAtMs = tsToMs(room?.meetingAt);
   const bodyUid     = room?.reportedBodyUid || "";
-  const hasMeeting  = !!meetingAtMs && (meetingType === "report" || meetingType === "meeting");
+
+  const hasMeeting =
+    !!meetingAtMs && (meetingType === "report" || meetingType === "meeting");
 
   if (!hasMeeting){
     setMeetingLock(false);
     hideReportSplash();
-    safeStyle(debatePill, "display", "none");
+
+    const pill = ensureDebatePill();
+    pill.style.display = "none";
+
+    setDebateUI(false);
     clearMeetingTimers();
     meetingAtMsLocal = 0;
     return;
   }
 
-  setMeetingLock(true);
-
-  if (meetingAtMs && meetingAtMs !== meetingAtMsLocal){
+  // évite de relancer le flow à chaque snapshot
+  if (meetingAtMs !== meetingAtMsLocal){
     meetingAtMsLocal = meetingAtMs;
-
-    if (meetingType === "report"){
-      const bodyName = getPlayerNameByUid(bodyUid) || "Un Ti’Doc";
-      showReportSplash(bodyName, meetingAtMs);
-   
-    } else {
-
-  // meeting “dénoncer” => chat direct + débat 60s
-  clearMeetingTimers();
-
-  safeStyle(debatePill, "display", "");
-  const endDebate = meetingAtMs + DEBATE_MS;
-
-  meetingTimers.tick = setInterval(() => {
-    const now = Date.now();
-    const s = Math.max(0, Math.ceil((endDebate - now)/1000));
-    safeSet(debatePill, "textContent", `Débat : ${s}s`);
-    if (s <= 0){
-      safeStyle(debatePill, "display", "none");
-      clearMeetingTimers();
-    }
-  }, 250);
-
-  setDebateUI(true, {
-    title: "Débat",
-    subtitle: "Identifiez le Ti’Truant 🕵️‍♀️",
-    endMs: endDebate
-  });
-
-  openChat();
-
-  meetingTimers.debate = setTimeout(() => {
-    safeStyle(debatePill, "display", "none");
-    setDebateUI(false);
-    setMeetingLock(false);
-  }, DEBATE_MS);
-    } // <-- ferme le if (meetingType === "report") { ... } else { ... }
-  }   // <-- ferme if (meetingAtMs && meetingAtMs !== meetingAtMsLocal)
-}     // <-- ferme function handleMeetingState
+    startMeetingFlow({ meetingType, meetingAtMs, bodyUid });
+  }
+}
 
 // ===================
 // SELF EXPULSED CARD (victime) : 10s puis spectateur
