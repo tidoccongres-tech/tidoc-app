@@ -1951,25 +1951,25 @@ async function playSpinThenReveal(finalRole){
   spinRunning = true;
 
   let flip = false;
-  let delay = 55;
+let delay = 40;           // démarre rapide
 
-  // ✅ spin minimum (même si role déjà connu)
-  const minSpinMs = 1300;
-  const endMin = performance.now() + minSpinMs;
+const minSpinMs = 2800;   // durée minimum du tirage (~2.8s)
+const endMin = performance.now() + minSpinMs;
 
-  // si rôle pas encore connu, on attend jusqu'à 6s max
-  const timeoutMs = 6000;
-  const deadline = performance.now() + timeoutMs;
+const timeoutMs = 6000;
+const deadline = performance.now() + timeoutMs;
 
-  while (performance.now() < deadline){
-    // animation flip
-    flip = !flip;
-    setOverlayFace(flip ? "titruant" : "tinocent");
-    await sleep(delay);
+while (performance.now() < deadline){
+  flip = !flip;
+  setOverlayFace(flip ? "titruant" : "tinocent");
 
-    // si on a déjà spin le minimum ET qu'on a le rôle => on sort
-    if (performance.now() >= endMin && (finalRole || myRole)) break;
-  }
+  await sleep(delay);
+
+  // ✅ ralentissement progressif (effet machine à sous)
+  delay = Math.min(120, delay + 6);
+
+  if (performance.now() >= endMin && (finalRole || myRole)) break;
+}
 
   const roleToShow = finalRole || myRole;
 
@@ -1984,10 +1984,11 @@ async function playSpinThenReveal(finalRole){
   }
 
   setOverlayFinal(roleToShow);
-  await sleep(900);
+  await sleep(1400); // ✅ laisse le résultat plus longtemps (au lieu de 900)
   hideRoleOverlay();
   spinRunning = false;
 }
+
 // écoute mon privateRole
 function listenMyRole(){
   if (!myUid || !roomId) return () => {};
