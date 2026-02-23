@@ -259,6 +259,23 @@ const chatBadge    = document.getElementById("chatBadge");
 const chatOverlay  = document.getElementById("chatOverlay");
 const btnChatClose = document.getElementById("btnChatClose");
 
+function setChatFabVisible(show){
+  if (!chatFab) return;
+
+  // show/hide bouton flottant
+  chatFab.style.display = show ? "" : "none";
+  chatFab.style.pointerEvents = show ? "auto" : "none";
+
+  // si on cache le chat => on cache aussi le badge
+  if (!show){
+    chatFab.classList.remove("has-unread");
+    if (chatBadge) chatBadge.hidden = true;
+  }
+}
+
+// au cas où le HTML l'appelle (rare, mais safe)
+window.setChatFabVisible = setChatFabVisible;
+
 const chatMessagesEl = document.getElementById("chatMessages");
 const chatForm  = document.getElementById("chatForm");
 const chatInput = document.getElementById("chatInput");
