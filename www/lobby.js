@@ -2273,7 +2273,7 @@ function getRemoteSprite(p){
 // PLAYERS STATE
 // ===================
 let myName = "";
-let myIsHost = false;
+myIsHost = false;
 
 let myLastExpelAtMs = 0;  // cooldown
 
@@ -3179,7 +3179,6 @@ function loop(t){
 // ===================
 // JOYSTICK
 // ===================
-const joy = document.getElementById("joystick");
 const stick = joy?.querySelector(".stick");
 
 let active = false;
