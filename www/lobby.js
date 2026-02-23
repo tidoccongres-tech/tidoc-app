@@ -1170,16 +1170,6 @@ window.addEventListener("resize", resize);
 window.visualViewport?.addEventListener("resize", resize);
 window.visualViewport?.addEventListener("scroll", resize);
 
-// ✅ démarre le rendu dès que possible (sans crash si startLoopOnce est défini plus bas)
-if (typeof startLoopOnce === "function") {
-  startLoopOnce();
-} else {
-  console.warn("[LOBBY] startLoopOnce pas encore défini → retry next tick");
-  setTimeout(() => {
-    if (typeof startLoopOnce === "function") startLoopOnce();
-  }, 0);
-}
-
 // ===================
 // GAME STATE
 // ===================
