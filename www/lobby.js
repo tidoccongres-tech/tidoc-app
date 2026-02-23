@@ -966,7 +966,7 @@ async function completeCurrentTask(){
 
   const nextIndex = myTaskIndex + 1;
 
-  // 1) ✅ on avance TOUJOURS l'index perso d'abord (sinon boucle infinie)
+  // ✅ 1) Progress perso d'abord (sinon boucle infinie si le global échoue)
   try{
     await updateDoc(doc(db, "rooms", roomId, "tasks", myUid), {
       index: nextIndex,
@@ -990,12 +990,12 @@ async function completeCurrentTask(){
     return;
   }
 
-  // 2) (optionnel) on tente le compteur global, mais si ça rate on bloque pas le joueur
+  // ✅ 2) Ensuite on tente le compteur global, mais si ça rate on bloque pas le joueur
   try{
     await updateDoc(doc(db, "rooms", roomId), { tasksDone: increment(1) });
   } catch(e){
     console.log("ROOM tasksDone increment error:", e);
-    // on laisse silencieux ou petit message si tu veux :
+    // Optionnel : message discret
     // setStartInfo("Mission validée ✅ (compteur global bloqué)");
   }
 
