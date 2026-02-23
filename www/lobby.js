@@ -238,13 +238,18 @@ if (!globalThis.crypto?.getRandomValues){
 }
 
 function cryptoRandInt(maxExclusive){
+  if (maxExclusive <= 0) return 0;
+
   const arr = new Uint32Array(1);
-  const limit = Math.floor(0xFFFFFFFF / maxExclusive) * maxExclusive;
+  const range = 0x100000000; // 2^32
+  const limit = Math.floor(range / maxExclusive) * maxExclusive;
+
   let x;
-  do {
+  do{
     crypto.getRandomValues(arr);
     x = arr[0];
   } while (x >= limit);
+
   return x % maxExclusive;
 }
 
