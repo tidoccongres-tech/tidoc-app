@@ -958,17 +958,16 @@ async function completeCurrentTask(){
   if (!z){ setStartInfo("Zone de mission introuvable."); return; }
 
   const range = getZoneRange(t.zoneId);
-const d = dist(player.x, player.y, z.cx, z.cy);
-if (d > range){
-  setStartInfo("Va sur la zone indiquée (flèche).");
-  return;
-}
-  
+  const d = dist(player.x, player.y, z.cx, z.cy);
+  if (d > range){
+    setStartInfo("Va sur la zone indiquée (flèche).");
+    return;
+  }
+
+  const nextIndex = myTaskIndex + 1;
+
+  // 1) ✅ on avance TOUJOURS l'index perso d'abord (sinon boucle infinie)
   try{
-    const nextIndex = myTaskIndex + 1;
-
-    await updateDoc(doc(db, "rooms", roomId), { tasksDone: increment(1) });
-
     await updateDoc(doc(db, "rooms", roomId, "tasks", myUid), {
       index: nextIndex,
       updatedAt: serverTimestamp()
@@ -983,14 +982,24 @@ if (d > range){
       await ensureMyTasksAssigned();
     } else {
       updateMyTaskHud();
-
     }
 
-    setStartInfo("");
   } catch(e){
-    console.log("completeCurrentTask error:", e);
-    setStartInfo("Erreur validation mission.");
+    console.log("TASK INDEX update error:", e);
+    setStartInfo(`Erreur validation mission (index): ${e?.code || ""}`);
+    return;
   }
+
+  // 2) (optionnel) on tente le compteur global, mais si ça rate on bloque pas le joueur
+  try{
+    await updateDoc(doc(db, "rooms", roomId), { tasksDone: increment(1) });
+  } catch(e){
+    console.log("ROOM tasksDone increment error:", e);
+    // on laisse silencieux ou petit message si tu veux :
+    // setStartInfo("Mission validée ✅ (compteur global bloqué)");
+  }
+
+  setStartInfo("");
 }
 
 // ===================
