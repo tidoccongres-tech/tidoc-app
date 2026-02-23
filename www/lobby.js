@@ -3653,7 +3653,10 @@ if (btnAdminStart){
 
       // meeting/report (lock + splash)
       handleMeetingState(room, status);
-
+      
+if (voteActive && voteAtMs && voteRound){
+  hostTallyAndApplyVote({ room, voteAtMs, voteDurMs, voteRound });
+}
       // END screen (safe)
       try { checkEndConditions(room); } catch(_) {}
 
