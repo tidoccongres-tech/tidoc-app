@@ -1131,13 +1131,6 @@ function clearMeetingTimers(){
   meetingTimers.splash = meetingTimers.debate = meetingTimers.vote = meetingTimers.tick = null;
 }
 
-await updateDoc(doc(db, "rooms", roomId), {
-  voteActive: true,
-  voteAt: serverTimestamp(),
-  voteDurMs: VOTE_MS,
-  voteRound: increment(1)
-});
-
 function tsToMs(v){
   if (!v) return 0;
   if (typeof v === "number") return v;
@@ -1222,12 +1215,13 @@ function showReportSplash(bodyName, meetingAtMs){
   }, REPORT_SPLASH_MS);
 
   // après débat : on déverrouille
-  meetingTimers.debate = setTimeout(() => {
-    safeStyle(debatePill, "display", "none");
-    setDebateUI(false);
-    setMeetingLock(false);
-  }, REPORT_SPLASH_MS + DEBATE_MS);
-}
+ meetingTimers.debate = setTimeout(async () => {
+  safeStyle(debatePill, "display", "none");
+  setMeetingLock(false);
+
+  // ✅ lance le vote après le débat
+  await hostStartVote();
+}, DEBATE_MS);
 
 function hideReportSplash(){
   safeStyle(reportOverlay, "display", "none");
@@ -1346,7 +1340,7 @@ function openVoteUI(endVoteMs){
 
   // construit la liste depuis playersMap (vivants)
   const alive = Array.from(playersMap.values())
-    .filter(p => p && !p.isDead && p.uid)
+    .filter(p => p && !p.isDead && p.uid && p.uid !== myUid)
     .sort((a,b) => (a.name||"").localeCompare(b.name||""));
 
   if (voteListEl){
@@ -3518,12 +3512,8 @@ if (
       try { checkEndConditions(room); } catch(_) {}
 
       // modes (1 seul endroit)
-      if (status === "starting"){
-  if (lastRoomStatus !== "starting"){
-    setStartingMode();
-    // ✅ NE PAS lancer le spin ici
-    // il sera lancé quand le rôle arrive via listenMyRole()
-  }
+      if (phase === "starting" && !spinRunning){
+  playSpinThenReveal(null);
 }
       
       else if (status === "started"){
