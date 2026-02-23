@@ -13,6 +13,7 @@ let phase = "lobby";
 let myRole = null;
 let myDead = false;
 let myUid = null;
+let voteSkipBound = false;
 
 const auth = AuthMod.auth;
 const db   = AuthMod.db;
@@ -1372,9 +1373,6 @@ function openVoteUI(endVoteMs){
     }
   }
 
-  // en global
-let voteSkipBound = false;
-
 // dans openVoteUI
 if (!voteSkipBound && voteSkipBtn){
   voteSkipBound = true;
@@ -1508,6 +1506,17 @@ async function hostTallyAndApplyVote({ room, voteAtMs, voteDurMs, voteRound }){
   await updateDoc(doc(db, "rooms", roomId), {
     voteActive: false,
     voteAt: null
+  }).catch(()=>{});
+}
+
+async function hostStartVote(){
+  if (!myIsHost) return;
+
+  await updateDoc(doc(db,"rooms",roomId), {
+    voteActive: true,
+    voteAt: serverTimestamp(),
+    voteDurMs: VOTE_MS,
+    voteRound: increment(1),
   }).catch(()=>{});
 }
 
