@@ -86,10 +86,10 @@ let isAdmin = false;
 let forceStart = false;
 
 function renderPlayers(players){
+  const playersEl = document.getElementById("playersList"); // ✅ récupère à chaque fois
   if (!playersEl) return;
 
-  // Trie : host en premier puis alpha
-  const sorted = [...players].sort((a,b) => {
+  const sorted = [...(players || [])].sort((a,b) => {
     const ah = a?.isHost ? 1 : 0;
     const bh = b?.isHost ? 1 : 0;
     if (ah !== bh) return bh - ah;
@@ -130,6 +130,8 @@ function renderPlayers(players){
     playersEl.appendChild(row);
   }
 }
+
+window.renderPlayers = renderPlayers; // ✅ au cas où le HTML l'appelle
 
 // =======================
 // HELPERS (⚠️ UNE SEULE FOIS)
