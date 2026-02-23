@@ -1199,10 +1199,12 @@ function showReportSplash(bodyName, meetingAtMs){
 
   // après splash + débat : on déverrouille
   meetingTimers.debate = setTimeout(() => {
-    safeStyle(debatePill, "display", "none");
-    setMeetingLock(false);
-  }, REPORT_SPLASH_MS + DEBATE_MS);
-}
+  safeStyle(debatePill, "display", "none");
+
+  setDebateUI(false);   // ✅ on remet le chat normal
+  setMeetingLock(false);
+
+}, DEBATE_MS);
 
 function hideReportSplash(){
   safeStyle(reportOverlay, "display", "none");
