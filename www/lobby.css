@@ -347,10 +347,6 @@ html, body{
   background: rgba(255,255,255,.92);
 }
 
-/* Empêche un conteneur plein écran de bloquer les clics */
-.lobby-root{
-  pointer-events: none;
-}
 
 /* …mais on réactive les clics sur les vrais éléments interactifs */
 .ui,
