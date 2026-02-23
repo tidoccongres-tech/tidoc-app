@@ -127,6 +127,10 @@ const roomCodeEl = document.getElementById("roomCode");
 const playersEl  = document.getElementById("playersList");
 const btnStart   = document.getElementById("btnStart");
 const btnLeave   = document.getElementById("btnLeave");
+// ✅ SAFE refs (évite ReferenceError qui casse tout le JS)
+const joy = document.getElementById("joystick"); // ton joystick HTML id="joystick"
+// ✅ SAFE host flag (sera mis à jour plus tard via Firestore)
+let myIsHost = false;
 
 const startInfo = document.getElementById("startInfo");
 function setStartInfo(msg){
