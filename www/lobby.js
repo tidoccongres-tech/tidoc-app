@@ -1171,18 +1171,11 @@ window.visualViewport?.addEventListener("resize", resize);
 window.visualViewport?.addEventListener("scroll", resize);
 
 // ===================
-// GAME STATE
+// GAME STATE (HOIST SAFE)
 // ===================
-let gameStarted = false;
-let loopRunning = false;
-let lastRoomStatus = null;
-
-// room flags
-let roomChatEnabled = false;
-let lastTalliedVoteRound = 0;
-
-// deadUids persistant (anti “revient debout”)
-let deadUidsSet = new Set();
+var gameStarted = false;
+var loopRunning = false;
+var lastRoomStatus = null;
 
 // ===================
 // MEETING / REPORT SPLASH (expulsion.png) + LOCK CHAT
