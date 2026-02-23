@@ -145,7 +145,7 @@ debateBanner.id = "debateBanner";
 debateBanner.style.cssText = `
   position: sticky;
   top: 0;
-  z-index: 5;
+  z-index: 999;
   padding: 10px 12px;
   margin: 0;
   font: 1000 12px system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
