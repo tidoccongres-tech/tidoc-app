@@ -454,3 +454,14 @@ html, body{
 }
 
 
+#debateBanner .debate-head{display:flex;align-items:center;justify-content:space-between;gap:10px;}
+#debateBanner .debate-title{font:1000 13px system-ui;}
+#debateBanner .debate-sub{font:900 11px system-ui;opacity:.85;margin-top:2px;}
+#debateBanner .debate-timer{
+  font:1000 12px system-ui;
+  padding:6px 10px;
+  border-radius:999px;
+  background: rgba(255,255,255,.12);
+  border:1px solid rgba(255,255,255,.14);
+  white-space:nowrap;
+}
