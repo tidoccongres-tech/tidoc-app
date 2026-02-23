@@ -3673,9 +3673,9 @@ if (status === "starting") {
 
   // ✅ IMPORTANT : déclenche le spin dès qu'on ENTRE en starting
   // (même si myRole a déjà été reçu avant)
-  if (!spinRunning) {
-    playSpinThenReveal(null); // spin + révélation quand myRole arrive
-  }
+  if (!spinRunning && !roleOverlay.classList.contains("open")) {
+  playSpinThenReveal(null);
+}
 }
 else if (status === "started") {
   // en jeu -> on ferme l'overlay de tirage
