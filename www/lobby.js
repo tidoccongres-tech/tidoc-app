@@ -358,28 +358,23 @@ tasksHud.innerHTML = `
     <div style="font:900 12px system-ui; opacity:.95;">Missions</div>
     <div id="tasksCount" style="font:900 12px system-ui; opacity:.95;">0/40</div>
   </div>
+
   <div style="height:10px; margin-top:8px; border-radius:999px; background: rgba(255,255,255,.12); overflow:hidden;">
     <div id="tasksBar" style="height:100%; width:0%; background: rgba(255,255,255,.85);"></div>
   </div>
 
-  <div id="myTaskLine" style="margin-top:10px; display:none; gap:10px; align-items:center;">
-    <div id="myTaskText" style="font:900 12px system-ui; opacity:.95; flex:1;">—</div>
-    <button id="btnTaskDone" type="button" style="
-      appearance:none; border:0; padding:10px 12px; border-radius:12px;
-      font:900 12px system-ui; color:#000; background: rgba(255,255,255,.85);
-    ">Valider</button>
+  <div id="myTaskLine" style="margin-top:10px; display:none;">
+    <div id="myTaskText" style="font:900 12px system-ui; opacity:.95;">—</div>
   </div>
-
-  <div id="myTaskList" style="margin-top:8px; display:none; font:800 11px system-ui; opacity:.92; line-height:1.35;"></div>
 `;
+
 document.body.appendChild(tasksHud);
 
 const tasksCountEl = tasksHud.querySelector("#tasksCount");
 const tasksBarEl   = tasksHud.querySelector("#tasksBar");
+
 const myTaskLineEl = tasksHud.querySelector("#myTaskLine");
 const myTaskTextEl = tasksHud.querySelector("#myTaskText");
-const btnTaskDone  = tasksHud.querySelector("#btnTaskDone");
-const myTaskListEl = tasksHud.querySelector("#myTaskList");
 
 let roomTasksDone = 0;
 let myTasks = [];
@@ -402,17 +397,17 @@ function currentTask(){
 function updateMyTaskHud(){
   const t = currentTask();
   const showPersonal = (myRole === "tinocent" && !myDead && phase === "started");
+
   myTaskLineEl.style.display = showPersonal ? "" : "none";
-  myTaskListEl.style.display = showPersonal ? "" : "none";
   if (!showPersonal) return;
 
   if (!t){
-    myTaskTextEl.textContent = "Ta mission: —";
-    myTaskListEl.textContent = "";
+    myTaskTextEl.textContent = "Ta mission : —";
     return;
   }
 
-  myTaskTextEl.textContent = `Ta mission: ${t.label}`;
+  myTaskTextEl.textContent = `Ta mission : ${t.label}`;
+}
 
   const list = myTasks.map((x, i) => {
     const done = i < myTaskIndex;
@@ -654,13 +649,6 @@ async function completeCurrentTask(){
     setStartInfo("Erreur validation mission.");
   }
 }
-
-btnTaskDone?.addEventListener("click", () => {
-  if (myRole !== "tinocent" || myDead || phase !== "started") return;
-  const t = currentTask();
-  if (!t) return;
-  startActivityForZone(t.zoneId);
-});
 
 // ===================
 // ACTION UI (Expulser / Rapporter / Activité)
