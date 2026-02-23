@@ -1595,42 +1595,41 @@ function handleMeetingState(room, status){
     if (meetingType === "report"){
       const bodyName = getPlayerNameByUid(bodyUid) || "Un Ti’Doc";
       showReportSplash(bodyName, meetingAtMs);
+   
     } else {
-      
-      // meeting “dénoncer” => chat direct + débat 60s
-clearMeetingTimers();
 
-safeStyle(debatePill, "display", "");
-const endDebate = meetingAtMs + DEBATE_MS;
+  // meeting “dénoncer” => chat direct + débat 60s
+  clearMeetingTimers();
 
-meetingTimers.tick = setInterval(() => {
-  const now = Date.now();
-  const s = Math.max(0, Math.ceil((endDebate - now)/1000));
-  safeSet(debatePill, "textContent", `Débat : ${s}s`);
-  if (s <= 0){
-    safeStyle(debatePill, "display", "none");
-    clearMeetingTimers();
-  }
-}, 250);
+  safeStyle(debatePill, "display", "");
+  const endDebate = meetingAtMs + DEBATE_MS;
 
-const endDebate = meetingAtMs + DEBATE_MS;
-
-setDebateUI(true, {
-  title: "Débat",
-  subtitle: "Identifiez le Ti’Truant 🕵️‍♀️",
-  endMs: endDebate
-});
-
-openChat();
-
-      meetingTimers.debate = setTimeout(() => {
-  safeStyle(debatePill, "display", "none");
-  setDebateUI(false);      
-  setMeetingLock(false);
-}, DEBATE_MS);
+  meetingTimers.tick = setInterval(() => {
+    const now = Date.now();
+    const s = Math.max(0, Math.ceil((endDebate - now)/1000));
+    safeSet(debatePill, "textContent", `Débat : ${s}s`);
+    if (s <= 0){
+      safeStyle(debatePill, "display", "none");
+      clearMeetingTimers();
     }
-  }
-}
+  }, 250);
+
+  setDebateUI(true, {
+    title: "Débat",
+    subtitle: "Identifiez le Ti’Truant 🕵️‍♀️",
+    endMs: endDebate
+  });
+
+  openChat();
+
+  meetingTimers.debate = setTimeout(() => {
+    safeStyle(debatePill, "display", "none");
+    setDebateUI(false);
+    setMeetingLock(false);
+  }, DEBATE_MS);
+    } // <-- ferme le if (meetingType === "report") { ... } else { ... }
+  }   // <-- ferme if (meetingAtMs && meetingAtMs !== meetingAtMsLocal)
+}     // <-- ferme function handleMeetingState
 
 // ===================
 // SELF EXPULSED CARD (victime) : 10s puis spectateur
