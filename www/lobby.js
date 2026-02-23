@@ -398,24 +398,29 @@ function updateMyTaskHud(){
   const t = currentTask();
   const showPersonal = (myRole === "tinocent" && !myDead && phase === "started");
 
-  myTaskLineEl.style.display = showPersonal ? "" : "none";
+  // sécurité DOM
+  if (myTaskLineEl) myTaskLineEl.style.display = showPersonal ? "" : "none";
   if (!showPersonal) return;
 
+  // Ligne "Ta mission"
   if (!t){
-    myTaskTextEl.textContent = "Ta mission : —";
-    return;
+    if (myTaskTextEl) myTaskTextEl.textContent = "Ta mission : —";
+  } else {
+    if (myTaskTextEl) myTaskTextEl.textContent = `Ta mission : ${t.label}`;
   }
 
-  myTaskTextEl.textContent = `Ta mission : ${t.label}`;
-}
-
-  const list = myTasks.map((x, i) => {
-    const done = i < myTaskIndex;
-    const cur  = i === myTaskIndex;
-    const prefix = done ? "✅" : (cur ? "➡️" : "•");
-    return `${prefix} ${x.label}`;
-  }).join("<br/>");
-  myTaskListEl.innerHTML = list;
+  // (OPTIONNEL) liste des missions si tu as un bloc HTML pour ça
+  // Exemple: <div id="myTaskList"></div>
+  const myTaskListEl = document.getElementById("myTaskList");
+  if (myTaskListEl && Array.isArray(myTasks) && myTasks.length){
+    const list = myTasks.map((x, i) => {
+      const done = i < myTaskIndex;
+      const cur  = i === myTaskIndex;
+      const prefix = done ? "✅" : (cur ? "➡️" : "•");
+      return `${prefix} ${escapeHTML(x.label)}`;
+    }).join("<br/>");
+    myTaskListEl.innerHTML = list;
+  }
 }
 
 async function ensureMyTasksAssigned(){
@@ -1506,7 +1511,7 @@ lobbyMaskImg.onload = async () => {
 // CAMERA + ZOOM
 // ===================
 const ZOOM_GAME  = 1.7;
-const CAM_LERP   = 0.12
+const CAM_LERP   = 0.12;
 let camX = 0, camY = 0;
 
 // FOV plus grand (téléphone)
