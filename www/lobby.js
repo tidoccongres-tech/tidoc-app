@@ -1122,32 +1122,41 @@ function showReportSplash(bodyName, meetingAtMs){
     }
   });
 
-  const endSplash = meetingAtMs + REPORT_SPLASH_MS;
-  const endDebate = endSplash + DEBATE_MS;
+  const endSplash = meetingAtMs + REPORT_SPLASH_MS;        // fin écran expulsion
+  const endDebate = endSplash + DEBATE_MS;                 // fin débat total
 
   clearMeetingTimers();
 
+  // ✅ Tick chrono (affiche le temps restant DU DÉBAT, pas du splash)
   meetingTimers.tick = setInterval(() => {
     const now = Date.now();
 
-    if (now < endSplash) return;
+    // pendant le splash: on peut cacher le pill (ou afficher "Débat dans 10s" si tu veux)
+    if (now < endSplash){
+      safeStyle(debatePill, "display", "none");
+      return;
+    }
 
+    // pendant le débat (60s)
     if (now < endDebate){
-      const s = Math.max(window.innerWidth / bw, window.innerHeight / bh);
+      const s = Math.max(0, Math.ceil((endDebate - now) / 1000));
       safeStyle(debatePill, "display", "");
       safeSet(debatePill, "textContent", `Débat : ${s}s`);
       return;
     }
 
+    // fin débat
     safeStyle(debatePill, "display", "none");
     clearMeetingTimers();
   }, 250);
 
+  // après le splash: on cache l’overlay expulsion + on force le chat
   meetingTimers.splash = setTimeout(() => {
     safeStyle(reportOverlay, "display", "none");
-    forceOpenChat(); // ouverture forcée après le splash
+    forceOpenChat(); // ✅ ouverture forcée après le splash
   }, REPORT_SPLASH_MS);
 
+  // après splash + débat : on déverrouille
   meetingTimers.debate = setTimeout(() => {
     safeStyle(debatePill, "display", "none");
     setMeetingLock(false);
