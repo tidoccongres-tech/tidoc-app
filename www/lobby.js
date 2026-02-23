@@ -10,6 +10,14 @@ import {
 function asset(p){ return new URL(p, import.meta.url).href; }
 
 // ===================
+// GAME LOOP FLAGS (HOIST SAFE)
+// ===================
+var loopRunning = false;
+var lastT = 0;             // sera initialisé au 1er start
+var gameStarted = false;
+var lastRoomStatus = null;
+
+// ===================
 // DEBUG OVERLAY (affiche les erreurs à l'écran)
 // ===================
 (function installDebugOverlay(){
@@ -1170,12 +1178,12 @@ window.addEventListener("resize", resize);
 window.visualViewport?.addEventListener("resize", resize);
 window.visualViewport?.addEventListener("scroll", resize);
 
-// ===================
-// GAME STATE (HOIST SAFE)
-// ===================
-var gameStarted = false;
-var loopRunning = false;
-var lastRoomStatus = null;
+// room flags
+let roomChatEnabled = false;
+let lastTalliedVoteRound = 0;
+
+// deadUids persistant (anti “revient debout”)
+let deadUidsSet = new Set();
 
 // ===================
 // MEETING / REPORT SPLASH (expulsion.png) + LOCK CHAT
@@ -1898,7 +1906,7 @@ function setGameMode(){
 function startLoopOnce(){
   if (loopRunning) return;
   loopRunning = true;
-  lastT = performance.now();
+  lastT = performance.now();     // lastT existe déjà (var)
   requestAnimationFrame(loop);
 }
 
@@ -3187,8 +3195,8 @@ function draw(){
   drawTaskArrow();
 }
 
-let lastT = performance.now();
 function loop(t){
+  if (!lastT) lastT = t;
   const dt = t - lastT;
   lastT = t;
   update(dt);
