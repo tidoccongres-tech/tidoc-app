@@ -1107,6 +1107,7 @@ let lastRoomStatus = null;
 
 // room flags
 let roomChatEnabled = false;
+let lastTalliedVoteRound = 0;
 
 // deadUids persistant (anti “revient debout”)
 let deadUidsSet = new Set();
@@ -1129,6 +1130,13 @@ function clearMeetingTimers(){
   clearInterval(meetingTimers.tick);
   meetingTimers.splash = meetingTimers.debate = meetingTimers.vote = meetingTimers.tick = null;
 }
+
+await updateDoc(doc(db, "rooms", roomId), {
+  voteActive: true,
+  voteAt: serverTimestamp(),
+  voteDurMs: VOTE_MS,
+  voteRound: increment(1)
+});
 
 function tsToMs(v){
   if (!v) return 0;
@@ -1473,6 +1481,26 @@ async function hostClearVotes(){
   }catch(e){
     console.warn("[VOTE] clear error", e);
   }
+}
+
+async function hostTallyAndApplyVote({ room, voteAtMs, voteDurMs, voteRound }){
+  if (!myIsHost) return;
+
+  const endVoteMs = voteAtMs + (voteDurMs || VOTE_MS);
+  if (Date.now() < endVoteMs) return;
+
+  // évite de re-calculer 15 fois si plusieurs snapshots arrivent
+  if (voteRound === lastTalliedVoteRound) return;
+  lastTalliedVoteRound = voteRound;
+
+  await resolveVoteAndMaybeExpel();
+  await hostClearVotes();
+
+  // ferme le vote dans la room
+  await updateDoc(doc(db, "rooms", roomId), {
+    voteActive: false,
+    voteAt: null
+  }).catch(()=>{});
 }
 
 function handleMeetingState(room, status){
@@ -3457,7 +3485,27 @@ if (btnAdminStart){
       // meeting/report (lock + splash)
       handleMeetingState(room, status);
       
-if (voteActive && voteAtMs && voteRound){
+// --- vote state depuis Firestore ---
+const voteActive = !!room.voteActive;
+const voteAtMs   = tsToMs(room.voteAt);
+const voteDurMs  = (typeof room.voteDurMs === "number") ? room.voteDurMs : VOTE_MS;
+const voteRound  = (typeof room.voteRound === "number") ? room.voteRound : 0;
+
+// UI vote pour tout le monde (sauf morts si tu veux)
+if (status === "started" && voteActive && voteAtMs){
+  const endVoteMs = voteAtMs + voteDurMs;
+
+  // ouvre l'UI vote si pas déjà ouverte
+  if (!voteUiOpen && !myDead){
+    openVoteUI(endVoteMs);
+  }
+} else {
+  // si le vote n'est plus actif, on ferme l'UI
+  if (voteUiOpen) hideVoteUI();
+}
+
+// Résolution côté host
+if (status === "started" && voteActive && voteAtMs && voteRound){
   hostTallyAndApplyVote({ room, voteAtMs, voteDurMs, voteRound });
 }
       // END screen (safe)
