@@ -59,6 +59,21 @@ function sleep(ms){ return new Promise(r => setTimeout(r, ms)); }
 
 function dist(a,b,c,d){ return Math.hypot(a-c, b-d); }
 
+function cryptoRandInt(maxExclusive){
+  // retourne un int dans [0, maxExclusive[
+  const arr = new Uint32Array(1);
+  crypto.getRandomValues(arr);
+  return arr[0] % maxExclusive;
+}
+
+function shuffleCryptoInPlace(arr){
+  for (let i = arr.length - 1; i > 0; i--){
+    const j = cryptoRandInt(i + 1);
+    [arr[i], arr[j]] = [arr[j], arr[i]];
+  }
+  return arr;
+}
+
 // =======================
 // MUSIC (Lobby) - sync avec menu
 // =======================
@@ -362,12 +377,6 @@ function setRoleHud(role){
   const isTruant = (role === "titruant" || role === "truant" || role === true);
   roleHud.textContent = `Rôle : ${isTruant ? "Ti’Truant 😈" : "Ti’Nocent 😇"}`;
   roleHud.style.display = "";
-}
-
-if (roomCodeEl) roomCodeEl.textContent = roomId || "----";
-
-if (!roomId){
-  setStartInfo("⚠️ Aucun code room dans l’URL (ex: lobby.html?room=ABCD).");
 }
 
 // ===================
@@ -1126,14 +1135,6 @@ window.visualViewport?.addEventListener("resize", resize);
 window.visualViewport?.addEventListener("scroll", resize);
 
 // ✅ démarre le rendu dès que possible (sans crash si startLoopOnce est défini plus bas)
-if (typeof startLoopOnce === "function") {
-  startLoopOnce();
-} else {
-  console.warn("[LOBBY] startLoopOnce pas encore défini → retry next tick");
-  setTimeout(() => {
-    if (typeof startLoopOnce === "function") startLoopOnce();
-  }, 0);
-}// ✅ démarre le rendu dès que possible (sans crash si startLoopOnce est défini plus bas)
 if (typeof startLoopOnce === "function") {
   startLoopOnce();
 } else {
