@@ -1005,10 +1005,9 @@ async function completeCurrentTask(){
   try{
     await updateDoc(doc(db, "rooms", roomId), { tasksDone: increment(1) });
   } catch(e){
-    console.log("ROOM tasksDone increment error:", e);
-    // Optionnel : message discret
-    // setStartInfo("Mission validée ✅ (compteur global bloqué)");
-  }
+  console.log("ROOM tasksDone increment error:", e);
+  setStartInfo(`Mission validée ✅ mais compteur global bloqué (${e?.code || "rules"})`);
+}
 
   setStartInfo("");
 }
