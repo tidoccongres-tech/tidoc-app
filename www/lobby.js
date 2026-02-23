@@ -1077,17 +1077,22 @@ function setLobbyMode(){
   clearMeetingTimers();
   meetingAtMsLocal = 0;
 
+  // chat OK en lobby
   chatCanViewNow = true;
   chatCanWriteNow = true;
   setChatFabVisible(true);
   applyChatWriteLock();
 
+  // actions / missions
   setActionUI({ show:false });
   showTasksHud(false);
   try{ closeActivityUI(); } catch(_) {}
+
+  // ✅ Admin visible UNIQUEMENT dans le lobby (et seulement admin + host)
+  if (btnAdminStart){
+    btnAdminStart.style.display = (isAdmin && myIsHost) ? "grid" : "none";
+  }
 }
-
-
 
 function setStartingMode(){
   gameStarted = false;
@@ -1104,6 +1109,7 @@ function setStartingMode(){
   clearMeetingTimers();
   meetingAtMsLocal = 0;
 
+  // chat OK pendant tirage (selon ton choix)
   chatCanViewNow = true;
   chatCanWriteNow = true;
   setChatFabVisible(true);
@@ -1112,9 +1118,12 @@ function setStartingMode(){
   setActionUI({ show:false });
   showTasksHud(false);
   try{ closeActivityUI(); } catch(_) {}
+
+  // ✅ Admin jamais visible hors lobby
+  if (btnAdminStart){
+    btnAdminStart.style.display = "none";
+  }
 }
-
-
 
 function setGameMode(){
   gameStarted = true;
@@ -1123,22 +1132,33 @@ function setGameMode(){
   // ✅ menu totalement caché en jeu
   setUiPanelVisible(false);
 
+  // joystick
   if (!meetingLockActive) joy?.classList.remove("is-hidden");
 
+  // chat (ta logique actuelle)
   chatCanViewNow  = !!roomChatEnabled;
   chatCanWriteNow = !!roomChatEnabled && !myDead;
 
+  // canvas interact: spectateur peut drag
   setCanvasInteract(myDead && !meetingLockActive);
-  setChatFabVisible(chatCanViewNow);
 
+  setChatFabVisible(chatCanViewNow);
   if (!chatCanViewNow && chatOverlay?.classList.contains("open")){
     closeChat(true);
   }
-
   applyChatWriteLock();
 
+  // missions (HUD) : affiché, mais sans bouton "valider" + sans liste si tu as appliqué mon patch missions
   showTasksHud(true);
   updateMyTaskHud();
+
+  // actions
+  setActionUI({ show:false });
+
+  // ✅ Admin jamais visible en jeu
+  if (btnAdminStart){
+    btnAdminStart.style.display = "none";
+  }
 }
 
 function startLoopOnce(){
