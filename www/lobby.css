@@ -341,69 +341,24 @@ canvas{
   }
 }
 
-.music-fab{
-  position:absolute;
-  right: 14px;
-  top: calc(80px + env(safe-area-inset-top));
-  width: 54px;
-  height: 54px;
-  border-radius: 999px;
-  border: 1px solid rgba(255,255,255,.15);
-  background: rgba(0,0,0,.35);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
-  color:#fff;
-  display:flex;
-  align-items:center;
-  justify-content:center;
-  cursor:pointer;
-  z-index: 70;
-  box-shadow: 0 14px 26px rgba(0,0,0,.25);
-}
-
-.music-fab svg{
-  width: 24px;
-  height: 24px;
-  fill: currentColor;
-}
-
-.music-fab:active{
-  transform: scale(.97);
-}
-
-/* Valeurs par défaut (tablette / desktop) */
-:root{
-  --joy-bottom: 18px;
-}
-
-/* Joystick */
-.joystick{
-  position: fixed;
-  left: 18px; /* ou ce que tu as déjà */
-  bottom: calc(var(--joy-bottom) + env(safe-area-inset-bottom));
-  z-index: 90; /* au-dessus du canvas */
-}
-
-@media (max-width: 900px) and (orientation: landscape) and (pointer: coarse){
-  :root{ --joy-bottom: 34px; }
-}
-
 /* =========================
-   ADMIN FORCE START (Diamant)
-   - caché par défaut (JS l'affiche si admin)
-   - placé à côté du bouton musique
+   FABs (CHAT / ADMIN / MUSIC) — VERSION PROPRE
+   ✅ 1 seule source de vérité
+   ✅ identique tel + tablette
 ========================= */
-.admin-fab{
+
+/* CHAT (FAB) */
+.chat-fab{
   position: fixed;
-  right: 76px; /* à gauche du bouton musique (music est à right:14px) */
-  top: calc(80px + env(safe-area-inset-top)); /* même hauteur que .music-fab */
+  right: calc(14px + env(safe-area-inset-right));
+  top:   calc(14px + env(safe-area-inset-top));
   width: 54px;
   height: 54px;
   border: 0;
   border-radius: 999px;
   cursor: pointer;
   z-index: 130;
-  color: #ffffff;
+  color:#fff;
 
   background: rgba(0,0,0,.35);
   border: 1px solid rgba(255,255,255,.15);
@@ -411,7 +366,53 @@ canvas{
   -webkit-backdrop-filter: blur(10px);
   box-shadow: 0 14px 26px rgba(0,0,0,.25);
 
-  display: none;              /* ✅ IMPORTANT : caché par défaut */
+  display: grid;
+  place-items: center;
+
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+}
+.chat-fab:active{ transform: scale(.98); }
+
+.chat-fab svg{
+  width: 26px;
+  height: 26px;
+  display: block;
+}
+
+.chat-fab .badge{
+  position:absolute;
+  top: 9px;
+  right: 9px;
+  width: 12px;
+  height: 12px;
+  border-radius: 999px;
+  background: #ff2d2d;
+  border: 2px solid rgba(0,0,0,.6);
+  display:none;
+}
+.chat-fab.has-unread .badge{ display:block; }
+
+/* ADMIN (Diamant) — sous le chat */
+.admin-fab{
+  position: fixed;
+  right: calc(14px + env(safe-area-inset-right));
+  top:   calc(14px + env(safe-area-inset-top) + 72px);
+  width: 54px;
+  height: 54px;
+  border: 0;
+  border-radius: 999px;
+  cursor: pointer;
+  z-index: 129;
+  color:#fff;
+
+  background: rgba(0,0,0,.35);
+  border: 1px solid rgba(255,255,255,.15);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  box-shadow: 0 14px 26px rgba(0,0,0,.25);
+
+  display: none;          /* ✅ ton JS met "grid" quand admin */
   place-items: center;
 
   -webkit-tap-highlight-color: transparent;
@@ -419,7 +420,6 @@ canvas{
 
   transition: transform .12s ease;
 }
-
 .admin-fab:active{ transform: scale(.97); }
 
 .admin-fab svg{
@@ -429,84 +429,64 @@ canvas{
   fill: currentColor;
 }
 
-.admin-fab{
+/* MUSIC — sous admin */
+.music-fab{
   position: fixed;
   right: calc(14px + env(safe-area-inset-right));
-
-  /* ⬇️ On le met plus bas que le bouton musique */
-  bottom: calc(150px + env(safe-area-inset-bottom));
-
-  z-index: 9999;
-  display: none;
-  place-items: center;
+  top:   calc(14px + env(safe-area-inset-top) + 144px);
   width: 54px;
   height: 54px;
-  border-radius: 16px;
   border: 0;
-  background: rgba(0,0,0,.55);
-  color: #fff;
+  border-radius: 999px;
+  cursor: pointer;
+  z-index: 128;
+  color:#fff;
+
+  background: rgba(0,0,0,.35);
+  border: 1px solid rgba(255,255,255,.15);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  box-shadow: 0 14px 26px rgba(0,0,0,.25);
+
+  display:flex;
+  align-items:center;
+  justify-content:center;
+
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+
+  transition: transform .12s ease;
+}
+.music-fab:active{ transform: scale(.97); }
+
+.music-fab svg{
+  width: 24px;
+  height: 24px;
+  fill: currentColor;
 }
 
-/* Bouton SON (au-dessus) */
-.music-fab{
-  position: fixed;
-  right: calc(14px + env(safe-area-inset-right));
-  bottom: calc(92px + env(safe-area-inset-bottom)) !important;
-  z-index: 220;
-}
-
-/* Diamant ADMIN (en dessous, donc plus près du bas) */
-.admin-fab{
-  position: fixed;
-  right: calc(14px + env(safe-area-inset-right));
-  bottom: calc(20px + env(safe-area-inset-bottom)) !important;
-  z-index: 219; /* un poil en dessous du son */
-}
-
-.right-fabs{
-  position: fixed;
-  right: calc(14px + env(safe-area-inset-right));
-  bottom: calc(18px + env(safe-area-inset-bottom));
-  z-index: 220;
-
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  align-items: flex-end;
-}
-
-/* Les boutons ne gèrent plus leur position eux-mêmes */
-.music-fab,
-.admin-fab{
-  position: static !important;
-  margin: 0 !important;
-}
-
-/* Base commune */
-.chat-fab, .admin-fab, .music-fab{
-  position: fixed;
-  right: calc(16px + env(safe-area-inset-right));
-  z-index: 120;
-}
-
-/* 1) Chat en haut */
-.chat-fab{
-  top: calc(16px + env(safe-area-inset-top));
-}
-
-/* 2) Admin juste sous le chat */
-.admin-fab{
-  top: calc(16px + env(safe-area-inset-top) + 72px);
-  display: none; /* ton JS met "grid" quand admin */
-}
-
-/* 3) Son sous admin */
-.music-fab{
-  top: calc(16px + env(safe-area-inset-top) + 144px);
-}
 
 /* =========================
-   ROLE OVERLAY (tirage)
+   JOYSTICK — variable bottom propre (optionnel)
+========================= */
+:root{
+  --joy-bottom: 140px; /* valeur que tu avais au début */
+}
+.joystick{
+  position: fixed;
+  left: 18px;
+  bottom: calc(var(--joy-bottom) + env(safe-area-inset-bottom));
+  z-index: 90;
+}
+
+/* petit ajustement landscape téléphone si tu veux */
+@media (max-width: 900px) and (orientation: landscape) and (pointer: coarse){
+  :root{ --joy-bottom: 90px; }
+}
+
+
+/* =========================
+   ROLE OVERLAY (tirage) — centrage + anim
 ========================= */
 #roleOverlay{
   position: fixed;
@@ -519,10 +499,14 @@ canvas{
   background: rgba(0,0,0,.55);
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
-}
 
+  opacity: 1;                 /* évite les conflits */
+  visibility: visible;
+  pointer-events: none;       /* devient auto quand .open */
+}
 #roleOverlay.open{
   display: flex;
+  pointer-events: auto;
 }
 
 /* carte centrée */
@@ -548,7 +532,6 @@ canvas{
   max-width: 100%;
   height: auto;
   object-fit: contain;
-
   transform: translateX(0);
 }
 
