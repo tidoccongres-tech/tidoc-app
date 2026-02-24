@@ -604,15 +604,23 @@ async function ensureMyTasksAssigned(){
 
     if (snap.exists()){
       const d = snap.data() || {};
-      if (Array.isArray(d.list) && d.list.length){
-        myTasks = d.list;
-        myTaskIndex = (typeof d.index === "number") ? d.index : 0;
+      const list = Array.isArray(d.list) ? d.list : [];
+      const idx  = (typeof d.index === "number") ? d.index : 0;
+
+      // ✅ si liste OK ET index pas terminé -> on reprend
+      if (list.length && idx >= 0 && idx < list.length){
+        myTasks = list;
+        myTaskIndex = idx;
         myTasksReady = true;
         updateMyTaskHud();
         return;
       }
+
+      // ✅ sinon: liste finie / index invalide -> on régénère
+      // (on continue plus bas pour créer une nouvelle liste)
     }
 
+    // ✅ création nouvelle liste
     const pool = shuffleCryptoInPlace([...TASK_POOL]);
     const list = pool.slice(0, Math.min(TASKS_PER_PLAYER, pool.length));
 
@@ -627,6 +635,7 @@ async function ensureMyTasksAssigned(){
     myTaskIndex = 0;
     myTasksReady = true;
     updateMyTaskHud();
+
   } catch(e){
     console.log("ensureMyTasksAssigned error:", e);
   }
