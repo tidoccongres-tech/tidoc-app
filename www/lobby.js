@@ -1574,6 +1574,16 @@ async function sendVote(targetUid){ // targetUid null => skip
   }
 }
 
+const endVoteMs = voteAtMs + voteDurMs;
+const remaining = endVoteMs - Date.now();
+
+// si déjà fini, on n'ouvre pas l'UI
+if (remaining <= 500){
+  if (voteUiOpen) hideVoteUI();
+} else {
+  if (!voteUiOpen && !myDead) openVoteUI(endVoteMs);
+}
+
 function openVoteUI(endVoteMs){
   voteUiOpen = true;
   myVoteSent = false;
