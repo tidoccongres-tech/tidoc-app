@@ -1540,9 +1540,8 @@ async function sendVote(targetUid){ // targetUid null => skip
   if (!roomId || !myUid) return;
   if (myVoteSent) return;
 
-  myVoteSent = true;
   setVoteDisabled(true);
-  if (voteStatusEl) voteStatusEl.textContent = "Vote enregistré ✅";
+  if (voteStatusEl) voteStatusEl.textContent = "Envoi…";
 
   try{
     const ref = doc(db, "rooms", roomId, "votes", myUid);
@@ -1553,12 +1552,14 @@ async function sendVote(targetUid){ // targetUid null => skip
       createdAt: serverTimestamp(),
       createdAtMs: Date.now()
     }, { merge:true });
+
+    myVoteSent = true;
+    if (voteStatusEl) voteStatusEl.textContent = "Vote enregistré ✅";
   } catch(e){
     console.log("sendVote error:", e);
-    // si échec, on permet de re-voter
     myVoteSent = false;
     setVoteDisabled(false);
-    if (voteStatusEl) voteStatusEl.textContent = "Erreur envoi vote… réessaie.";
+    if (voteStatusEl) voteStatusEl.textContent = `Erreur envoi vote… (${e?.code || "rules"})`;
   }
 }
 
@@ -1621,30 +1622,40 @@ async function resolveVoteAndMaybeExpel(){
 
   try{
     const snapPlayers = await getDocs(collection(db, "rooms", roomId, "players"));
-    const aliveSet = new Set(
-      snapPlayers.docs
-        .map(d => d.data())
-        .filter(p => p && !p.isDead && p.uid)
-        .map(p => p.uid)
-    );
+    const alive = snapPlayers.docs
+      .map(d => d.data())
+      .filter(p => p && !p.isDead && p.uid);
+
+    const aliveSet = new Set(alive.map(p => p.uid));
+    const aliveCount = aliveSet.size;
 
     const snapVotes = await getDocs(collection(db, "rooms", roomId, "votes"));
-    const tallies = new Map(); // uid -> count
+
+    const tallies = new Map(); // targetUid -> count
     let skipCount = 0;
+    let validVoters = 0;
 
     for (const d of snapVotes.docs){
       const v = d.data() || {};
       const voter = v.uid;
-      if (!aliveSet.has(voter)) continue; // ignore vote de morts/déco
+
+      if (!aliveSet.has(voter)) continue;   // ignore morts / déco
+      validVoters++;
 
       const target = v.targetUid || null;
       if (!target) { skipCount++; continue; }
-      if (!aliveSet.has(target)) { skipCount++; continue; } // vote invalide -> skip
+
+      // vote vers vivant uniquement
+      if (!aliveSet.has(target)) { skipCount++; continue; }
 
       tallies.set(target, (tallies.get(target) || 0) + 1);
     }
 
-    // trouve top
+    // ✅ règle demandée: > la moitié des vivants ont VOTÉ (pas "passer")
+    const nonSkip = validVoters - skipCount;
+    const majorityReached = nonSkip > (aliveCount / 2);
+
+    // top vote
     let bestUid = null;
     let best = 0;
     let tie = false;
@@ -1659,35 +1670,51 @@ async function resolveVoteAndMaybeExpel(){
       }
     }
 
-    // règle simple :
-    // - si égalité OU aucun vote -> personne expulsée
-    // - sinon bestUid expulsé
-    if (!bestUid || best <= 0 || tie){
+    // cas "personne expulsé"
+    if (!majorityReached || !bestUid || best <= 0 || tie){
       await updateDoc(doc(db, "rooms", roomId), {
-        meetingType: null,
-        meetingAt: null,
-        meetingBy: null,
-        reportedBodyUid: null,
-        chatEnabled: true
+        voteResult: {
+          atMs: Date.now(),
+          expelledUid: null,
+          expelledName: null,
+          expelledRole: null,
+          reason: !majorityReached ? "no_majority" : (tie ? "tie" : "no_votes"),
+          nonSkip,
+          aliveCount
+        }
       }).catch(()=>{});
       return;
     }
 
+    // expulser
     const now = Date.now();
+    const expelledName = getPlayerNameByUid(bestUid) || "Joueur";
 
-    await updateDoc(doc(db, "rooms", roomId), {
-      deadUids: arrayUnion(bestUid),
-      meetingType: null,
-      meetingAt: null,
-      meetingBy: null,
-      reportedBodyUid: null,
-      chatEnabled: true
-    }).catch(()=>{});
+    // ✅ récupérer le rôle (host a le droit)
+    let expelledRole = null;
+    try{
+      const roleSnap = await getDoc(doc(db, "rooms", roomId, "privateRoles", bestUid));
+      expelledRole = roleSnap.exists() ? (roleSnap.data()?.role || null) : null;
+    } catch(_) {}
 
     await updateDoc(doc(db, "rooms", roomId, "players", bestUid), {
       isDead: true,
       deadAtMs: now,
       deadBy: "vote"
+    }).catch(()=>{});
+
+    await updateDoc(doc(db, "rooms", roomId), {
+      deadUids: arrayUnion(bestUid),
+      voteResult: {
+        atMs: now,
+        expelledUid: bestUid,
+        expelledName,
+        expelledRole,
+        reason: "expelled",
+        bestVotes: best,
+        nonSkip,
+        aliveCount
+      }
     }).catch(()=>{});
 
   } catch(e){
@@ -1735,6 +1762,7 @@ async function hostStartVote(){
   await updateDoc(doc(db,"rooms",roomId), {
     voteActive: true,
     voteAt: serverTimestamp(),
+    voteAtMs: Date.now(),        // ✅ IMPORTANT (clients n’attendent pas le serverTimestamp)
     voteDurMs: VOTE_MS,
     voteRound: increment(1),
   }).catch(()=>{});
@@ -3754,10 +3782,15 @@ if (btnAdminStart){
       
 // --- vote state depuis Firestore ---
 const voteActive = !!room.voteActive;
-const voteAtMs   = tsToMs(room.voteAt);
+
+const voteAtMs =
+  (typeof room.voteAtMs === "number" && room.voteAtMs > 0)
+    ? room.voteAtMs
+    : tsToMs(room.voteAt);
+
 const voteDurMs  = (typeof room.voteDurMs === "number") ? room.voteDurMs : VOTE_MS;
 const voteRound  = (typeof room.voteRound === "number") ? room.voteRound : 0;
-
+      
 // UI vote pour tout le monde (sauf morts si tu veux)
 if (status === "started" && voteActive && voteAtMs){
   const endVoteMs = voteAtMs + voteDurMs;
