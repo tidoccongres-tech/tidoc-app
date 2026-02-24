@@ -2743,11 +2743,13 @@ async function doReport(bodyUid){
   if (meetingLockActive) return;
   try{
     await updateDoc(doc(db, "rooms", roomId), {
-      chatEnabled: true,
-      meetingType: "report",
-      meetingAt: serverTimestamp(),
-      meetingBy: myUid,
-      reportedBodyUid: bodyUid
+  chatEnabled: true,
+  meetingType: "report",
+  meetingAt: serverTimestamp(),
+  meetingAtMs: Date.now(),   // ✅ AJOUT IMPORTANT
+  meetingBy: myUid,
+  reportedBodyUid: bodyUid
+});
     });
     setStartInfo("Rapport envoyé.");
   } catch(e){
