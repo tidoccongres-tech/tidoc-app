@@ -370,3 +370,16 @@ html, body{
 #iconSoundOn img, #iconSoundOff img {
   filter: brightness(0) invert(1) !important;
 }
+
+/* Le diamant (bouton admin) */
+#btnAdminStart,
+#btnAdminStart * {
+  color: #fff !important;
+  fill: #fff !important;
+  stroke: #fff !important;
+}
+
+/* Si le diamant est un <img> */
+#btnAdminStart img {
+  filter: brightness(0) invert(1) !important;
+}
