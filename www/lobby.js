@@ -1574,16 +1574,6 @@ async function sendVote(targetUid){ // targetUid null => skip
   }
 }
 
-const endVoteMs = voteAtMs + voteDurMs;
-const remaining = endVoteMs - Date.now();
-
-// si déjà fini, on n'ouvre pas l'UI
-if (remaining <= 500){
-  if (voteUiOpen) hideVoteUI();
-} else {
-  if (!voteUiOpen && !myDead) openVoteUI(endVoteMs);
-}
-
 function openVoteUI(endVoteMs){
   voteUiOpen = true;
   myVoteSent = false;
@@ -1621,19 +1611,24 @@ if (!voteSkipBound && voteSkipBtn){
   voteSkipBound = true;
   voteSkipBtn.addEventListener("click", () => sendVote(null));
 }
-  // timer affiché
+   // timer affiché
   const tick = () => {
-    const s = Math.max(0, Math.ceil((endVoteMs - Date.now())/1000));
+    const s = Math.max(0, Math.ceil((endVoteMs - Date.now()) / 1000));
     if (voteTimerEl) voteTimerEl.textContent = `Temps restant : ${s}s`;
+
     if (s <= 0){
-  // ✅ évite le "Passer" automatique juste parce qu'on a rechargé à la fin
-  const openForMs = Date.now() - voteUiOpenedAtMs;
-  if (!myVoteSent && openForMs > 1500){
-    sendVote(null);
-  }
-} else if (voteUiOpen){
+      // évite le "Passer" auto si on a ouvert en fin de vote
+      const openForMs = Date.now() - (voteUiOpenedAtMs || Date.now());
+      if (!myVoteSent && openForMs > 1500){
+        sendVote(null);
+      }
+      return;
+    }
+
+    if (voteUiOpen) requestAnimationFrame(tick);
+  };
+
   requestAnimationFrame(tick);
-}
 
 // ===================
 // Résolution vote (HOST)
