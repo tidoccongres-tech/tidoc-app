@@ -906,11 +906,17 @@ function startMovingTargetMiniGame({ hits = 5 } = {}){
 
   const area = document.createElement("div");
   area.style.cssText = `
-    position:relative; width:min(520px, 92vw); height:280px;
-    border-radius:18px; border:1px solid rgba(255,255,255,.14);
-    background: rgba(255,255,255,.06);
-    overflow:hidden; margin: 0 auto;
-  `;
+  position:relative;
+  width: 100%;
+  max-width: 520px;
+  height: 280px;
+  box-sizing: border-box;
+  border-radius: 18px;
+  border: 1px solid rgba(255,255,255,.14);
+  background: rgba(255,255,255,.06);
+  overflow: hidden;
+  margin: 0 auto;
+`;
 
   const target = document.createElement("button");
   target.type = "button";
