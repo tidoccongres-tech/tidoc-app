@@ -1192,6 +1192,7 @@ function openChat(){
   chatOverlay.classList.add("open");
   chatOverlay.setAttribute("aria-hidden", "false");
   document.body.classList.add("chat-open");
+  mountDebateBanner(); // ✅ AJOUT
 
   // ✅ Message d'aide si débat et chat vide
   if (chatMessagesEl && debateUiActive && !chatMessagesEl.children.length){
@@ -1879,6 +1880,7 @@ function forceOpenChat(){
   chatOverlay.classList.add("open");
   chatOverlay.setAttribute("aria-hidden","false");
   document.body.classList.add("chat-open");
+  mountDebateBanner(); // ✅ AJOUT
 
   applyChatWriteLock();
 
