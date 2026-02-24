@@ -2419,16 +2419,21 @@ function ensurePlayerState(p){
   }
 
   if (typeof x === "number" && typeof y === "number"){
-    prev.x = x; prev.y = y;
+
+  // 🔒 Si le joueur est mort → on ne met PLUS à jour sa position
+  if (!isDead){
+    prev.x = x;
+    prev.y = y;
 
     const dx = (prev.lastX ?? x) - x;
     const dy = (prev.lastY ?? y) - y;
     const d = Math.hypot(dx, dy);
 
-    if (!isDead && d > 0.6){
+    if (d > 0.6){
       prev.moving = true;
       prev.lastMoveAt = performance.now();
     }
+
     prev.lastX = x;
     prev.lastY = y;
   }
