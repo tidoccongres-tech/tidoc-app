@@ -301,19 +301,23 @@ debateBanner.style.cssText = `
   display: none;
 `;
 
-(function mountDebateBanner(){
-  if (!chatOverlay) return;
+function mountDebateBanner(){
+  if (!chatOverlay) return false;
+
   const chatPanel = chatOverlay.querySelector(".chat-panel");
-  if (!chatPanel) return;
+  if (!chatPanel) return false;
+
+  // déjà monté
+  if (debateBanner.parentElement === chatPanel) return true;
 
   const chatHead = chatOverlay.querySelector(".chat-head");
   if (chatHead && chatHead.parentElement === chatPanel){
     chatPanel.insertBefore(debateBanner, chatHead.nextSibling);
   } else {
-    // fallback : tout en haut
     chatPanel.insertBefore(debateBanner, chatPanel.firstChild);
   }
-})();
+  return true;
+}
 
 let debateEndMs = 0;
 let debateRaf = null;
