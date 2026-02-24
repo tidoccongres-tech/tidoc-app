@@ -3548,6 +3548,97 @@ function refreshChatGating(status){
 
 function checkEndConditions(){ /* TODO */ }
 
+// ===============================
+// VOTE RESULT OVERLAY (GLOBAL)
+// ===============================
+
+let voteResultLastAt = 0;
+
+const voteResultOverlay = document.createElement("div");
+voteResultOverlay.style.cssText = `
+  position:fixed;
+  inset:0;
+  z-index:310;
+  display:none;
+  align-items:center;
+  justify-content:center;
+  background: rgba(0,0,0,.65);
+  backdrop-filter: blur(7px);
+  -webkit-backdrop-filter: blur(7px);
+`;
+
+voteResultOverlay.innerHTML = `
+  <div style="
+    width:min(520px, calc(100vw - 28px));
+    border-radius:22px;
+    padding:16px;
+    background: rgba(0,0,0,.74);
+    border:1px solid rgba(255,255,255,.14);
+    color:#fff;
+    font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+    text-align:center;
+    box-shadow:0 18px 50px rgba(0,0,0,.40);
+  ">
+    <div id="vrTitle" style="font:1000 18px system-ui;">Résultat du vote</div>
+    <div id="vrText" style="margin-top:10px; font:900 13px system-ui; opacity:.95;"></div>
+    <button id="vrOk" type="button" style="
+      margin-top:14px;
+      appearance:none;
+      border:0;
+      padding:10px 12px;
+      border-radius:12px;
+      font:900 12px system-ui;
+      color:#000;
+      background: rgba(255,255,255,.88);
+    ">OK</button>
+  </div>
+`;
+
+document.body.appendChild(voteResultOverlay);
+
+const vrTitle = voteResultOverlay.querySelector("#vrTitle");
+const vrText  = voteResultOverlay.querySelector("#vrText");
+
+voteResultOverlay.querySelector("#vrOk")?.addEventListener("click", () => {
+  voteResultOverlay.style.display = "none";
+});
+
+function showVoteResult(result){
+  if (!result) return;
+
+  const atMs = typeof result.atMs === "number" ? result.atMs : 0;
+  if (!atMs || atMs <= voteResultLastAt) return;
+  voteResultLastAt = atMs;
+
+  let text = "";
+
+  if (result.reason === "expelled"){
+    const name = result.expelledName || "Quelqu’un";
+    const role = result.expelledRole
+      ? (result.expelledRole === "titruant" ? "Ti’Truant 😈" : "Ti’Nocent 😇")
+      : "Rôle inconnu";
+
+    text = `${name} a été expulsé.\nRôle : ${role}`;
+  }
+  else if (result.reason === "tie"){
+    text = "Égalité : personne n’a été expulsé.";
+  }
+  else if (result.reason === "no_majority"){
+    text = "Pas de majorité : trop de 'Passer'.\nPersonne n’a été expulsé.";
+  }
+  else {
+    text = "Aucun vote valide.\nPersonne n’a été expulsé.";
+  }
+
+  vrText.textContent = text;
+  voteResultOverlay.style.display = "flex";
+
+  // fermeture auto après 6s
+  setTimeout(() => {
+    voteResultOverlay.style.display = "none";
+  }, 6000);
+}
+
 onAuthStateChanged(auth, async (u) => {
   if (!u) { location.href = "./login.html"; return; }
   if (!roomId) { setStartInfo("⚠️ Code de partie manquant."); return; }
@@ -3753,6 +3844,7 @@ if (!adminBtnBound){
       }
 
       const room = snap.data() || {};
+      try { showVoteResult(room.voteResult); } catch(_) {}
       const status = room.status || "lobby";
       roomStatusCache = status;
 
