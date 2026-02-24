@@ -2755,11 +2755,8 @@ async function doReport(bodyUid){
     await updateDoc(doc(db, "rooms", roomId), {
       chatEnabled: true,
       meetingType: "report",
-
-      // 🔥 IMPORTANT
       meetingAt: serverTimestamp(),
-      meetingAtMs: Date.now(),   // ✅ timer immédiat
-
+      meetingAtMs: Date.now(),   // ✅ AJOUT IMPORTANT
       meetingBy: myUid,
       reportedBodyUid: bodyUid
     });
