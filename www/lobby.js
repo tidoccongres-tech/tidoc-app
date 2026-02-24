@@ -1742,7 +1742,12 @@ function handleMeetingState(room, status){
   }
 
   const meetingType = room?.meetingType || "";
-  const meetingAtMs = tsToMs(room?.meetingAt);
+  
+  const meetingAtMs =
+  (typeof room?.meetingAtMs === "number" && room.meetingAtMs > 0)
+    ? room.meetingAtMs
+    : tsToMs(room?.meetingAt);
+  
   const bodyUid     = room?.reportedBodyUid || "";
 
   const hasMeeting =
@@ -2739,18 +2744,26 @@ async function doExpulse(targetUid){
   }
 }
 
+// ===================
+// REPORT (cadavre)
+// ===================
 async function doReport(bodyUid){
   if (meetingLockActive) return;
+  if (!roomId || !myUid) return;
+
   try{
     await updateDoc(doc(db, "rooms", roomId), {
-  chatEnabled: true,
-  meetingType: "report",
-  meetingAt: serverTimestamp(),
-  meetingAtMs: Date.now(),   // ✅ AJOUT IMPORTANT
-  meetingBy: myUid,
-  reportedBodyUid: bodyUid
-});
+      chatEnabled: true,
+      meetingType: "report",
+
+      // 🔥 IMPORTANT
+      meetingAt: serverTimestamp(),
+      meetingAtMs: Date.now(),   // ✅ timer immédiat
+
+      meetingBy: myUid,
+      reportedBodyUid: bodyUid
     });
+
     setStartInfo("Rapport envoyé.");
   } catch(e){
     console.log("report error:", e);
@@ -2763,20 +2776,27 @@ async function doZoneAction(zone){
   if (meetingLockActive) return;
 
   if (zone.id === "meeting"){
-    try{
-      await updateDoc(doc(db, "rooms", roomId), {
-        chatEnabled: true,
-        meetingType: "meeting",
-        meetingAt: serverTimestamp(),
-        meetingBy: myUid
-      });
-      setStartInfo("Réunion lancée (chat activé).");
-    } catch(e){
-      console.log("meeting error:", e);
-      setStartInfo("Erreur réunion.");
-    }
-    return;
+  if (!roomId || !myUid) return;
+
+  try{
+    await updateDoc(doc(db, "rooms", roomId), {
+      chatEnabled: true,
+      meetingType: "meeting",
+
+      // 🔥 IMPORTANT
+      meetingAt: serverTimestamp(),
+      meetingAtMs: Date.now(),   // ✅ timer immédiat
+
+      meetingBy: myUid
+    });
+
+    setStartInfo("Réunion lancée.");
+  } catch(e){
+    console.log("meeting error:", e);
+    setStartInfo("Erreur réunion.");
   }
+  return;
+}
 
   if (myRole !== "tinocent" || myDead) return;
 
