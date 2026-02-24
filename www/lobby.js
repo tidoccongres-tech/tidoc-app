@@ -327,6 +327,8 @@ function setDebateUI(on, { title = "Débat", subtitle = "", endMs = 0 } = {}){
   if (!debateBanner) return;
 
   if (!debateUiActive){
+    mountDebateBanner(); // ✅ AJOUT
+  }
     debateBanner.style.display = "none";
     debateBanner.innerHTML = "";
     debateEndMs = 0;
@@ -468,18 +470,18 @@ const roleHud = document.createElement("div");
 roleHud.id = "roleHud";
 roleHud.style.cssText = `
   position: fixed;
-  top: calc(12px + env(safe-area-inset-top));
-  right: calc(12px + env(safe-area-inset-right));
-  z-index: 60;
-  padding: 10px 12px;
-  border-radius: 14px;
-  font: 800 13px system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+  top: calc(10px + env(safe-area-inset-top));
+  right: calc(10px + env(safe-area-inset-right));
+  z-index: 200;
+  padding: 8px 10px;
+  border-radius: 999px;
+  font: 900 12px system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
   letter-spacing: .2px;
   color: #fff;
-  background: rgba(0,0,0,.45);
+  background: rgba(0,0,0,.55);
   border: 1px solid rgba(255,255,255,.12);
-  backdrop-filter: blur(6px);
-  -webkit-backdrop-filter: blur(6px);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
   display: none;
   pointer-events: none;
 `;
@@ -515,7 +517,7 @@ tasksHud.id = "tasksHud";
 tasksHud.style.cssText = `
   position: fixed;
   right: calc(12px + env(safe-area-inset-right));
-  top: calc(58px + env(safe-area-inset-top));
+  top: calc(46px + env(safe-area-inset-top));
   z-index: 59;
   padding: 10px 12px;
   border-radius: 14px;
@@ -1412,28 +1414,30 @@ function startMeetingFlow({ meetingType, meetingAtMs, bodyUid }){
     endMs: endDebate
   });
 
-  // --- pill timer en haut (maintenant garanti car créé si absent)
-  meetingTimers.tick = setInterval(() => {
-    const now = Date.now();
+ // --- pill timer en haut (TOUJOURS visible : splash + débat)
+meetingTimers.tick = setInterval(() => {
+  const now = Date.now();
 
-    // avant le débat (pendant splash report)
-    if (now < startDebateAt){
-      pill.style.display = "none";
-      return;
-    }
+  // avant le débat (pendant splash report)
+  if (now < startDebateAt){
+    const s = Math.max(0, Math.ceil((startDebateAt - now) / 1000));
+    pill.style.display = "";
+    pill.textContent = `Débat dans : ${s}s`;
+    return;
+  }
 
-    // pendant débat
-    if (now < endDebate){
-      const s = Math.max(0, Math.ceil((endDebate - now) / 1000));
-      pill.style.display = "";
-      pill.textContent = `Débat : ${s}s`;
-      return;
-    }
+  // pendant débat
+  if (now < endDebate){
+    const s = Math.max(0, Math.ceil((endDebate - now) / 1000));
+    pill.style.display = "";
+    pill.textContent = `Débat : ${s}s`;
+    return;
+  }
 
-    // après débat
-    pill.style.display = "none";
-    clearMeetingTimers();
-  }, 250);
+  // après débat
+  pill.style.display = "none";
+  clearMeetingTimers();
+}, 250);
 
   // --- fin débat : unlock + vote (host)
   const delayToEndDebate = Math.max(0, endDebate - Date.now());
