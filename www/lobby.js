@@ -62,6 +62,9 @@ let myDead = false;
 let myUid = null;
 let voteSkipBound = false;
 
+let voteResolveTimer = null;
+let voteResolveEndMs = 0;
+
 const auth = AuthMod.auth;
 const db   = AuthMod.db;
 
@@ -3889,6 +3892,25 @@ const voteAtMs =
 
 const voteDurMs  = (typeof room.voteDurMs === "number") ? room.voteDurMs : VOTE_MS;
 const voteRound  = (typeof room.voteRound === "number") ? room.voteRound : 0;
+
+// ✅ HOST: planifie le tally EXACTEMENT à la fin du vote
+if (myIsHost && status === "started" && voteActive && voteAtMs && voteRound){
+  const endVoteMs = voteAtMs + voteDurMs;
+
+  if (voteResolveEndMs !== endVoteMs){
+    voteResolveEndMs = endVoteMs;
+    if (voteResolveTimer) clearTimeout(voteResolveTimer);
+
+    const delay = Math.max(0, endVoteMs - Date.now() + 250);
+    voteResolveTimer = setTimeout(() => {
+      hostTallyAndApplyVote({ room, voteAtMs, voteDurMs, voteRound });
+    }, delay);
+  }
+} else {
+  if (voteResolveTimer) clearTimeout(voteResolveTimer);
+  voteResolveTimer = null;
+  voteResolveEndMs = 0;
+}
       
 // UI vote pour tout le monde (sauf morts si tu veux)
 if (status === "started" && voteActive && voteAtMs){
