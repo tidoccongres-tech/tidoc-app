@@ -383,3 +383,29 @@ html, body{
 #btnAdminStart img {
   filter: brightness(0) invert(1) !important;
 }
+
+/* ===== CHAT : rendu clean + texte blanc ===== */
+#chatOverlay .chat-panel {
+  color: #fff;
+}
+
+/* Header (titre + bouton) */
+#chatOverlay .chat-head,
+#chatOverlay .chat-head * {
+  color: #fff !important;
+}
+
+/* Input + placeholder */
+#chatOverlay input,
+#chatOverlay textarea {
+  color: #fff;
+}
+#chatOverlay input::placeholder,
+#chatOverlay textarea::placeholder {
+  color: rgba(255,255,255,.6);
+}
+
+/* Messages (si tu as des classes) */
+#chatOverlay .chat-msg { color:#fff; }
+#chatOverlay .chat-meta { color: rgba(255,255,255,.75); }
+#chatOverlay .chat-text { color:#fff; }
