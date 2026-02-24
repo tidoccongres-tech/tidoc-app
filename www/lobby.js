@@ -322,13 +322,16 @@ function mountDebateBanner(){
 let debateEndMs = 0;
 let debateRaf = null;
 
-function setDebateUI(on, { title = "Débat", subtitle = "", endMs = 0 } = {}){
+function setDebateUI(on, { title="Débat", subtitle="", endMs=0 } = {}){
   debateUiActive = !!on;
-  if (!debateBanner) return;
 
-  if (!debateUiActive){
-    mountDebateBanner(); // ✅ AJOUT
+  // ✅ ICI : quand on ACTIVE
+  if (debateUiActive){
+    mountDebateBanner();
   }
+
+  // ❌ quand on DESACTIVE
+  if (!debateUiActive){
     debateBanner.style.display = "none";
     debateBanner.innerHTML = "";
     debateEndMs = 0;
