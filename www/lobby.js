@@ -2004,7 +2004,7 @@ const titruantImgSrc = asset("./assets/titruant.png");
 // expulsé sprite
 const pleurImg = new Image();
 pleurImg.src = asset("./assets/pleure.png");
-pleurImg.onerror = () => { pleurImg.src = asset("./assets/pleure.png"); };
+watchImg(pleurImg, "pleure.png");
 
 lobbyBgImg.decode?.().catch(()=>{});
 
