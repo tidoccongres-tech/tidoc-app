@@ -64,6 +64,7 @@ let voteSkipBound = false;
 
 let voteResolveTimer = null;
 let voteResolveEndMs = 0;
+let voteUiOpenedAtMs = 0;
 
 const auth = AuthMod.auth;
 const db   = AuthMod.db;
@@ -1576,8 +1577,9 @@ async function sendVote(targetUid){ // targetUid null => skip
 function openVoteUI(endVoteMs){
   voteUiOpen = true;
   myVoteSent = false;
+  voteUiOpenedAtMs = Date.now(); // ✅ AJOUT
   voteOverlay.style.display = "flex";
-
+  
   // construit la liste depuis playersMap (vivants)
   const alive = Array.from(playersMap.values())
     .filter(p => p && !p.isDead && p.uid && p.uid !== myUid)
@@ -1614,12 +1616,12 @@ if (!voteSkipBound && voteSkipBtn){
     const s = Math.max(0, Math.ceil((endVoteMs - Date.now())/1000));
     if (voteTimerEl) voteTimerEl.textContent = `Temps restant : ${s}s`;
     if (s <= 0){
-      // auto-skip si rien voté
-      if (!myVoteSent) sendVote(null);
-    } else if (voteUiOpen){
-      requestAnimationFrame(tick);
-    }
-  };
+  // ✅ évite le "Passer" automatique juste parce qu'on a rechargé à la fin
+  const openForMs = Date.now() - voteUiOpenedAtMs;
+  if (!myVoteSent && openForMs > 1500){
+    sendVote(null);
+  }
+} else if (voteUiOpen){
   requestAnimationFrame(tick);
 }
 
