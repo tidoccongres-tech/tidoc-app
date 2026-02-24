@@ -2003,7 +2003,7 @@ const titruantImgSrc = asset("./assets/titruant.png");
 
 // expulsé sprite
 const pleurImg = new Image();
-pleurImg.src = asset("./assets/pleur.png");
+pleurImg.src = asset("./assets/pleure.png");
 pleurImg.onerror = () => { pleurImg.src = asset("./assets/pleure.png"); };
 
 lobbyBgImg.decode?.().catch(()=>{});
@@ -2017,7 +2017,7 @@ watchImg(lobbyBgImg, "lobby.png");
 watchImg(lobbyMaskImg, "lobby-NB.png");
 watchImg(mapImg, "map.png");
 watchImg(collisionImg, "collisions.png");
-watchImg(pleurImg, "pleur.png/pleure.png");
+watchImg(pleurImg, "pleure.png/pleure.png");
 
 // ===================
 // WORLD SIZES
