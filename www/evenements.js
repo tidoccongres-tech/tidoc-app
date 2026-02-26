@@ -11,7 +11,8 @@ import * as AuthMod from "./auth.js";
 import {
   collection, addDoc, getDocs, getDoc, doc, deleteDoc,
   runTransaction, serverTimestamp, query, orderBy, Timestamp, limit,
-  setDoc, where
+  setDoc, where,
+  getCountFromServer
 } from "https://www.gstatic.com/firebasejs/10.12.4/firebase-firestore.js";
 import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.4/firebase-auth.js";
 
@@ -884,7 +885,7 @@ function renderPromoBroadcastCard(){
 // =====================
 // RENDER EVENT CARD
 // =====================
-function renderEventCard(eventId, e = {}, { myWorkshopKeys = new Set(), regMap = {} } = {}){
+function renderEventCard(eventId, e = {}, { myWorkshopKeys = new Set(), regMap = {}, countsMap = {} } = {}){
   const start = e.startAt?.toDate ? e.startAt.toDate() : null;
   const end   = e.endAt?.toDate ? e.endAt.toDate() : null;
 
@@ -905,9 +906,11 @@ function renderEventCard(eventId, e = {}, { myWorkshopKeys = new Set(), regMap =
   const admin = isAdmin();
 
   const capPub  = Number(e.capacity || 0);
-  const capStf  = Number(e.capacityStaff || 0);
-  const bookedP = Number(e.bookedCount || 0);
-  const bookedS = Number(e.bookedStaffCount || 0);
+const capStf  = Number(e.capacityStaff || 0);
+
+// ✅ SOURCE DE VÉRITÉ : sous-collection registrations (si dispo)
+const bookedP = Number(countsMap?.[eventId]?.pub   ?? e.bookedCount ?? 0);
+const bookedS = Number(countsMap?.[eventId]?.staff ?? e.bookedStaffCount ?? 0);
 
   const sec = document.createElement("section");
   sec.className = "event-card";
@@ -1032,6 +1035,34 @@ async function loadEvents(){
     const uid = auth.currentUser?.uid || "";
     const docs = snap.docs.map(d => ({ id: d.id, data: d.data() || {} }));
 
+// ✅ Compteurs réels depuis registrations/{uid}
+const countsMap = {}; // { [eventId]: { pub:number, staff:number } }
+
+await Promise.all(docs.map(async (row) => {
+  const e = row.data || {};
+  if (isWorkshopEvent(e.type)) return; // workshops gérés HelloAsso
+
+  try {
+    const regsCol = collection(db, "events", row.id, "registrations");
+
+    const pubQ   = query(regsCol, where("isStaff", "==", false));
+    const staffQ = query(regsCol, where("isStaff", "==", true));
+
+    const [pubC, staffC] = await Promise.all([
+      getCountFromServer(pubQ),
+      getCountFromServer(staffQ)
+    ]);
+
+    countsMap[row.id] = {
+      pub:   Number(pubC.data().count || 0),
+      staff: Number(staffC.data().count || 0),
+    };
+  } catch (e) {
+    console.log("count error for", row.id, e);
+    countsMap[row.id] = { pub: 0, staff: 0 };
+  }
+}));
+    
     // Map inscription (conf/autre)
     const regMap = {};
     if (uid){
@@ -1080,7 +1111,7 @@ async function loadEvents(){
     }
 
     scored.forEach((row)=>{
-      const card = renderEventCard(row.id, row.data, { myWorkshopKeys, regMap });
+      const card = renderEventCard(row.id, row.data, { myWorkshopKeys, regMap, countsMap });
       if (card) eventsList.appendChild(card);
     });
 
