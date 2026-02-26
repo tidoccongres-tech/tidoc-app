@@ -1234,7 +1234,7 @@ function ensureScanOverlay() {
   return ov;
 }
 
-function openScanMode({ mainTicket = null, workshops = [] } = {}) {
+function openScanMode({ mainTicket = null, workshops = [], parties = [] } = {}) {
   const ov = ensureScanOverlay();
   const body = ov.querySelector("#scanBody");
   if (!body) return;
@@ -1398,6 +1398,69 @@ function openScanMode({ mainTicket = null, workshops = [] } = {}) {
     wrap.appendChild(section);
   }
 
+  // ====== PARTY: Ti’Masqué ======
+  const ps = Array.isArray(parties) ? parties : [];
+  if (ps.length) {
+    const section = document.createElement("div");
+    section.style.cssText = `
+      border:1px solid var(--line);
+      border-radius:16px;
+      padding:14px;
+      background:#fff;
+    `;
+
+    section.innerHTML = `
+      <div style="font-weight:950; color:var(--tidoc);">🎭 Ti’Masqué — QR à scanner</div>
+      <div id="scanPartyWrap" style="margin-top:12px; display:flex; flex-direction:column; gap:12px;"></div>
+      <div style="margin-top:6px; font-size:12px; font-weight:800; opacity:.7;">
+        Scanne ce QR à l’entrée Ti’Masqué.
+      </div>
+    `;
+
+    const wrapParty = section.querySelector("#scanPartyWrap");
+
+    ps.forEach((p, i) => {
+      const card = document.createElement("div");
+      card.style.cssText = `
+        border:1px solid rgba(0,0,0,.08);
+        border-radius:14px;
+        padding:12px;
+        background:rgba(15,79,96,.03);
+        display:flex;
+        gap:12px;
+        align-items:center;
+        flex-wrap:wrap;
+      `;
+
+      const qrid = `scanPartyQR_${i}`;
+      const qr = String(p.qrText || "").trim();
+
+      card.innerHTML = `
+        <div style="min-width:220px;">
+          <div style="font-weight:950; color:#0f4f60; margin-bottom:8px;">
+            🎭 ${escapeHTML(p.partyTitle || "Ti’Masqué")}
+          </div>
+          <div id="${qrid}" style="width:220px;height:220px; background:#fff; border-radius:12px; padding:8px;"></div>
+        </div>
+
+        <div style="min-width:200px; flex:1 1 220px;">
+          <div style="font-weight:900;">${escapeHTML(p.holderName || "—")}</div>
+          <div style="opacity:.85; font-weight:800;">N° billet : ${escapeHTML(p.ticketNumber || "—")}</div>
+        </div>
+      `;
+
+      wrapParty?.appendChild(card);
+
+      const host = card.querySelector(`#${qrid}`);
+      if (host && window.QRCode && qr) {
+        host.innerHTML = "";
+        new window.QRCode(host, { text: qr, width: 220, height: 220 });
+      }
+    });
+
+    wrap.appendChild(section);
+  }
+  
   // fallback (aucun QR)
   if (!hasMain && !ws.length) {
     wrap.innerHTML = `<div style="font-weight:900; opacity:.8;">Aucun billet à afficher.</div>`;
