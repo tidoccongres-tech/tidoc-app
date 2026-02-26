@@ -558,6 +558,7 @@ let myTaskIndex = 0;
 let myTasksReady = false;
 
 function showTasksHud(show){
+  if (!tasksHud) return;
   tasksHud.style.display = show ? "" : "none";
 }
 function setGlobalTasksProgress(done, total){
