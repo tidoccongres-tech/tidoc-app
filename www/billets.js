@@ -178,6 +178,47 @@ if (!Number.isFinite(PACKS.staff.workshopDiscountPacks) || PACKS.staff.workshopD
   }
 }
 
+const previewEl = document.getElementById("ticketPreview");
+let LAST_PREVIEW_URL = null;
+
+function showTicketPreview(file) {
+  if (!previewEl || !file) return;
+
+  // nettoie l’ancien blob url
+  if (LAST_PREVIEW_URL) {
+    try { URL.revokeObjectURL(LAST_PREVIEW_URL); } catch (_) {}
+    LAST_PREVIEW_URL = null;
+  }
+
+  const url = URL.createObjectURL(file);
+  LAST_PREVIEW_URL = url;
+
+  if (file.type === "application/pdf") {
+    previewEl.innerHTML = `
+      <div style="font-weight:900; color:var(--tidoc); margin-bottom:8px;">Aperçu du billet</div>
+      <embed src="${url}#view=FitH" type="application/pdf"
+             style="width:100%; height:520px; border:1px solid var(--line); border-radius:14px; background:#fff;" />
+    `;
+  } else if (file.type.startsWith("image/")) {
+    previewEl.innerHTML = `
+      <div style="font-weight:900; color:var(--tidoc); margin-bottom:8px;">Aperçu du billet</div>
+      <img src="${url}" alt="Billet importé"
+           style="width:100%; max-height:520px; object-fit:contain; border:1px solid var(--line); border-radius:14px; background:#fff;" />
+    `;
+  } else {
+    previewEl.innerHTML = "";
+  }
+}
+
+function clearTicketPreview() {
+  if (!previewEl) return;
+  previewEl.innerHTML = "";
+  if (LAST_PREVIEW_URL) {
+    try { URL.revokeObjectURL(LAST_PREVIEW_URL); } catch (_) {}
+    LAST_PREVIEW_URL = null;
+  }
+}
+
 // =====================
 // PROMO CODES — pools séparés
 // Firestore: config/promoPools
@@ -646,6 +687,7 @@ async function deleteMyTicketAndUnclaim() {
 
     // 8️⃣ Nettoyage interface
     if (boxEl) boxEl.textContent = "Aucun billet importé pour l’instant.";
+    clearTicketPreview();
     await loadSavedTicket().catch(() => {});
     setStatus("✅ Billet totalement supprimé !");
   } catch (e) {
@@ -1401,6 +1443,8 @@ async function loadSavedTicket() {
 // =====================
 async function handleFile(file) {
   if (!file) return;
+
+  showTicketPreview(file);
 
   setStatus("");
   if (statusEl) statusEl.style.color = "";
