@@ -1187,6 +1187,8 @@ const EXPEL_COOLDOWN_MS = 60_000;
 // ===================
 let chatCanViewNow  = true;  // peut ouvrir/voir le chat
 let chatCanWriteNow = true;  // peut envoyer
+let chatJustOpenedAt = 0;
+const CHAT_BACKDROP_GUARD_MS = 350;
 
 function applyChatWriteLock(){
   if (!chatInput || !chatForm) return;
@@ -1198,6 +1200,8 @@ function openChat(){
   if (!chatOverlay) return;
   if (!chatCanViewNow) return;
 
+  chatJustOpenedAt = performance.now(); // ✅ anti “fermeture instant” iOS
+
   chatOverlay.classList.add("open");
   chatOverlay.setAttribute("aria-hidden", "false");
   document.body.classList.add("chat-open");
@@ -1205,18 +1209,17 @@ function openChat(){
 
   // ✅ Message d'aide si débat et chat vide
   if (chatMessagesEl && debateUiActive && !chatMessagesEl.children.length){
-  chatMessagesEl.innerHTML = `
-    <div style="opacity:.92;padding:14px;font:900 13px system-ui;color:#fff;">
-      Débat en cours… discutez et accusez quelqu’un avant la fin du timer 👀
-    </div>
-  `;
-}
+    chatMessagesEl.innerHTML = `
+      <div style="opacity:.92;padding:14px;font:900 13px system-ui;color:#fff;">
+        Débat en cours… discutez et accusez quelqu’un avant la fin du timer 👀
+      </div>
+    `;
+  }
 
   if (chatCanWriteNow){
     setTimeout(() => chatInput?.focus?.(), 80);
   }
 }
-
 function closeChat(force=false){
   if (!force && meetingLockActive) return;
   if (!chatOverlay) return;
@@ -1225,7 +1228,10 @@ function closeChat(force=false){
   document.body.classList.remove("chat-open");
 }
 
-chatFab?.addEventListener("click", () => {
+chatFab?.addEventListener("click", (e) => {
+  e.preventDefault();
+  e.stopPropagation();
+  
   if (!chatOverlay) return;
 
   if (!chatCanViewNow){
@@ -1241,7 +1247,14 @@ chatFab?.addEventListener("click", () => {
   else openChat();
 });
 btnChatClose?.addEventListener("click", () => closeChat(false));
-chatOverlay?.addEventListener("click", (e) => { if (e.target === chatOverlay) closeChat(false); });
+chatOverlay?.addEventListener("click", (e) => {
+  if (e.target !== chatOverlay) return;
+
+  // ✅ ignore le “click fantôme” iOS juste après l'ouverture
+  if (performance.now() - chatJustOpenedAt < CHAT_BACKDROP_GUARD_MS) return;
+
+  closeChat(false);
+});
 window.addEventListener("keydown", (e) => { if (e.key === "Escape") closeChat(false); });
 
 // ===================
