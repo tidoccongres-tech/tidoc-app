@@ -178,6 +178,8 @@ if (!Number.isFinite(PACKS.staff.workshopDiscountPacks) || PACKS.staff.workshopD
   }
 }
 
+const ENABLE_TICKET_PREVIEW = false; // ⛔️ tu veux pas d’aperçu
+
 const previewEl = document.getElementById("ticketPreview");
 let LAST_PREVIEW_URL = null;
 
@@ -1444,7 +1446,8 @@ async function loadSavedTicket() {
 async function handleFile(file) {
   if (!file) return;
 
-  showTicketPreview(file);
+if (ENABLE_TICKET_PREVIEW) showTicketPreview(file);
+else clearTicketPreview();
 
   setStatus("");
   if (statusEl) statusEl.style.color = "";
