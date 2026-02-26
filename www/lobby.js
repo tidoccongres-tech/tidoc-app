@@ -706,19 +706,20 @@ function openActivityUI(title, sub){
   activityOpen = true;
   activityDone = false;
   activityOverlay.style.display = "flex";
-  activityTitleEl.textContent = title || "Activité";
-  activitySubEl.textContent = sub || "";
-  activityBodyEl.innerHTML = "";
-  activityBarEl.style.width = "0%";
+
+  if (activityTitleEl) activityTitleEl.textContent = title || "Activité";
+  if (activitySubEl)   activitySubEl.textContent   = sub || "";
+  if (activityBodyEl)  activityBodyEl.innerHTML    = "";
+  if (activityBarEl)   activityBarEl.style.width   = "0%";
 }
+
 function closeActivityUI(){
   activityOpen = false;
   activityDone = false; // ✅ reset
   activityOverlay.style.display = "none";
-  activityBodyEl.innerHTML = "";
+  if (activityBodyEl) activityBodyEl.innerHTML = "";
+  if (activityBarEl)  activityBarEl.style.width = "0%";
 }
-activityCloseBtn?.addEventListener("click", closeActivityUI);
-activityOverlay.addEventListener("click", (e) => { if (e.target === activityOverlay) closeActivityUI(); });
 
 // mini-jeu: “taper les pastilles dans l’ordre”
 function startTapOrderMiniGame({ steps = 6 } = {}){
