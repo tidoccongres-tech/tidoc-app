@@ -1240,15 +1240,24 @@ chatFab?.addEventListener("click", (e) => {
   if (chatOverlay.classList.contains("open")) closeChat();
   else openChat();
 });
-btnChatClose?.addEventListener("click", () => closeChat(false));
-chatOverlay?.addEventListener("click", (e) => {
-  if (e.target !== chatOverlay) return;
-
-  // ✅ ignore le “click fantôme” iOS juste après l'ouverture
-  if (performance.now() - chatJustOpenedAt < CHAT_BACKDROP_GUARD_MS) return;
-
+btnChatClose?.addEventListener("click", (e) => {
+  e.preventDefault();
+  e.stopPropagation();
   closeChat(false);
 });
+chatOverlay?.addEventListener("pointerdown", (e) => {
+  // on ferme uniquement si on tape vraiment sur le backdrop
+  if (e.target !== chatOverlay) return;
+
+  // ✅ iOS: évite le “tap” qui sert à ouvrir puis retombe sur le backdrop
+  if (performance.now() - chatJustOpenedAt < CHAT_BACKDROP_GUARD_MS) {
+    e.preventDefault();
+    return;
+  }
+
+  closeChat(false);
+}, { passive:false });
+
 window.addEventListener("keydown", (e) => { if (e.key === "Escape") closeChat(false); });
 
 // ===================
