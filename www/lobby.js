@@ -3154,11 +3154,12 @@ function update(dt){
 
   settleRemoteIdle();
 
-  // ACTION UI refresh (map uniquement)
+    // ACTION UI refresh (map uniquement)
   if (phase !== "started") return;
 
   if (myDead || activityOpen || meetingLockActive){
     setActionUI({ show:false });
+    actionBtn.onclick = null;
     return;
   }
 
@@ -3177,6 +3178,7 @@ function update(dt){
     const hit = getClosestAliveTargetForExpel();
     if (hit){
       const remain = EXPEL_COOLDOWN_MS - (now - (myLastExpelAtMs || 0));
+
       if (remain > 0){
         setActionUI({
           show:true,
@@ -3212,8 +3214,8 @@ function update(dt){
 
   // rien à faire
   setActionUI({ show:false });
-}
-
+  actionBtn.onclick = null;
+  
 // ===================
 // LOBBY CAMERA (tablette) : suit le joueur + clamp
 // ===================
