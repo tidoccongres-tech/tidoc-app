@@ -3154,7 +3154,7 @@ function update(dt){
 
   settleRemoteIdle();
 
-    // ACTION UI refresh (map uniquement)
+  // ACTION UI refresh (map uniquement)
   if (phase !== "started") return;
 
   if (myDead || activityOpen || meetingLockActive){
@@ -3215,6 +3215,7 @@ function update(dt){
   // rien à faire
   setActionUI({ show:false });
   actionBtn.onclick = null;
+}
   
 // ===================
 // LOBBY CAMERA (tablette) : suit le joueur + clamp
@@ -4022,128 +4023,8 @@ if (!unsubRoom){
     }
     lastRoomStatus = status;
   });
-}// ===================
-// ROOM snapshot (1 seul)
-// ===================
-if (!unsubRoom){
-  unsubRoom = onSnapshot(doc(db,"rooms",roomId), async (snap)=>{
-    if (!snap.exists()){
-      alert("Partie supprimée");
-      location.href="./game.html";
-      return;
-    }
-
-    const room = snap.data() || {};
-    const status = room.status || "lobby";
-    roomStatusCache = status;
-
-    // vote result overlay (safe)
-    try { showVoteResult(room.voteResult); } catch(_) {}
-
-    // flags room
-    roomChatEnabled = !!room.chatEnabled;
-
-    // deadUids persistant
-    const deadArr = Array.isArray(room.deadUids) ? room.deadUids : [];
-    deadUidsSet = new Set(deadArr);
-
-    // tasks global
-    roomTasksDone = (typeof room.tasksDone === "number") ? room.tasksDone : 0;
-    const tasksTotalRoom = (typeof room.tasksTotal === "number") ? room.tasksTotal : TASKS_TOTAL;
-    setGlobalTasksProgress(roomTasksDone, tasksTotalRoom);
-
-    // host
-    myIsHost = (room.hostUid === myUid);
-    if (btnStart) btnStart.style.display = myIsHost ? "" : "none";
-
-    // admin button (CSS display:none => grid)
-    if (btnAdminStart){
-      btnAdminStart.style.display = (isAdmin && myIsHost) ? "grid" : "none";
-    }
-
-    // meeting/report (lock + splash)
-    handleMeetingState(room, status);
-
-    // -------------------
-    // VOTE state (depuis Firestore)
-    // -------------------
-    const voteActive = !!room.voteActive;
-
-    const voteAtMs =
-      (typeof room.voteAtMs === "number" && room.voteAtMs > 0)
-        ? room.voteAtMs
-        : tsToMs(room.voteAt);
-
-    const voteDurMs  = (typeof room.voteDurMs === "number") ? room.voteDurMs : VOTE_MS;
-    const voteRound  = (typeof room.voteRound === "number") ? room.voteRound : 0;
-
-    // ✅ UI vote pour les vivants
-    if (status === "started" && voteActive && voteAtMs){
-      const endVoteMs = voteAtMs + voteDurMs;
-
-      if (!voteUiOpen && !myDead){
-        openVoteUI(endVoteMs);
-      }
-    } else {
-      if (voteUiOpen) hideVoteUI();
-    }
-
-    // ✅ HOST: planifie le tally EXACTEMENT à la fin du vote (UNE SEULE FOIS)
-    if (myIsHost && status === "started" && voteActive && voteAtMs && voteRound){
-      const endVoteMs = voteAtMs + voteDurMs;
-
-      if (voteResolveEndMs !== endVoteMs){
-        voteResolveEndMs = endVoteMs;
-        if (voteResolveTimer) clearTimeout(voteResolveTimer);
-
-        const delay = Math.max(0, endVoteMs - Date.now() + 250);
-        voteResolveTimer = setTimeout(() => {
-          hostTallyAndApplyVote({ room, voteAtMs, voteDurMs, voteRound });
-        }, delay);
-      }
-    } else {
-      if (voteResolveTimer) clearTimeout(voteResolveTimer);
-      voteResolveTimer = null;
-      voteResolveEndMs = 0;
-    }
-
-    // END screen (safe)
-    try { checkEndConditions(room); } catch(_) {}
-
-    // -------------------
-    // SWITCH MODE PROPRE
-    // -------------------
-    if (status === "starting"){
-      setStartingMode();
-
-      // lance le spin seulement si pas déjà en cours
-      if (!spinRunning && roleOverlay && !roleOverlay.classList.contains("open")){
-        playSpinThenReveal(null);
-      }
-    }
-    else if (status === "started"){
-      // si un spin était en cours, on laisse l’UI se fermer (évite flash)
-      spinRunning = false;
-      hideRoleOverlay();
-      setGameMode();
-    }
-    else {
-      spinRunning = false;
-      hideRoleOverlay();
-      setLobbyMode();
-    }
-
-    // gating chat
-    refreshChatGating(status);
-
-    // spawn uniquement quand status change
-    if (lastRoomStatus !== status){
-      await ensureSpawnCenter();
-    }
-    lastRoomStatus = status;
-  });
 }
-
+  
   // ===================
   // PLAYERS snapshot (1 seul)
   // ===================
