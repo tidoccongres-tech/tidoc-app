@@ -6,19 +6,20 @@
   <title>Ti'Doc</title>
 
   <link rel="stylesheet" href="style.css?v=9" />
-  <link rel="manifest" href="manifest.webmanifest" />
+
+  <!-- PWA -->
+  <link rel="manifest" href="/manifest.json" />
   <meta name="theme-color" content="#178CA8" />
 
-  <!-- PWA / Icônes -->
-<link rel="icon" href="/icons/icon-192.png">
-<link rel="apple-touch-icon" href="/icons/icon-192.png">
-<link rel="manifest" href="/manifest.json">
+  <!-- Icônes -->
+  <link rel="icon" href="/icons/icon-192.png" />
+  <link rel="apple-touch-icon" sizes="180x180" href="/icons/apple-touch-icon.png" />
 
-<meta name="theme-color" content="#000000">
-<meta name="mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="apple-mobile-web-app-title" content="Ti'Doc">
+  <!-- iOS / Android (standalone) -->
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="Ti'Doc" />
 </head>
 
 <body>
@@ -41,7 +42,6 @@
           </div>
         </div>
 
-        <!-- ✅ bouton premium animé -->
         <a href="mailto:tidoc.congres@gmail.com" class="btn-primary home-contact-btn home-contact-premium">
           Nous contacter
         </a>
@@ -64,9 +64,9 @@
         <div class="home-tile-sub">Photos</div>
       </a>
 
-     <a class="home-tile home-tile-premium home-tile-game" href="game.html">
-       <div class="home-tile-title">🧢 Ti’Truant</div>
-       <div class="home-tile-sub">Le mini-jeu Ti'Doc</div>
+      <a class="home-tile home-tile-premium home-tile-game" href="game.html">
+        <div class="home-tile-title">🧢 Ti’Truant</div>
+        <div class="home-tile-sub">Le mini-jeu Ti'Doc</div>
       </a>
     </section>
 
@@ -85,26 +85,26 @@
       <p class="social-title">Pour en savoir plus sur nous</p>
 
       <div class="social-icons">
-        <a class="social-icon" href="https://www.instagram.com/congres_tidoc" target="_blank" aria-label="Instagram">
+        <a class="social-icon" href="https://www.instagram.com/congres_tidoc" target="_blank" rel="noopener" aria-label="Instagram">
           <svg viewBox="0 0 48 48" class="icon" xmlns="http://www.w3.org/2000/svg">
             <path d="M0 0h48v48H0z" fill="none"/>
             <path d="M36 4H12c-4.4 0-8 3.6-8 8v24c0 4.4 3.6 8 8 8h24c4.4 0 8-3.6 8-8V12c0-4.4-3.6-8-8-8ZM24 34c-5.5 0-10-4.5-10-10s4.5-10 10-10 10 4.5 10 10-4.5 10-10 10Zm11-19c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2Z"/>
           </svg>
         </a>
 
-        <a class="social-icon" href="https://www.tiktok.com/@congres_tidoc" target="_blank" aria-label="TikTok">
+        <a class="social-icon" href="https://www.tiktok.com/@congres_tidoc" target="_blank" rel="noopener" aria-label="TikTok">
           <svg viewBox="0 0 32 32" class="icon" xmlns="http://www.w3.org/2000/svg">
             <path d="M16.66 1.03h4.89c.05 2.03.88 3.86 2.19 5.21 1.41 1.27 3.25 2.1 5.27 2.24v5.04a11.5 11.5 0 0 1-5.33-1.21c-.78-.38-1.45-.76-2.08-1.2v10.93c-.1 1.85-.72 3.54-1.71 4.95-1.65 2.37-4.33 3.92-7.37 4.01h-.41c-1.73 0-3.35-.48-4.73-1.32-2.51-1.51-4.24-4.09-4.56-7.09-.02-.63-.04-1.25-.01-1.86.49-4.78 4.49-8.48 9.36-8.48.55 0 1.08.05 1.6.14v5.55a4.26 4.26 0 0 0-1.42-.24c-1.87 0-3.46 1.19-4.05 2.86-.13.43-.21.92-.21 1.43 0 .2.01.41.04.61.33 2.05 2.09 3.59 4.2 3.59h.18c1.46-.04 2.73-.83 3.45-1.99.27-.37.45-.82.51-1.31.13-2.24.08-4.46.09-6.7V1.03z"/>
           </svg>
         </a>
 
-        <a class="social-icon" href="https://www.facebook.com/share/1AAdnhuuvd" target="_blank" aria-label="Facebook">
+        <a class="social-icon" href="https://www.facebook.com/share/1AAdnhuuvd" target="_blank" rel="noopener" aria-label="Facebook">
           <svg viewBox="0 0 24 24" class="icon" xmlns="http://www.w3.org/2000/svg">
             <path d="M12 2.04C6.5 2.04 2 6.53 2 12.06c0 5 3.66 9.15 8.44 9.9v-7h-2.54v-2.9h2.54V9.85c0-2.51 1.49-3.89 3.78-3.89 1.09 0 2.23.19 2.23.19v2.47h-1.26c-1.24 0-1.63.77-1.63 1.56v1.88h2.78l-.45 2.9h-2.33v7c2.36-.37 4.5-1.57 6.05-3.39A9.98 9.98 0 0 0 22 12.06c0-5.53-4.5-10.02-10-10.02Z"/>
           </svg>
         </a>
 
-        <a class="social-icon" href="https://tidoccongres.wixsite.com/tidoc-congres" target="_blank" aria-label="Site internet">
+        <a class="social-icon" href="https://tidoccongres.wixsite.com/tidoc-congres" target="_blank" rel="noopener" aria-label="Site internet">
           <svg viewBox="0 0 24 24" class="icon" xmlns="http://www.w3.org/2000/svg">
             <path d="M4 15h16M4 9h16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
             <circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
