@@ -1962,11 +1962,15 @@ function forceOpenChat(){
 // ===================
 // MODES
 // ===================
+// ===================
+// MODES (VERSION STABLE)
+// ===================
+
 function setLobbyMode(){
   gameStarted = false;
   phase = "lobby";
 
-  // ✅ menu visible
+  // UI menu visible
   setUiPanelVisible(true);
 
   joy?.classList.remove("is-hidden");
@@ -1974,13 +1978,15 @@ function setLobbyMode(){
   setCanvasInteract(false);
   setMeetingLock(false);
   hideReportSplash();
+
   const pill = ensureDebatePill();
   pill.style.display = "none";
+
   clearMeetingTimers();
   meetingAtMsLocal = 0;
 
-  // chat OK en lobby
-  chatCanViewNow = true;
+  // chat lobby
+  chatCanViewNow  = true;
   chatCanWriteNow = true;
   setChatFabVisible(true);
   applyChatWriteLock();
@@ -1990,30 +1996,34 @@ function setLobbyMode(){
   showTasksHud(false);
   try{ closeActivityUI(); } catch(_) {}
 
-  // ✅ Admin visible UNIQUEMENT dans le lobby (et seulement admin + host)
+  // admin visible uniquement lobby
   if (btnAdminStart){
     btnAdminStart.style.display = (isAdmin && myIsHost) ? "grid" : "none";
   }
+
+  // 🔥 IMPORTANT
+  startLoopOnce();
 }
+
 
 function setStartingMode(){
   gameStarted = false;
   phase = "starting";
 
-  // ✅ menu caché pendant tirage
   setUiPanelVisible(false);
 
   joy?.classList.add("is-hidden");
 
   setMeetingLock(false);
   hideReportSplash();
+
   const pill = ensureDebatePill();
   pill.style.display = "none";
+
   clearMeetingTimers();
   meetingAtMsLocal = 0;
 
-  // chat OK pendant tirage (selon ton choix)
-  chatCanViewNow = true;
+  chatCanViewNow  = true;
   chatCanWriteNow = true;
   setChatFabVisible(true);
   applyChatWriteLock();
@@ -2022,52 +2032,58 @@ function setStartingMode(){
   showTasksHud(false);
   try{ closeActivityUI(); } catch(_) {}
 
-  // ✅ Admin jamais visible hors lobby
   if (btnAdminStart){
     btnAdminStart.style.display = "none";
   }
+
+  // 🔥 IMPORTANT
+  startLoopOnce();
 }
+
 
 function setGameMode(){
   gameStarted = true;
   phase = "started";
 
-  // ✅ menu totalement caché en jeu
   setUiPanelVisible(false);
 
-  // joystick
   if (!meetingLockActive) joy?.classList.remove("is-hidden");
 
-  // chat (ta logique actuelle)
   chatCanViewNow  = !!roomChatEnabled;
   chatCanWriteNow = !!roomChatEnabled && !myDead;
 
-  // canvas interact: spectateur peut drag
   setCanvasInteract(myDead && !meetingLockActive);
 
   setChatFabVisible(chatCanViewNow);
+
   if (!chatCanViewNow && chatOverlay?.classList.contains("open")){
     closeChat(true);
   }
+
   applyChatWriteLock();
 
-  // missions (HUD) : affiché, mais sans bouton "valider" + sans liste si tu as appliqué mon patch missions
   showTasksHud(true);
   updateMyTaskHud();
 
-  // actions
   setActionUI({ show:false });
 
-  // ✅ Admin jamais visible en jeu
   if (btnAdminStart){
     btnAdminStart.style.display = "none";
   }
+
+  // 🔥 IMPORTANT
+  startLoopOnce();
 }
 
+
+// ===================
+// LOOP SAFE START
+// ===================
 function startLoopOnce(){
   if (loopRunning) return;
+
   loopRunning = true;
-  lastT = performance.now();     // lastT existe déjà (var)
+  lastT = performance.now();
   requestAnimationFrame(loop);
 }
 
@@ -2858,29 +2874,35 @@ async function doZoneAction(zone){
   if (!zone) return;
   if (meetingLockActive) return;
 
+  // ===================
+  // ZONE MEETING (DÉNONCER)
+  // ===================
   if (zone.id === "meeting"){
-  if (!roomId || !myUid) return;
+    if (!roomId || !myUid) return;
 
-  try{
-    await updateDoc(doc(db, "rooms", roomId), {
-      chatEnabled: true,
-      meetingType: "meeting",
+    try{
+      await updateDoc(doc(db, "rooms", roomId), {
+        chatEnabled: true,
+        meetingType: "meeting",
 
-      // 🔥 IMPORTANT
-      meetingAt: serverTimestamp(),
-      meetingAtMs: Date.now(),   // ✅ timer immédiat
+        // ✅ TIMER IMMEDIAT (clients)
+        meetingAt: serverTimestamp(),
+        meetingAtMs: Date.now(),
 
-      meetingBy: myUid
-    });
+        meetingBy: myUid
+      });
 
-    setStartInfo("Réunion lancée.");
-  } catch(e){
-    console.log("meeting error:", e);
-    setStartInfo("Erreur réunion.");
+      setStartInfo("Réunion lancée.");
+    } catch(e){
+      console.log("meeting error:", e);
+      setStartInfo("Erreur réunion.");
+    }
+    return;
   }
-  return;
-}
 
+  // ===================
+  // ZONES MISSIONS (Ti’Nocent)
+  // ===================
   if (myRole !== "tinocent" || myDead) return;
 
   const t = currentTask();
@@ -2891,10 +2913,10 @@ async function doZoneAction(zone){
 
   const d = dist(player.x, player.y, zone.cx, zone.cy);
   const range = getZoneRange(zone.id);
-if (d > range){
-  setStartInfo("Approche-toi encore un peu.");
-  return;
-}
+  if (d > range){
+    setStartInfo("Approche-toi encore un peu.");
+    return;
+  }
 
   startActivityForZone(zone.id);
 }
@@ -2991,7 +3013,10 @@ function drawVignette(){
   const rOuter = Math.min(w, h) * 0.94;
 
   ctx.save();
-  ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+
+  // ✅ repasse en coordonnées écran quoi qu’il arrive
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.scale(DPR, DPR);
 
   const g = ctx.createRadialGradient(cx, cy, rInner, cx, cy, rOuter);
   g.addColorStop(0.0, "rgba(0,0,0,0)");
@@ -3000,6 +3025,7 @@ function drawVignette(){
 
   ctx.fillStyle = g;
   ctx.fillRect(0, 0, w, h);
+
   ctx.restore();
 }
 
