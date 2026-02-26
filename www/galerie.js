@@ -17,6 +17,9 @@ import {
 
 import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.4/firebase-auth.js";
 
+import { initFocusMode } from "./ui-fullscreen.js";
+initFocusMode();
+
 // ✅ Evite double init
 const app = getApps().length ? getApp() : initializeApp(firebaseConfig);
 const db = getFirestore(app);
