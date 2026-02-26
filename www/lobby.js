@@ -255,6 +255,17 @@ const chatBadge    = document.getElementById("chatBadge");
 const chatOverlay  = document.getElementById("chatOverlay");
 const btnChatClose = document.getElementById("btnChatClose");
 
+function ensureChatOverlayStyles(){
+  if (!chatOverlay) return;
+
+  // Si ton CSS le fait déjà, ça ne gêne pas. Si ton CSS ne s'applique pas => ça sauve tout.
+  chatOverlay.style.position = "fixed";
+  chatOverlay.style.inset = "0";
+  chatOverlay.style.zIndex = "250";
+  chatOverlay.style.display = chatOverlay.classList.contains("open") ? "block" : "none";
+}
+ensureChatOverlayStyles();
+
 function setChatFabVisible(show){
   if (!chatFab) return;
 
@@ -1197,6 +1208,7 @@ function openChat(){
   chatJustOpenedAt = performance.now(); // ✅ anti “fermeture instant” iOS
 
   chatOverlay.classList.add("open");
+  chatOverlay.style.display = "block";          // ✅ AJOUT
   chatOverlay.setAttribute("aria-hidden", "false");
   document.body.classList.add("chat-open");
   mountDebateBanner(); // ✅ AJOUT
@@ -1218,6 +1230,7 @@ function closeChat(force=false){
   if (!force && meetingLockActive) return;
   if (!chatOverlay) return;
   chatOverlay.classList.remove("open");
+  chatOverlay.style.display = "none";           // ✅ AJOUT
   chatOverlay.setAttribute("aria-hidden", "true");
   document.body.classList.remove("chat-open");
 }
@@ -1948,8 +1961,10 @@ function forceOpenChat(){
   setChatFabVisible(true);
 
   chatOverlay.classList.add("open");
+  chatOverlay.style.display = "block";          // ✅ AJOUT
   chatOverlay.setAttribute("aria-hidden","false");
   document.body.classList.add("chat-open");
+
   mountDebateBanner(); // ✅ AJOUT
 
   applyChatWriteLock();
@@ -1958,10 +1973,6 @@ function forceOpenChat(){
     setTimeout(() => chatInput?.focus?.(), 80);
   }
 }
-  
-// ===================
-// MODES
-// ===================
 // ===================
 // MODES (VERSION STABLE)
 // ===================
