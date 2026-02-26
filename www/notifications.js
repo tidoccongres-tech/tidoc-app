@@ -14,6 +14,9 @@ import {
 } from "https://www.gstatic.com/firebasejs/10.12.4/firebase-firestore.js";
 import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.4/firebase-auth.js";
 
+import { initFocusMode } from "./ui-fullscreen.js";
+initFocusMode();
+
 // ===== Cloudinary (newsletter uploads) =====
 const CLOUD_NAME = "dctwkkvn1";
 const UPLOAD_PRESET_NEWSLETTER = "tidoc_galerie";
