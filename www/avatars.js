@@ -1,7 +1,5 @@
 // avatars.js (MODULE)
 import { auth, db } from "./auth.js";
-import { initFocusMode } from "./ui-fullscreen.js";
-initFocusMode();
 import {
   onAuthStateChanged,
   updateProfile
