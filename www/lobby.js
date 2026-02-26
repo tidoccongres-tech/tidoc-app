@@ -7,6 +7,9 @@ import {
   addDoc, query, orderBy, limit, getDocs, setDoc, increment, arrayUnion
 } from "https://www.gstatic.com/firebasejs/10.12.4/firebase-firestore.js";
 
+import { initFocusMode } from "./ui-fullscreen.js";
+initFocusMode();
+
 function asset(p){ return new URL(p, import.meta.url).href; }
 
 // ===================
