@@ -1277,7 +1277,7 @@ function openScanMode({ mainTicket = null, workshops = [], parties = [] } = {}) 
         <div style="font-weight:900; margin-bottom:6px;">${escapeHTML(mainTicket?.holderName || "—")}</div>
         <div style="opacity:.85; font-weight:800;">N° billet : ${escapeHTML(mainTicket?.ticketNumber || "—")}</div>
         <div style="margin-top:10px; font-size:12px; font-weight:800; opacity:.75;">
-          Scanne ce QR à l’entrée générale.
+          Montre ce QR à la cérémonie d'ouverture.
         </div>
       </div>
     `;
@@ -1363,7 +1363,7 @@ function openScanMode({ mainTicket = null, workshops = [], parties = [] } = {}) 
             <div style="font-weight:900;">${escapeHTML(w.holderName || "—")}</div>
             <div style="opacity:.85; font-weight:800;">N° billet : ${escapeHTML(w.ticketNumber || "—")}</div>
             <div style="margin-top:10px; font-size:12px; font-weight:800; opacity:.75;">
-              Scanne ce QR au check-in workshop.
+              Montre ce QR au moment de ton workshop.
             </div>
           </div>
         </div>
@@ -1412,9 +1412,6 @@ function openScanMode({ mainTicket = null, workshops = [], parties = [] } = {}) 
     section.innerHTML = `
       <div style="font-weight:950; color:var(--tidoc);">🎭 Ti’Masqué — QR à scanner</div>
       <div id="scanPartyWrap" style="margin-top:12px; display:flex; flex-direction:column; gap:12px;"></div>
-      <div style="margin-top:6px; font-size:12px; font-weight:800; opacity:.7;">
-        Scanne ce QR à l’entrée Ti’Masqué.
-      </div>
     `;
 
     const wrapParty = section.querySelector("#scanPartyWrap");
@@ -1444,9 +1441,12 @@ function openScanMode({ mainTicket = null, workshops = [], parties = [] } = {}) 
         </div>
 
         <div style="min-width:200px; flex:1 1 220px;">
-          <div style="font-weight:900;">${escapeHTML(p.holderName || "—")}</div>
-          <div style="opacity:.85; font-weight:800;">N° billet : ${escapeHTML(p.ticketNumber || "—")}</div>
-        </div>
+  <div style="font-weight:900;">${escapeHTML(p.holderName || "—")}</div>
+  <div style="opacity:.85; font-weight:800;">N° billet : ${escapeHTML(p.ticketNumber || "—")}</div>
+  <div style="margin-top:6px; font-size:12px; font-weight:800; opacity:.7;">
+    Montre ce QR à l’entrée de la soirée Ti’Masqué.
+  </div>
+</div>
       `;
 
       wrapParty?.appendChild(card);
