@@ -12,6 +12,8 @@ import {
   serverTimestamp, collection, query, where, getDocs
 } from "https://www.gstatic.com/firebasejs/10.12.4/firebase-firestore.js";
 
+import { initFocusMode } from "./ui-fullscreen.js";
+initFocusMode();
 // =====================
 // UI
 // =====================
