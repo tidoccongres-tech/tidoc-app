@@ -1555,8 +1555,10 @@ function hideVoteUI(){
 }
 
 function setVoteDisabled(disabled){
-  voteSkipBtn.disabled = !!disabled;
-  voteSkipBtn.style.opacity = disabled ? "0.6" : "1";
+  if (voteSkipBtn){
+    voteSkipBtn.disabled = !!disabled;
+    voteSkipBtn.style.opacity = disabled ? "0.6" : "1";
+  }
   voteListEl?.querySelectorAll("button")?.forEach(btn => {
     btn.disabled = !!disabled;
     btn.style.opacity = disabled ? "0.6" : "1";
@@ -1632,14 +1634,17 @@ if (!voteSkipBound && voteSkipBtn){
     const s = Math.max(0, Math.ceil((endVoteMs - Date.now()) / 1000));
     if (voteTimerEl) voteTimerEl.textContent = `Temps restant : ${s}s`;
 
-    if (s <= 0){
-      // évite le "Passer" auto si on a ouvert en fin de vote
-      const openForMs = Date.now() - (voteUiOpenedAtMs || Date.now());
-      if (!myVoteSent && openForMs > 1500){
-        sendVote(null);
-      }
-      return;
-    }
+   if (s <= 0){
+  const openForMs = Date.now() - (voteUiOpenedAtMs || Date.now());
+
+  if (!myVoteSent && openForMs > 1500){
+    sendVote(null);
+  }
+
+  // ✅ on ferme l’UI une fois le vote terminé (évite overlay bloqué)
+  setTimeout(() => { if (voteUiOpen) hideVoteUI(); }, 250);
+  return;
+}
 
     if (voteUiOpen) requestAnimationFrame(tick);
   };
@@ -1936,6 +1941,8 @@ function showSelfExpelledCard(ms = SELF_EXPEL_MS){
 
 function forceOpenChat(){
   if (!chatOverlay) return;
+
+  chatJustOpenedAt = performance.now(); // ✅ AJOUT: anti iOS ghost tap
 
   chatCanViewNow = true;
   setChatFabVisible(true);
