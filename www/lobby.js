@@ -224,18 +224,10 @@ const roomId = (
 console.log("[LOBBY] href =", location.href);
 console.log("[LOBBY] roomId =", roomId);
 
-window.addEventListener("error", (e) => {
-  console.error("[WINDOW ERROR]", e?.message, e?.filename, e?.lineno, e?.colno, e?.error);
-});
-window.addEventListener("unhandledrejection", (e) => {
-  console.error("[UNHANDLED PROMISE]", e?.reason);
-});
-
 // ===================
 // DOM (suite)
 // ===================
 const roomCodeEl = document.getElementById("roomCode");
-const playersEl  = document.getElementById("playersList");
 const btnStart   = document.getElementById("btnStart");
 const btnLeave   = document.getElementById("btnLeave");
 // ✅ SAFE refs (évite ReferenceError qui casse tout le JS)
