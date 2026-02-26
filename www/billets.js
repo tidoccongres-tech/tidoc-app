@@ -733,6 +733,21 @@ async function ocrCanvas(canvas) {
 // =====================
 // Parsing (PDF texte / OCR texte)
 // =====================
+// à mettre UNE FOIS en haut du fichier (hors fonction)
+const PARTY_DEFAULT_TITLE = "Ti’Masqué";
+const PARTY_KEYWORDS = [
+  "ti-masque",
+  "ti-masqué",
+  "ti masque",
+  "ti masqué",
+  "timasque",
+  "timasqué",
+  "ti’masqué",
+  "ti'masqué",
+  "ti’masque",
+  "ti'masque",
+];
+
 function parseMetaFromText(raw = "") {
   const lines = String(raw).split(/\r?\n/).map(l => l.replace(/\s+/g, " ").trim()).filter(Boolean);
   const full = lines.join(" ");
@@ -812,7 +827,40 @@ function parseMetaFromText(raw = "") {
     }
   }
 
-  return { holderName, packKey, ticketNumber, workshopTitle, rawText: raw };
+  // =====================
+  // Party title (Ti-Masqué)
+  // =====================
+  let partyTitle = "";
+
+  const fullNorm = full
+    .toLowerCase()
+    .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+    .replace(/[’']/g, "'")
+    .replace(/[–—]/g, "-");
+
+  const looksTiMasque = PARTY_KEYWORDS.some(k => {
+    const kn = String(k)
+      .toLowerCase()
+      .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+      .replace(/[’']/g, "'")
+      .replace(/[–—]/g, "-");
+    return fullNorm.includes(kn);
+  });
+
+  if (looksTiMasque) {
+    // Si une ligne du type "Ti-Masqué : NOM", on récupère NOM
+    for (const l of lines) {
+      const m = l.match(/ti\s*[-’']?\s*masqu[eé]\s*[:\-–—]?\s*(.+)$/i);
+      if (m && m[1]) {
+        const tail = String(m[1]).trim();
+        if (tail && tail.length >= 2) { partyTitle = tail; break; }
+      }
+    }
+    if (!partyTitle) partyTitle = PARTY_DEFAULT_TITLE;
+  }
+
+  // ✅ IMPORTANT : on retourne aussi partyTitle
+  return { holderName, packKey, ticketNumber, workshopTitle, partyTitle, rawText: raw };
 }
 
 // =====================
@@ -1281,7 +1329,6 @@ async function loadSavedTicket() {
 async function handleFile(file) {
   if (!file) return;
 
-  // reset UI status
   setStatus("");
   if (statusEl) statusEl.style.color = "";
 
@@ -1293,7 +1340,8 @@ async function handleFile(file) {
     let holderName = "";
     let ticketNumber = "";
     let workshopTitle = "";
-    let rawText = ""; // utile si tu veux debugger
+    let partyTitle = "";
+    let rawText = "";
 
     // =====================
     // 1) EXTRACTION (PDF / IMAGE)
@@ -1308,8 +1356,10 @@ async function handleFile(file) {
       holderName = meta?.holderName || "";
       ticketNumber = meta?.ticketNumber || "";
       workshopTitle = meta?.workshopTitle || "";
+      partyTitle = meta?.partyTitle || "";
       rawText = meta?.rawText || "";
-    } else if (file.type.startsWith("image/")) {
+    }
+    else if (file.type.startsWith("image/")) {
       const canvas = await loadImageToCanvas(file);
 
       qrText = scanCanvasForQR(canvas) || "";
@@ -1322,37 +1372,41 @@ async function handleFile(file) {
       holderName = meta?.holderName || "";
       ticketNumber = meta?.ticketNumber || "";
       workshopTitle = meta?.workshopTitle || "";
+      partyTitle = meta?.partyTitle || "";
       rawText = meta?.rawText || text || "";
-    } else {
+    }
+    else {
       throw new Error("Format non supporté (PDF ou image uniquement).");
     }
 
     if (!qrText) throw new Error("QR Code non détecté sur le billet.");
 
     // =====================
-    // 2) HEURISTIQUE ANTI-ÉCRASEMENT (workshop sans 'Pack ...')
+    // 2) HEURISTIQUES INTELLIGENTES
     // =====================
-    const hasPackKey = !!String(packKey || "").trim();
 
-    // Si on a détecté un titre workshop mais pas de pack => c'est un billet workshop
-    if (!hasPackKey && String(workshopTitle || "").trim()) {
-      packKey = "workshop";
-    }
-
-    // Sécurité supplémentaire : si le texte “sent” le workshop mais packKey inconnu
     const p0 = String(packKey || "").toLowerCase();
     const isKnownMain = ["premium", "standard", "essentiel", "staff"].includes(p0);
 
     const looksWorkshop =
       /workshop|atelier/i.test(String(workshopTitle || "")) ||
-      /workshop|atelier/i.test(String(rawText || "")); // rawText contient le texte OCR/PDF
+      /workshop|atelier/i.test(String(rawText || ""));
 
+    const looksParty =
+      !!String(partyTitle || "").trim(); // si parseMeta a détecté Ti-Masqué
+
+    // 🔹 Si pas pack principal détecté mais workshop trouvé
     if (!isKnownMain && looksWorkshop) {
       packKey = "workshop";
     }
 
+    // 🔹 Si pas pack principal détecté mais Ti-Masqué trouvé
+    if (!isKnownMain && looksParty) {
+      packKey = "party";
+    }
+
     // =====================
-    // 3) VÉRIF OFFICIELLE (optionnelle)
+    // 3) VERIFICATION OFFICIELLE (si activée)
     // =====================
     const v = await verifyPackWithQrOrThrow(qrText, packKey);
     if (v?.finalPackKey) packKey = v.finalPackKey;
@@ -1360,29 +1414,77 @@ async function handleFile(file) {
     const p = String(packKey || "").toLowerCase();
 
     // =====================
-    // 4) LOCK ANTI-DOUBLE (qrClaims)
+    // 4) LOCK QR (anti double import)
     // =====================
-    if (p !== "workshop" || (typeof CLAIM_WORKSHOP_QR === "undefined" ? true : CLAIM_WORKSHOP_QR)) {
+
+    if (p !== "workshop" && p !== "party") {
       await claimQrOrThrow(qrText);
+    } else {
+      if (
+        (p === "workshop" && (typeof CLAIM_WORKSHOP_QR === "undefined" ? true : CLAIM_WORKSHOP_QR)) ||
+        (p === "party" && (typeof CLAIM_PARTY_QR === "undefined" ? true : CLAIM_PARTY_QR))
+      ) {
+        await claimQrOrThrow(qrText);
+      }
     }
 
     // =====================
-    // 5) SAVE (workshop multi / main ticket)
+    // 5) SAVE
     // =====================
-    if (p === "workshop") {
-      const r = await saveWorkshopTicket({ qrText, packKey, holderName, ticketNumber, workshopTitle });
+
+    // 🎉 Billet Soirée (Ti’Masqué)
+    if (p === "party") {
+      const r = await savePartyTicket({
+        qrText,
+        holderName,
+        ticketNumber,
+        partyTitle
+      });
+
       await syncNameFromTicket(holderName);
       await loadSavedTicket();
-      setStatus(r?.already ? "ℹ️ Billet workshop déjà importé" : "✅ Billet workshop importé");
+
+      setStatus(r?.already
+        ? "ℹ️ Billet Ti’Masqué déjà importé"
+        : "✅ Billet Ti’Masqué importé");
+
       return;
     }
 
-    // Billet principal
-    await saveTicketToFirestore({ qrText, packKey, holderName, ticketNumber });
+    // 🧪 Workshop
+    if (p === "workshop") {
+      const r = await saveWorkshopTicket({
+        qrText,
+        packKey,
+        holderName,
+        ticketNumber,
+        workshopTitle
+      });
+
+      await syncNameFromTicket(holderName);
+      await loadSavedTicket();
+
+      setStatus(r?.already
+        ? "ℹ️ Billet workshop déjà importé"
+        : "✅ Billet workshop importé");
+
+      return;
+    }
+
+    // 🎫 Billet principal
+    await saveTicketToFirestore({
+      qrText,
+      packKey,
+      holderName,
+      ticketNumber
+    });
+
     await syncNameFromTicket(holderName);
     await loadSavedTicket();
+
     setStatus("✅ Billet importé avec succès");
-  } catch (e) {
+  }
+  catch (e) {
     console.log("handleFile import error:", e);
     setStatus("❌ " + (e?.message || String(e)));
   }
