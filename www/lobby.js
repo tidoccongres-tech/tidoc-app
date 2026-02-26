@@ -1630,6 +1630,8 @@ if (!voteSkipBound && voteSkipBtn){
 
   requestAnimationFrame(tick);
 
+}
+  
 // ===================
 // Résolution vote (HOST)
 // ===================
