@@ -1595,12 +1595,15 @@ else clearTicketPreview();
     }
 
     // =====================
-    // 3) VERIFICATION OFFICIELLE (si activée)
-    // =====================
-    const v = await verifyPackWithQrOrThrow(qrText, packKey);
-    if (v?.finalPackKey) packKey = v.finalPackKey;
+// 3) VERIFICATION OFFICIELLE (si activée)
+// =====================
+// ✅ pas de vérif officielle sur Ti’Masqué (sauf si tu ajoutes "party" dans l’index)
+if (String(packKey).toLowerCase() !== "party") {
+  const v = await verifyPackWithQrOrThrow(qrText, packKey);
+  if (v?.finalPackKey) packKey = v.finalPackKey;
+}
 
-    const p = String(packKey || "").toLowerCase();
+const p = String(packKey || "").toLowerCase();
 
     // =====================
     // 4) LOCK QR (anti double import)
@@ -2156,7 +2159,7 @@ function initBilletsPage() {
   bindAdminUI();
 
   document.getElementById("scanModeIconBtn")?.addEventListener("click", () => {
-  openScanMode({ mainTicket: LAST_MAIN_TICKET, workshops: LAST_WORKSHOPS });
+  openScanMode({ mainTicket: LAST_MAIN_TICKET, workshops: LAST_WORKSHOPS, parties: LAST_PARTIES });
 });
 }
 
