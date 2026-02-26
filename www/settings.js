@@ -8,6 +8,9 @@ import {
   reauthenticateWithCredential
 } from "https://www.gstatic.com/firebasejs/10.12.4/firebase-auth.js";
 
+import { initFocusMode } from "./ui-fullscreen.js";
+initFocusMode();
+
 // ===== Profil UI =====
 const avatarBox = document.getElementById("currentAvatar");
 const nameEl = document.getElementById("profileName");
