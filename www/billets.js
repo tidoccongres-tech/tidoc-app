@@ -19,6 +19,7 @@ const boxEl     = document.getElementById("ticketBox");
 
 let LAST_MAIN_TICKET = null;     // { qrText, packKey, holderName, ticketNumber }
 let LAST_WORKSHOPS = [];         // array of workshop docs
+let LAST_PARTIES = []; // billets Ti’Masqué (array)
 
 function setStatus(t = "") { if (statusEl) statusEl.textContent = t; }
 function escapeHTML(s = "") {
@@ -1127,6 +1128,56 @@ function renderWorkshopsList(workshops = []) {
   });
 }
 
+function renderPartyTicketsList(parties = []) {
+  const listBox =
+    boxEl?.querySelector("#partyTicketsListBox") ||
+    document.getElementById("partyTicketsListBox");
+
+  if (!listBox) return;
+
+  if (!parties.length) {
+    listBox.innerHTML = `
+      <div style="opacity:.8; font-weight:800; color:rgba(31,75,86,.75);">
+        Aucun billet Ti’Masqué importé pour l’instant.
+      </div>
+    `;
+    return;
+  }
+
+  const items = parties.map((p) => `
+    <div style="position:relative; border:1px solid var(--line); border-radius:14px; padding:12px; background:#fff;">
+      <button class="delete-btn party-del-btn"
+              type="button"
+              data-party-hash="${escapeHTML(p.qrHash || "")}"
+              aria-label="Supprimer le billet Ti’Masqué"
+              title="Supprimer"
+              style="position:absolute; top:10px; right:10px;">
+        ${TRASH_TIDOC_SVG}
+      </button>
+
+      <div style="font-weight:900; color:#0f4f60;">🎭 ${escapeHTML(p.partyTitle || "Ti’Masqué")}</div>
+      <div style="margin-top:6px;"><b>Nom :</b> ${escapeHTML(p.holderName || "—")}</div>
+      <div><b>N° billet :</b> ${escapeHTML(p.ticketNumber || "—")}</div>
+      <div style="margin-top:6px;"><b>Type :</b> Ti’Masqué</div>
+    </div>
+  `).join("");
+
+  listBox.innerHTML = `
+    <div style="margin-top:6px; font-weight:900; color:var(--tidoc);">🎭 Billets Ti’Masqué importés</div>
+    <div style="margin-top:10px; display:flex; flex-direction:column; gap:10px;">
+      ${items}
+    </div>
+  `;
+
+  listBox.querySelectorAll(".party-del-btn").forEach(btn => {
+    btn.addEventListener("click", async () => {
+      const h = btn.getAttribute("data-party-hash") || "";
+      if (!h) return;
+      await deletePartyTicketByHash(h);
+    });
+  });
+}
+
 function ensureScanOverlay() {
   let ov = document.getElementById("scanOverlay");
   if (ov) return ov;
@@ -1363,7 +1414,6 @@ function openScanMode({ mainTicket = null, workshops = [] } = {}) {
 // =====================
 async function loadSavedTicket() {
   const u = auth.currentUser;
-
   const scanBtn = document.getElementById("scanModeIconBtn");
 
   if (!u) {
@@ -1371,12 +1421,14 @@ async function loadSavedTicket() {
     if (boxEl) boxEl.textContent = "Aucun billet importé pour l’instant.";
     LAST_MAIN_TICKET = null;
     LAST_WORKSHOPS = [];
+    LAST_PARTIES = [];
     if (scanBtn) scanBtn.style.display = "none";
     return;
   }
 
   const snap = await getDoc(doc(db, "userTickets", u.uid));
 
+  // ---- workshops ----
   let workshops = [];
   try {
     const wsQ = query(collection(db, "userWorkshopTickets"), where("uid", "==", u.uid));
@@ -1386,35 +1438,49 @@ async function loadSavedTicket() {
     console.warn("workshops load error:", e);
     workshops = [];
   }
-
-  // ✅ mémorise toujours les workshops
   LAST_WORKSHOPS = workshops;
+
+  // ---- parties (Ti’Masqué) ----
+  let parties = [];
+  try {
+    const pQ = query(collection(db, "userPartyTickets"), where("uid", "==", u.uid));
+    const pSnap = await getDocs(pQ);
+    parties = pSnap.docs.map(d => d.data() || {}).filter(Boolean);
+  } catch (e) {
+    console.warn("party tickets load error:", e);
+    parties = [];
+  }
+  LAST_PARTIES = parties;
+
+  // scan icon: on l’affiche si main OU workshops OU parties
+  const hasAnyQR = !!(snap.exists() && (snap.data()?.qrText)) || workshops.length || parties.length;
+  if (scanBtn) scanBtn.style.display = hasAnyQR ? "" : "none";
 
   // --- CAS: pas de billet principal ---
   if (!snap.exists()) {
-  LAST_MAIN_TICKET = null;
+    LAST_MAIN_TICKET = null;
 
-  // ✅ afficher l’icône QR si on a des workshops
-  if (scanBtn) scanBtn.style.display = workshops.length ? "" : "none";
+    setStatus((workshops.length || parties.length) ? "✅ Billets chargés" : "");
+    if (!boxEl) return;
 
-  setStatus(workshops.length ? "✅ Billets workshop chargés" : "");
-  if (!boxEl) return;
+    if (!workshops.length && !parties.length) {
+      boxEl.textContent = "Aucun billet importé pour l’instant.";
+      return;
+    }
 
-  if (!workshops.length) {
-    boxEl.textContent = "Aucun billet importé pour l’instant.";
+    boxEl.innerHTML = `
+      <div style="font-weight:900; color:var(--tidoc); margin-bottom:10px;">🎫 Tes billets</div>
+      <div id="workshopsListBox"></div>
+      <div id="partyTicketsListBox" style="margin-top:12px;"></div>
+    `;
+
+    renderWorkshopsList(workshops);
+    renderPartyTicketsList(parties);
     return;
   }
 
-  boxEl.innerHTML = `
-    <div style="font-weight:900; color:var(--tidoc); margin-bottom:10px;">🎫 Tes billets workshop</div>
-    <div id="workshopsListBox"></div>
-  `;
-  renderWorkshopsList(workshops);
-  return;
-}
-
-   // --- CAS: billet principal ---
-  const ticket = snap.data() || {};   // ✅ déclaré avant tout usage
+  // --- CAS: billet principal ---
+  const ticket = snap.data() || {};
 
   LAST_MAIN_TICKET = {
     qrText: ticket.qrText || "",
@@ -1422,8 +1488,6 @@ async function loadSavedTicket() {
     holderName: ticket.holderName || "",
     ticketNumber: ticket.ticketNumber || ""
   };
-
-  if (scanBtn) scanBtn.style.display = (LAST_MAIN_TICKET?.qrText || workshops.length) ? "" : "none";
 
   setStatus("✅ Billet chargé");
 
@@ -1436,8 +1500,13 @@ async function loadSavedTicket() {
     workshopsImportedCount: workshops.length
   });
 
-    renderWorkshopsList(workshops);
-  return;
+  // on ajoute la box Ti’Masqué sous la box workshops
+  if (boxEl && !boxEl.querySelector("#partyTicketsListBox")) {
+    boxEl.insertAdjacentHTML("beforeend", `<div id="partyTicketsListBox" style="margin-top:12px;"></div>`);
+  }
+
+  renderWorkshopsList(workshops);
+  renderPartyTicketsList(parties);
 }
 
 // =====================
