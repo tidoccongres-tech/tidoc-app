@@ -378,6 +378,9 @@ async function sha256Hex(str) {
 // =====================
 const CLAIM_WORKSHOP_QR = true;
 
+// Option : est-ce qu’on claim le QR aussi pour les billets soirée ?
+const CLAIM_PARTY_QR = true;
+
 // =====================
 // Lock QR (anti-double billet)
 // =====================
@@ -502,6 +505,76 @@ async function saveWorkshopTicket({ qrText, packKey, holderName, ticketNumber, w
   }); // ✅ create uniquement (si existe déjà => update => interdit, mais on l'a évité)
 
   return { already: false };
+}
+
+// =====================
+// Save party ticket (Ti’Masqué) (multi)
+// =====================
+async function savePartyTicket({ qrText, holderName, ticketNumber, partyTitle }) {
+  const u = auth.currentUser;
+  if (!u) throw new Error("Connexion requise.");
+
+  const qrHash = await sha256Hex(qrText);
+
+  // ✅ anti-doublon (autorisé par rules)
+  const q = query(
+    collection(db, "userPartyTickets"),
+    where("uid", "==", u.uid),
+    where("qrHash", "==", qrHash)
+  );
+  const snap = await getDocs(q);
+  if (!snap.empty) return { already: true };
+
+  // ✅ id stable = uid_hash
+  const id = `${u.uid}_${qrHash}`;
+  const ref = doc(db, "userPartyTickets", id);
+
+  const title = String(partyTitle || "Ti’Masqué").trim();
+  const partyKey = normalizeKey(title) || "ti-masque";
+
+  await setDoc(ref, {
+    uid: u.uid,
+    qrText, qrHash,
+    holderName: holderName || "",
+    ticketNumber: ticketNumber || "",
+    partyTitle: title,
+    partyKey,
+    createdAt: serverTimestamp()
+  }); // create only (si déjà => évité via query)
+
+  return { already: false };
+}
+
+async function deletePartyTicketByHash(qrHash) {
+  const u = auth.currentUser;
+  if (!u) { setStatus("🔒 Connecte-toi."); return; }
+
+  const ok = confirm("Supprimer ce billet Ti’Masqué ?");
+  if (!ok) return;
+
+  setStatus("⏳ Suppression du billet Ti’Masqué…");
+
+  try {
+    const id = `${u.uid}_${qrHash}`;
+    await deleteDoc(doc(db, "userPartyTickets", id)).catch(() => {});
+
+    // libérer le QR si tu claim aussi les billets soirée
+    if (typeof CLAIM_PARTY_QR === "undefined" ? true : CLAIM_PARTY_QR) {
+      const claimRef = doc(db, "qrClaims", qrHash);
+      await runTransaction(db, async (tx) => {
+        const cs = await tx.get(claimRef);
+        if (!cs.exists()) return;
+        const uidInClaim = String(cs.data()?.uid || "");
+        if (uidInClaim === u.uid) tx.delete(claimRef);
+      }).catch(() => {});
+    }
+
+    await loadSavedTicket();
+    setStatus("✅ Billet Ti’Masqué supprimé");
+  } catch (e) {
+    console.error("deletePartyTicketByHash error:", e);
+    setStatus("❌ " + (e?.message || "Erreur suppression billet Ti’Masqué"));
+  }
 }
 
 // =====================
