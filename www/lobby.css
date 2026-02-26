@@ -409,3 +409,21 @@ html, body{
 #chatOverlay .chat-msg { color:#fff; }
 #chatOverlay .chat-meta { color: rgba(255,255,255,.75); }
 #chatOverlay .chat-text { color:#fff; }
+
+
+/* Mode focus : cache les barres/UI */
+body.ui-hidden .ui,
+body.ui-hidden .topbar,
+body.ui-hidden .searchbar,
+body.ui-hidden .header,
+body.ui-hidden .filters,
+body.ui-hidden .nav,
+body.ui-hidden .chat-fab,
+body.ui-hidden #btnChatToggle {
+  display: none !important;
+}
+
+/* si tu veux garder le bouton focus visible */
+body.ui-hidden #btnFocusMode {
+  display: grid !important;
+}
