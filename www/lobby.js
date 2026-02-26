@@ -311,10 +311,9 @@ debateBanner.style.cssText = `
 function mountDebateBanner(){
   if (!chatOverlay) return false;
 
-  const chatPanel = chatOverlay.querySelector(".chat-panel");
-  if (!chatPanel) return false;
+  // Fallback : si pas de .chat-panel, on injecte direct dans chatOverlay
+  const chatPanel = chatOverlay.querySelector(".chat-panel") || chatOverlay;
 
-  // déjà monté
   if (debateBanner.parentElement === chatPanel) return true;
 
   const chatHead = chatOverlay.querySelector(".chat-head");
@@ -1411,6 +1410,11 @@ function startMeetingFlow({ meetingType, meetingAtMs, bodyUid }){
 
   clearMeetingTimers();
   setMeetingLock(true);
+
+  // pendant débat: chat forcé visible + écriture autorisée si vivant
+chatCanViewNow = true;
+chatCanWriteNow = !myDead;
+applyChatWriteLock();
 
   const isReport = (meetingType === "report");
   const bodyName = getPlayerNameByUid(bodyUid) || "Un Ti’Doc";
