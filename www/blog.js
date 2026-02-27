@@ -424,50 +424,57 @@ function renderPostCard(postId, p) {
   const adminBadge = isAdminEmail(p.authorEmail);
 
   card.innerHTML = `
-    <div class="post-head">
-      <div>
+  <div class="post-head">
+    <div class="post-head-left">
+      <div class="post-avatar" aria-hidden="true">
+        ${escapeHTML(author.slice(0,1).toUpperCase())}
+      </div>
+
+      <div class="post-head-meta">
         <div class="post-title">${escapeHTML(p.title || "")}</div>
 
         <div class="post-sub">
-          <span class="post-author">
-            ${author}
+          <span class="post-author-chip">
+            <span class="post-author">${author}</span>
             ${adminBadge ? `<span class="crown-inline">${CROWN_GRAY_SVG}</span>` : ""}
           </span>
-          • ${fmtDate(p.createdAt)}
+          <span class="dot">•</span>
+          <span class="post-date">${fmtDate(p.createdAt)}</span>
         </div>
       </div>
-
-      ${delOk ? `
-        <button class="delete-btn" type="button" data-del="${postId}" aria-label="Supprimer" title="Supprimer">
-          ${TRASH_TIDOC_SVG}
-        </button>
-      ` : ""}
     </div>
 
-    <div class="post-body">${escapeHTML(p.text || "")}</div>
-
-    <div class="post-actions">
-      <button class="like-btn" type="button" data-like="${postId}">
-        ${HEART_SVG}
+    ${delOk ? `
+      <button class="delete-btn" type="button" data-del="${postId}" aria-label="Supprimer" title="Supprimer">
+        ${TRASH_TIDOC_SVG}
       </button>
+    ` : ""}
+  </div>
+
+  <div class="post-body">${escapeHTML(p.text || "")}</div>
+
+  <div class="post-actions post-actions-premium">
+    <button class="like-btn like-pill" type="button" data-like="${postId}">
+      ${HEART_SVG}
       <span class="like-count" data-likecount="${postId}">…</span>
+    </button>
 
-      <button class="btn-premium btn-premium-outline" type="button" data-togglecomments="${postId}">
-        Commentaires
+    <button class="btn-premium btn-premium-outline comments-pill" type="button" data-togglecomments="${postId}">
+      💬 Commentaires
+    </button>
+  </div>
+
+  <div class="comments comments-accordion" data-commentswrap="${postId}" style="display:none;">
+    <div class="comments-list" data-commentslist="${postId}"></div>
+
+    <div class="comment-form" style="margin-top:10px;">
+      <input type="text" placeholder="Écrire un commentaire…" data-cinput="${postId}" />
+      <button class="btn-premium btn-premium-primary" type="button" data-csend="${postId}">
+        Envoyer
       </button>
     </div>
-
-    <div class="comments" data-commentswrap="${postId}" style="display:none;">
-      <div data-commentslist="${postId}" style="margin-top:8px;"></div>
-
-      <div class="comment-form" style="margin-top:10px;">
-        <input type="text" placeholder="Écrire un commentaire…" data-cinput="${postId}" />
-        <button class="btn-premium btn-premium-primary" type="button" data-csend="${postId}">
-          Envoyer
-        </button>
-      </div>
-    </div>
-  `;
+  </div>
+`;
 
   // delete
   if (delOk) {
