@@ -33,11 +33,6 @@ const eventMsg      = document.getElementById("eventMsg");
 
 function showMsg(t=""){ if (eventMsg) eventMsg.textContent = t; }
 
-// ✅ petit indicateur debug (ne remplace pas le body)
-if (eventsList) {
-  eventsList.innerHTML = `<section class="card"><p>🟡 evenements.js chargé…</p></section>`;
-}
-
 // =====================
 // PACKS (quotas) + STAFF
 // =====================
