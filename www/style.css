@@ -3116,3 +3116,9 @@ body.ui-hidden #btnFocusMode {
   display:inline-block;
   vertical-align:bottom;
 }
+
+/* Promo workshops (admin) */
+.promo-card{
+  width: 100%;
+  box-sizing: border-box;
+}
