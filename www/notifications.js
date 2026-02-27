@@ -120,7 +120,8 @@ async function loadNotifs() {
   if (!root) return;
 
   root.innerHTML = `<section class="card"><p>Chargement…</p></section>`;
-
+  root.className = "notif-list";
+  
   const qy = query(
     collection(db, "notifications", uid, "items"),
     orderBy("createdAt", "desc"),
@@ -143,117 +144,111 @@ async function loadNotifs() {
   const admin = isAdminUser(auth.currentUser);
 
   snap.forEach((d) => {
-    const n = d.data() || {};
-    const card = document.createElement("section");
-    card.className = "card";
-    card.style.opacity = n.read ? "0.7" : "1";
-    card.style.position = "relative";
-    card.style.cursor = "pointer";
+  const n = d.data() || {};
 
-    // ✅ supprimer seulement newsletters + seulement admin
-    const canDeleteNewsletter = admin && (n.type === "newsletter");
+  const card = document.createElement("section");
+  const unread = (n.read === false);
+  card.className = `card notif-card ${unread ? "unread" : "read"}`;
+  card.style.cursor = "pointer";
 
-    card.innerHTML = `
-  ${n.logoUrl ? `
-    <div style="margin-top:10px;display:flex;align-items:center;gap:10px;">
-      <img src="${n.logoUrl}" alt="logo"
-        style="width:28px;height:28px;border-radius:8px;object-fit:cover">
-      <span style="font-size:12px;color:var(--muted);font-weight:800">Ti’Doc</span>
-    </div>
-  ` : ""}
+  const admin = isAdminUser(auth.currentUser);
+  const canDeleteNewsletter = admin && (n.type === "newsletter");
 
-  ${canDeleteNewsletter ? `
-    <button
-      type="button"
-      data-del="${d.id}"
-      class="link"
-      style="position:absolute;top:12px;right:12px;font-size:13px;"
-    >
-      Supprimer
-    </button>
-  ` : ""}
+  const dateStr = fmtNotifDate(n.createdAt);
 
-  <div>
-    <strong>${escapeHTML(n.title || "Notification")}</strong>
+  card.innerHTML = `
+    ${canDeleteNewsletter ? `
+      <button type="button" data-del="${d.id}" class="notif-del">Supprimer</button>
+    ` : ""}
 
-    ${n.text ? `<div style="margin-top:4px">${escapeHTML(n.text)}</div>` : ""}
-
-    <!-- ✅ BLOC CODE PROMO -->
-    ${(n.type === "workshop_promo" && n.promoCode) ? `
-      <div style="
-        margin-top:12px;
-        padding:12px;
-        border-radius:14px;
-        background:rgba(23,140,168,.08);
-        border:1px solid rgba(23,140,168,.18);
-        display:flex;
-        align-items:center;
-        justify-content:space-between;
-        gap:10px;
-        font-weight:950;
-      ">
-        <span>Code promo :</span>
-        <span style="
-          font-family:ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-          font-size:15px;
-          letter-spacing:1px;
-        ">
-          ${escapeHTML(n.promoCode)}
-        </span>
-        <button type="button"
-          data-copy="${d.id}"
-          class="btn-outline"
-          style="height:34px;border-radius:10px;font-weight:900;">
-          Copier
-        </button>
+    ${n.logoUrl ? `
+      <div class="notif-brand">
+        <img src="${n.logoUrl}" alt="logo">
+        <span>Ti’Doc</span>
       </div>
     ` : ""}
 
-    ${n.imageUrl ? `<img src="${n.imageUrl}" style="margin-top:10px;width:100%;border-radius:12px">` : ""}
+    <div class="notif-row">
+      <div class="notif-avatar" aria-hidden="true">
+        ${notifIconSvg(n.type)}
+      </div>
 
-    ${renderNotifLinkButton(n)}
-  </div>
-`;
+      <div class="notif-main">
+        <div class="notif-top">
+          <div style="min-width:0;flex:1;">
+            <p class="notif-title">${escapeHTML(n.title || "Notification")}</p>
+          </div>
+          <div class="notif-time">${escapeHTML(dateStr)}</div>
+        </div>
 
-    // clic supprimer (ne doit pas markRead)
-    const delBtn = card.querySelector(`[data-del="${d.id}"]`);
-    delBtn?.addEventListener("click", async (e) => {
-      e.preventDefault();
-      e.stopPropagation();
+        ${n.text ? `<div class="notif-text">${escapeHTML(n.text)}</div>` : ""}
 
-      if (!confirm("Supprimer cette newsletter ?")) return;
+        <div class="notif-badges">
+          ${unread ? `<span class="notif-badge new">Nouveau</span>` : ``}
+          ${n.type ? `<span class="notif-badge">${escapeHTML(String(n.type))}</span>` : ``}
+        </div>
 
-      try {
-        await deleteNotif(d.id);
-        card.remove();
-      } catch (err) {
-        alert("Impossible de supprimer (permissions).");
-        console.log(err);
-      }
-    });
+        ${(n.type === "workshop_promo" && n.promoCode) ? `
+          <div class="notif-promo">
+            <span>Code promo</span>
+            <code>${escapeHTML(n.promoCode)}</code>
+            <button type="button"
+              data-copy="${d.id}"
+              class="btn-outline"
+              style="height:34px;border-radius:10px;font-weight:900;">
+              Copier
+            </button>
+          </div>
+        ` : ""}
 
-    // bouton copier code promo
-const copyBtn = card.querySelector(`[data-copy="${d.id}"]`);
-copyBtn?.addEventListener("click", async (e) => {
-  e.preventDefault();
-  e.stopPropagation();
+        ${n.imageUrl ? `
+          <div class="notif-media">
+            <img src="${n.imageUrl}" alt="image notification">
+          </div>
+        ` : ""}
 
-  try {
-    await navigator.clipboard.writeText(String(n.promoCode || ""));
-    copyBtn.textContent = "✅ Copié";
-    setTimeout(() => copyBtn.textContent = "Copier", 1000);
-  } catch {
-    alert("Copie impossible. Copie manuellement le code.");
-  }
-});
+        <div class="notif-actions">
+          ${renderNotifLinkButton(n)}
+        </div>
+      </div>
+    </div>
+  `;
 
-    // clic carte = markRead
-    card.addEventListener("click", async () => {
-      try { await markRead(d.id); } catch {}
-    });
-
-    root.appendChild(card);
+  // delete
+  const delBtn = card.querySelector(`[data-del="${d.id}"]`);
+  delBtn?.addEventListener("click", async (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!confirm("Supprimer cette newsletter ?")) return;
+    try { await deleteNotif(d.id); card.remove(); }
+    catch (err) { alert("Impossible de supprimer (permissions)."); console.log(err); }
   });
+
+  // copy promo
+  const copyBtn = card.querySelector(`[data-copy="${d.id}"]`);
+  copyBtn?.addEventListener("click", async (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    try {
+      await navigator.clipboard.writeText(String(n.promoCode || ""));
+      copyBtn.textContent = "✅ Copié";
+      setTimeout(() => copyBtn.textContent = "Copier", 1000);
+    } catch {
+      alert("Copie impossible. Copie manuellement le code.");
+    }
+  });
+
+  // click card = mark read + UI update
+  card.addEventListener("click", async () => {
+    try {
+      await markRead(d.id);
+      card.classList.remove("unread");
+      card.classList.add("read");
+    } catch {}
+  });
+
+  root.appendChild(card);
+});
 }
 
 // =========================
