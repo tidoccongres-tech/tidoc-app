@@ -97,9 +97,10 @@ export async function ensureUserDoc(user, { displayName, avatarUrl } = {}) {
     // displayName:
     // displayName: on ne l'écrit QUE si manquant, ou si on fournit displayName explicitement
 const wantedName = (displayName || "").trim();
-if (!data.displayName) patch.displayName = wantedName || "Utilisateur";
-else if (wantedName && wantedName !== data.displayName) patch.displayName = wantedName;
+const authName = (user.displayName || "").trim();
 
+if (!data.displayName) patch.displayName = wantedName || authName || "Utilisateur";
+else if (wantedName && wantedName !== data.displayName) patch.displayName = wantedName;
     if (Object.keys(patch).length) {
       patch.updatedAt = serverTimestamp();
       await setDoc(ref, patch, { merge: true });
