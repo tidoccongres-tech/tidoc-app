@@ -168,6 +168,14 @@ export async function claimUsername(user, displayNameRaw) {
   return { original, normalized };
 }
 
+function waitForAuthReady() {
+  return new Promise((resolve) => {
+    const unsub = onAuthStateChanged(auth, (u) => {
+      if (u) { unsub(); resolve(u); }
+    });
+  });
+}
+
 // =====================
 // AUTH ACTIONS
 // =====================
@@ -178,7 +186,8 @@ export async function signupEmail({ email, password, displayName } = {}) {
   if (!name) throw new Error("Pseudo requis.");
 
   const cred = await createUserWithEmailAndPassword(auth, email, password);
-
+  await waitForAuthReady();
+  
   try {
     // 1) Réserve le pseudo (unique)
     const claimed = await claimUsername(cred.user, name);
