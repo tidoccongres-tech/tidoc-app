@@ -512,7 +512,7 @@ function renderPostCard(postId, p) {
   const open = wrap.style.display !== "none";
   if (open) {
     wrap.classList.remove("open");
-    wrap.style.display = "none";
+    setTimeout(()=>{ wrap.style.display = "none"; }, 180);
     return;
   }
   wrap.style.display = "";
