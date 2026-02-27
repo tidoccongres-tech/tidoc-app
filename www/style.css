@@ -3770,3 +3770,90 @@ body{
   position: relative;
   z-index: 1;
 }
+
+/* =========================
+   HOME — GLASS CARDS
+========================= */
+.card,
+.home-card,
+.home-tile,
+.home-section{
+  background: rgba(255,255,255,.72);
+  border: 1px solid rgba(23,140,168,.14);
+  box-shadow:
+    0 18px 45px rgba(0,0,0,.08),
+    0 1px 0 rgba(255,255,255,.55) inset;
+  backdrop-filter: blur(10px);
+}
+
+/* Coins plus doux + spacing mieux */
+.card{
+  border-radius: 22px;
+}
+
+/* Ajoute un "highlight" en haut à gauche (donne du relief) */
+.card::before{
+  content:"";
+  position:absolute;
+  inset:0;
+  border-radius: inherit;
+  pointer-events:none;
+  background: radial-gradient(500px 240px at 12% 8%, rgba(255,255,255,.85), transparent 55%);
+  opacity:.55;
+}
+
+/* Si tes cartes ont déjà position:relative, parfait. Sinon : */
+.card{ position: relative; overflow: hidden; }
+
+/* =========================
+   HOME — MICRO INTERACTIONS
+========================= */
+button, a{
+  -webkit-tap-highlight-color: transparent;
+}
+
+.card a, .card button{
+  transition: transform .16s ease, box-shadow .16s ease, filter .16s ease;
+}
+
+@media (hover:hover){
+  .card:hover{
+    transform: translateY(-2px);
+    box-shadow:
+      0 26px 60px rgba(0,0,0,.10),
+      0 1px 0 rgba(255,255,255,.55) inset;
+  }
+}
+
+.card:active{
+  transform: translateY(0px) scale(.99);
+}
+
+/* Boutons principaux un peu plus “premium” */
+.btn-primary, .btn-premium-primary{
+  box-shadow: 0 16px 32px rgba(23,140,168,.22);
+}
+.btn-primary:active, .btn-premium-primary:active{
+  transform: scale(.99);
+  filter: brightness(.98);
+}
+
+/* =========================
+   HOME — HERO BOOST
+========================= */
+.home-hero, .home-header, .top-hero, .welcome-card{
+  border: 1px solid rgba(23,140,168,.18);
+  box-shadow:
+    0 28px 70px rgba(23,140,168,.10),
+    0 1px 0 rgba(255,255,255,.65) inset;
+}
+
+.home-hero .btn-primary,
+.home-header .btn-primary{
+  background: linear-gradient(135deg, rgba(23,140,168,1), rgba(34,170,192,1));
+}
+
+/* Texte un peu plus net */
+.home-hero h1, .home-header h1{
+  letter-spacing: -.3px;
+}
