@@ -223,7 +223,10 @@ export async function signupEmail({ email, password, displayName } = {}) {
 export async function loginEmail({ email, password } = {}) {
   if (!email || !password) throw new Error("Email + mot de passe requis.");
   const cred = await signInWithEmailAndPassword(auth, email, password);
-  await ensureUserDoc(cred.user);
+
+  try { await ensureUserDoc(cred.user); }
+  catch (e) { console.warn("ensureUserDoc failed on login:", e); }
+
   return cred.user;
 }
 
