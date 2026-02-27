@@ -176,7 +176,8 @@ export async function claimUsername(user, displayNameRaw) {
 function waitForAuthReady() {
   return new Promise((resolve) => {
     const unsub = onAuthStateChanged(auth, (u) => {
-      if (u) { unsub(); resolve(u); }
+      unsub();
+      resolve(u || null);
     });
   });
 }
