@@ -56,6 +56,19 @@ function safeHref(u=""){
   return url.replaceAll('"', "%22").replaceAll("'", "%27");
 }
 
+// ✅ TON SVG poubelle (inline) — même que galerie
+const TRASH_SVG = `
+<svg class="trash-ico" viewBox="0 0 408.483 408.483" aria-hidden="true" focusable="false">
+  <path d="M87.748,388.784c0.461,11.01,9.521,19.699,20.539,19.699h191.911c11.018,0,20.078-8.689,20.539-19.699l13.705-289.316
+    H74.043L87.748,388.784z M247.655,171.329c0-4.61,3.738-8.349,8.35-8.349h13.355c4.609,0,8.35,3.738,8.35,8.349v165.293
+    c0,4.611-3.738,8.349-8.35,8.349h-13.355c-4.61,0-8.35-3.736-8.35-8.349V171.329z M189.216,171.329
+    c0-4.61,3.738-8.349,8.349-8.349h13.355c4.609,0,8.349,3.738,8.349,8.349v165.293c0,4.611-3.737,8.349-8.349,8.349h-13.355
+    c-4.61,0-8.349-3.736-8.349-8.349V171.329L189.216,171.329z M130.775,171.329c0-4.61,3.738-8.349,8.349-8.349h13.356
+    c4.61,0,8.349,3.738,8.349,8.349v165.293c0,4.611-3.738,8.349-8.349,8.349h-13.356c-4.61,0-8.349-3.736-8.349-8.349V171.329z"/>
+  <path d="M343.567,21.043h-88.535V4.305c0-2.377-1.927-4.305-4.305-4.305h-92.971c-2.377,0-4.304,1.928-4.304,4.305v16.737H64.916
+    c-7.125,0-12.9,5.776-12.9,12.901V74.47h304.451V33.944C356.467,26.819,350.692,21.043,343.567,21.043z"/>
+</svg>`;
+
 function skeleton(){
   if (!grid) return;
   grid.innerHTML = "";
@@ -65,14 +78,6 @@ function skeleton(){
     el.innerHTML = `<div class="skel-block"></div><div class="skel-foot"></div>`;
     grid.appendChild(el);
   }
-}
-
-function trashSvg(){
-  return `
-    <svg viewBox="0 0 24 24" aria-hidden="true">
-      <path d="M9 3h6l1 2h4v2H4V5h4l1-2Zm1 6h2v9h-2V9Zm4 0h2v9h-2V9ZM6 9h2v9H6V9Z"></path>
-    </svg>
-  `;
 }
 
 async function loadPartners(){
@@ -108,7 +113,7 @@ async function loadPartners(){
     card.innerHTML = `
       ${admin ? `
         <button class="partner-del" type="button" data-del="${d.id}" aria-label="Supprimer">
-          ${trashSvg()}
+          ${TRASH_SVG}
         </button>
       ` : ""}
 
