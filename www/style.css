@@ -3352,3 +3352,33 @@ body.ui-hidden #btnFocusMode {
   font-weight:900;
 }
 
+/* Bloc code promo */
+.notif-promo {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;          /* 🔥 permet retour à la ligne sur mobile */
+}
+
+.notif-promo code {
+  flex: 1;                  /* prend l’espace dispo */
+  min-width: 0;             /* 🔥 ultra important pour éviter overflow */
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.notif-promo .btn-outline {
+  flex-shrink: 0;           /* ne s’écrase pas */
+}
+
+/* Sécurité mobile */
+@media (max-width: 480px) {
+  .notif-promo {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .notif-promo .btn-outline {
+    width: 100%;
+  }
+}
