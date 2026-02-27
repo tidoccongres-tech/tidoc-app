@@ -14,7 +14,7 @@ const db   = AuthMod.db;
 // PRIVATE ACCESS (TEMP)
 // =======================
 const GAME_LOCK = true;        // mets false quand prêt
-const GAME_PASS = "TIDOC2026"; // change le mot de passe
+const GAME_PASS = "TIDOC2026*"; // change le mot de passe
 
 (function gateGame(){
   if (!GAME_LOCK) return;
