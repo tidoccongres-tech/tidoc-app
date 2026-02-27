@@ -501,10 +501,16 @@ function renderPostCard(postId, p) {
   const toggleBtn = card.querySelector(`[data-togglecomments="${postId}"]`);
 
   toggleBtn?.addEventListener("click", async () => {
-    const open = wrap.style.display !== "none";
-    wrap.style.display = open ? "none" : "";
-    if (!open) await loadComments(postId, p, list);
-  });
+  const open = wrap.style.display !== "none";
+  if (open) {
+    wrap.classList.remove("open");
+    wrap.style.display = "none";
+    return;
+  }
+  wrap.style.display = "";
+  requestAnimationFrame(() => wrap.classList.add("open"));
+  await loadComments(postId, p, list);
+});
 
   // comment send
   const uid = currentUserId();
