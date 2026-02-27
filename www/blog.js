@@ -349,17 +349,18 @@ async function addComment(postId, postData, inputEl, commentsWrap, sendBtn) {
     });
 
     // ✅ notif unique au propriétaire du post (si pas soi-même)
-    try {
-      const p = postData || await getPostData(postId);
-      const toUid = p?.authorUid || "";
-      if (toUid && toUid !== u.uid) {
-        await createNotif({
-          toUid,
-          type: "comment",
-          text: `${myBestName()} a commenté ton post`,
-          postId
-        });
-      } catch (e) {
+try {
+  const p = postData || await getPostData(postId);
+  const toUid = p?.authorUid || "";
+  if (toUid && toUid !== u.uid) {
+    await createNotif({
+      toUid,
+      type: "comment",
+      text: `${myBestName()} a commenté ton post`,
+      postId
+    });
+  }
+} catch (e) {
   console.log("notif comment failed:", e);
 }
 
