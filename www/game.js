@@ -11,26 +11,91 @@ const auth = AuthMod.auth;
 const db   = AuthMod.db;
 
 // =======================
-// PRIVATE ACCESS (TEMP)
+// PRIVATE ACCESS (STYLED)
 // =======================
-const GAME_LOCK = true;        // mets false quand prêt
-const GAME_PASS = "TIDOC2026*"; // change le mot de passe
+const GAME_LOCK = true;
+const GAME_PASS = "TIDOC2026*";
 
-(function gateGame(){
-  if (!GAME_LOCK) return;
+if (GAME_LOCK && sessionStorage.getItem("tidoc_game_ok") !== "1") {
 
-  const ok = sessionStorage.getItem("tidoc_game_ok") === "1";
-  if (ok) return;
+  document.body.innerHTML = `
+    <div style="
+      position:fixed;
+      inset:0;
+      background: radial-gradient(circle at center, #0f2b33, #07181d);
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;
+      z-index:9999;
+    ">
+      <div style="
+        width:min(420px,90%);
+        padding:28px;
+        border-radius:24px;
+        background:rgba(0,0,0,.6);
+        border:1px solid rgba(255,255,255,.12);
+        backdrop-filter:blur(12px);
+        box-shadow:0 25px 60px rgba(0,0,0,.5);
+        text-align:center;
+        color:#fff;
+      ">
+        <h2 style="margin:0 0 10px 0;font-weight:1000;">
+          🧢 Ti’Truant
+        </h2>
+        <p style="opacity:.8;font-weight:600;margin-bottom:20px;">
+          Arrive bientôt…
+        </p>
 
-  const p = prompt("Accès privé — Ti’Truant arrive bientôt.\nEntre le code :");
-  if (p && p.trim() === GAME_PASS){
-    sessionStorage.setItem("tidoc_game_ok", "1");
-    return;
-  }
+        <input id="privatePassInput" type="password" placeholder="Code d’accès"
+          style="
+            width:100%;
+            padding:12px 14px;
+            border-radius:14px;
+            border:1px solid rgba(255,255,255,.2);
+            background:rgba(255,255,255,.08);
+            color:#fff;
+            font-weight:700;
+            outline:none;
+          "
+        />
 
-  alert("Accès refusé.");
-  window.location.href = "./index.html";
-})();
+        <button id="privatePassBtn"
+          style="
+            margin-top:14px;
+            width:100%;
+            padding:12px;
+            border-radius:14px;
+            border:none;
+            font-weight:900;
+            background:#1fc2e0;
+            color:#00242c;
+            cursor:pointer;
+          "
+        >
+          Accéder
+        </button>
+
+        <div id="privateError"
+          style="margin-top:10px;color:#ff6b6b;font-weight:700;display:none;">
+          Code incorrect
+        </div>
+      </div>
+    </div>
+  `;
+
+  document.getElementById("privatePassBtn").addEventListener("click", () => {
+    const val = document.getElementById("privatePassInput").value.trim();
+    if (val === GAME_PASS) {
+      sessionStorage.setItem("tidoc_game_ok", "1");
+      location.reload();
+    } else {
+      document.getElementById("privateError").style.display = "block";
+    }
+  });
+
+  throw new Error("Game locked");
+}
 
 // =======================
 // UI
