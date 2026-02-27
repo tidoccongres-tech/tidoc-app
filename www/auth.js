@@ -182,36 +182,54 @@ function waitForAuthReady() {
 // =====================
 export async function signupEmail({ email, password, displayName } = {}) {
   if (!email || !password) throw new Error("Email + mot de passe requis.");
+
   const name = (displayName || "").trim();
   if (!name) throw new Error("Pseudo requis.");
 
+  // 1) Auth
   const cred = await createUserWithEmailAndPassword(auth, email, password);
 
-  // 1) set Auth profile
-  await updateProfile(cred.user, { displayName: name });
+  // important: attendre que Firestore voie bien l'user connecté
+  await new Promise((resolve) => {
+    const unsub = onAuthStateChanged(auth, (u) => {
+      if (u) { unsub(); resolve(u); }
+    });
+  });
 
-  // 2) essaie de créer le doc users/{uid} (si ça rate, on garde le compte Auth)
-  try {
-    await ensureUserDoc(cred.user, { displayName: name, avatarUrl: pickRandomAvatar() });
-  } catch (e) {
-    console.error("users/{uid} failed (keeping Auth user):", e);
-  }
+  const normalized = normalizeUsername(name);
+  const unameRef = doc(db, "usernames", normalized);
 
-  // 3) réserve le pseudo EN DERNIER (si ça rate -> là, tu peux supprimer le compte Auth)
   try {
+    // 2) Réserve le pseudo (transaction)
     const claimed = await claimUsername(cred.user, name);
 
+    // 3) Update profil Auth
+    await updateProfile(cred.user, { displayName: claimed.original });
+
+    // 4) Crée le doc users/{uid} (il faut que rules CREATE acceptent)
     await setDoc(doc(db, "users", cred.user.uid), {
+      email: (cred.user.email || "").toLowerCase(),
+      displayName: claimed.original,
+      avatarUrl: pickRandomAvatar(),
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
       username: claimed.original,
-      usernameNormalized: claimed.normalized,
-      updatedAt: serverTimestamp()
-    }, { merge: true });
+      usernameNormalized: claimed.normalized
+    }); // <-- PAS de merge sur la création
 
     return cred.user;
 
   } catch (e) {
-    // ici, on peut rollback Auth car pseudo PAS réservé
+    // rollback pseudo si réservé
+    try {
+      // supprime la réservation (si tes rules interdisent delete -> fais-le manuellement en admin)
+      // sinon laisse tomber, mais au moins tu sais pourquoi ça bloque.
+      // await deleteDoc(unameRef);
+    } catch (_) {}
+
+    // rollback auth user pour éviter comptes fantômes
     try { await deleteUser(cred.user); } catch (_) {}
+
     throw e;
   }
 }
