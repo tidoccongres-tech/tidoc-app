@@ -2751,3 +2751,13 @@ body.ui-hidden #btnFocusMode {
   flex-direction:column;
   gap:10px;
 }
+
+.comments-accordion{
+  transform: translateY(6px);
+  opacity: 0;
+  transition: transform .18s ease, opacity .18s ease;
+}
+.comments-accordion.open{
+  transform: translateY(0);
+  opacity: 1;
+}
