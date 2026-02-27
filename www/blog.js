@@ -460,7 +460,7 @@ function renderPostCard(postId, p) {
     </button>
 
     <button class="btn-premium btn-premium-outline comments-pill" type="button" data-togglecomments="${postId}">
-      💬 Commentaires
+      Commentaires
     </button>
   </div>
 
