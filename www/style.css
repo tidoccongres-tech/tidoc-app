@@ -2867,3 +2867,167 @@ body.ui-hidden #btnFocusMode {
 .comment-form button{
   flex-shrink:0; /* empêche le bouton d'être compressé bizarrement */
 }
+
+/* =========================
+   EVENTS — ULTRA PREMIUM
+   ========================= */
+
+/* la liste */
+#eventsList{
+  display:flex;
+  flex-direction:column;
+  gap:12px;
+}
+
+/* carte event */
+.event-card{
+  display:flex;
+  gap:14px;
+  padding:14px;
+  border-radius:22px;
+  border:1px solid rgba(23,140,168,.14);
+  background: rgba(255,255,255,.70);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  box-shadow: 0 18px 36px rgba(0,0,0,.08);
+}
+
+/* colonne date */
+.event-date{
+  width:64px;
+  min-width:64px;
+  height:64px;
+  border-radius:20px;
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  justify-content:center;
+  background: linear-gradient(135deg, rgba(23,140,168,.18), rgba(255,255,255,.92));
+  border:1px solid rgba(23,140,168,.18);
+  box-shadow: 0 12px 26px rgba(0,0,0,.08);
+  flex:0 0 auto;
+}
+.event-date .day{
+  font-size:22px;
+  font-weight:950;
+  color:#0f4f60;
+  line-height:1;
+}
+.event-date .month{
+  font-size:12px;
+  font-weight:900;
+  color: rgba(31,75,86,.75);
+  margin-top:4px;
+  letter-spacing:.5px;
+}
+
+/* contenu */
+.event-content{
+  flex:1;
+  min-width:0;
+}
+
+/* header titre + actions */
+.event-head{
+  display:flex;
+  align-items:flex-start;
+  justify-content:space-between;
+  gap:10px;
+}
+
+.event-head h3{
+  margin:0;
+  font-size:16px;
+  font-weight:950;
+  color:#0f3f4b;
+  line-height:1.2;
+}
+
+/* actions zone */
+.event-actions{
+  display:flex;
+  gap:8px;
+  align-items:center;
+  flex:0 0 auto;
+}
+
+/* meta lignes */
+.event-meta{
+  margin-top:6px;
+  font-size:13px;
+  font-weight:850;
+  color: rgba(31,75,86,.72);
+  line-height:1.35;
+}
+.event-meta a{
+  color: #0f6f86;
+  text-decoration:none;
+  font-weight:900;
+}
+.event-meta a:hover{
+  text-decoration:underline;
+}
+
+/* description */
+.event-desc{
+  margin-top:10px;
+  font-size:13px;
+  color: rgba(15,35,42,.88);
+  background: rgba(23,140,168,.06);
+  border:1px solid rgba(23,140,168,.12);
+  border-radius:14px;
+  padding:10px 12px;
+  line-height:1.4;
+}
+
+/* bouton admin "liste participants" */
+.pill-btn{
+  height:38px;
+  padding:0 12px;
+  border-radius:999px;
+  border:1px solid rgba(23,140,168,.16);
+  background: rgba(255,255,255,.75);
+  font-weight:950;
+  color:#0f4f60;
+}
+.pill-btn:hover{
+  background: rgba(23,140,168,.08);
+}
+
+/* bouton delete icône */
+.icon-danger{
+  width:40px;
+  height:40px;
+  border-radius:14px;
+  border:1px solid rgba(220,70,70,.18);
+  background: rgba(255,255,255,.75);
+  display:flex;
+  align-items:center;
+  justify-content:center;
+}
+.icon-danger:hover{
+  background: rgba(220,70,70,.08);
+}
+.trash-ico{
+  width:18px;
+  height:18px;
+  fill: rgba(220,70,70,.90);
+}
+
+/* mobile */
+@media (max-width: 420px){
+  .event-card{
+    padding:12px;
+    gap:12px;
+  }
+  .event-date{
+    width:56px;
+    min-width:56px;
+    height:56px;
+    border-radius:18px;
+  }
+  .event-date .day{ font-size:20px; }
+  .event-head h3{ font-size:15px; }
+  .event-actions{ gap:6px; }
+  .pill-btn{ height:36px; padding:0 10px; }
+}
