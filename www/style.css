@@ -3122,3 +3122,25 @@ body.ui-hidden #btnFocusMode {
   width: 100%;
   box-sizing: border-box;
 }
+
+/* =========================
+   FIX — COMMENT FORM (mobile/tablette)
+   Empêche le bouton d'écraser l'input
+   ========================= */
+.comment-form{
+  display:flex;
+  align-items:center;
+  gap:10px;
+}
+
+.comment-form input{
+  flex: 1 1 auto;
+  min-width: 0; /* important en flex */
+}
+
+.comment-form button,
+.comment-form .btn-premium{
+  flex: 0 0 auto;
+  width: auto !important;   /* 🔥 stop le width:100% de .btn-premium */
+  white-space: nowrap;
+}
