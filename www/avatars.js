@@ -1,5 +1,5 @@
 // avatars.js (MODULE)
-import { auth, db } from "./auth.js";
+import { auth, db, ensureUserDoc } from "./auth.js";
 import {
   onAuthStateChanged,
   updateProfile
@@ -135,6 +135,7 @@ onAuthStateChanged(auth, async (user) => {
 
   try {
     await loadCurrentAvatar(user);
+    await ensureUserDoc(user); // ✅ crée le doc users/{uid} si absent
   } catch (e) {
     console.log(e);
     show("Erreur chargement: " + (e?.message || e));
@@ -143,6 +144,7 @@ onAuthStateChanged(auth, async (user) => {
   saveBtn?.addEventListener("click", async () => {
     try {
       await saveAvatar(user);
+      await ensureUserDoc(user); // ✅ double sécurité
     } catch (e) {
       console.log(e);
       show("Erreur: " + (e?.message || e));
