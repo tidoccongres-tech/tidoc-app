@@ -185,37 +185,35 @@ export async function signupEmail({ email, password, displayName } = {}) {
   const name = (displayName || "").trim();
   if (!name) throw new Error("Pseudo requis.");
 
+  // 1) crée le compte Auth
   const cred = await createUserWithEmailAndPassword(auth, email, password);
 
-  // 1) Réserve le pseudo (unique)
-  const claimed = await claimUsername(cred.user, name);
-
-  // 2) Met à jour auth profile
-  await updateProfile(cred.user, { displayName: claimed.original });
-
-  // 3) Firestore : on tente, mais si ça plante on NE supprime PAS l’utilisateur Auth
   try {
+    // 2) réserve le pseudo (Firestore)
+    const claimed = await claimUsername(cred.user, name);
+
+    // 3) maj profil Auth
+    await updateProfile(cred.user, { displayName: claimed.original });
+
+    // 4) crée/complète users/{uid}
     await ensureUserDoc(cred.user, {
       displayName: claimed.original,
       avatarUrl: pickRandomAvatar()
     });
 
+    // 5) stocke normalized dans users/{uid}
     await setDoc(doc(db, "users", cred.user.uid), {
       username: claimed.original,
       usernameNormalized: claimed.normalized,
       updatedAt: serverTimestamp()
     }, { merge: true });
 
-  } catch (e) {
-    console.error("🔥 Signup Firestore failed AFTER Auth success:", e);
-    // On garde le compte pour permettre la connexion
-  }
+    return cred.user;
 
-  return cred.user;
   } catch (e) {
-    // ✅ rollback : si Firestore/pseudo a échoué après création Auth,
-    // on supprime le compte Auth pour éviter "compte existe déjà" ensuite.
-    try { await deleteUser(cred.user); } catch(_) {}
+    // 🔁 rollback : si pseudo/Firestore plante, on supprime l'utilisateur Auth
+    // (sinon tu te retrouves avec "email already in use" et pas de compte utilisable)
+    try { await deleteUser(cred.user); } catch (_) {}
     throw e;
   }
 }
