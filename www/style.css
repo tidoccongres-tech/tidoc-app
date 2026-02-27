@@ -2761,3 +2761,72 @@ body.ui-hidden #btnFocusMode {
   transform: translateY(0);
   opacity: 1;
 }
+
+/* =========================
+   COMMENTS — VISUAL SEPARATION
+   ========================= */
+
+/* zone "Commentaires" plus marquée */
+.comments-accordion{
+  margin-top: 12px;
+  padding-top: 14px;
+  border-top: 1px solid rgba(23,140,168,.14);
+}
+
+/* chaque commentaire devient une mini-card */
+.comment-item{
+  display:flex;
+  gap:10px;
+  align-items:flex-start;
+
+  background: rgba(23,140,168,.04);
+  border: 1px solid rgba(23,140,168,.12);
+  border-radius: 16px;
+  padding: 10px 12px;
+
+  box-shadow: 0 12px 24px rgba(0,0,0,.06);
+}
+
+/* petit avatar pour commentaire */
+.comment-avatar{
+  width: 34px;
+  height: 34px;
+  border-radius: 14px;
+  flex: 0 0 auto;
+
+  background: linear-gradient(135deg, rgba(23,140,168,.18), rgba(255,255,255,.92));
+  border: 1px solid rgba(23,140,168,.14);
+  display:flex;
+  align-items:center;
+  justify-content:center;
+
+  font-weight: 950;
+  color:#0f4f60;
+}
+
+/* header commentaire (auteur + date) */
+.comment-head{
+  display:flex;
+  align-items:center;
+  gap:8px;
+  flex-wrap:wrap;
+}
+
+.comment-author{
+  font-weight: 950;
+  color:#0f4f60;
+}
+
+.comment-date{
+  font-weight: 850;
+  font-size: 12px;
+  color: rgba(31,75,86,.65);
+}
+
+/* texte commentaire */
+.comment-text{
+  margin-top: 4px;
+  font-size: 13px;
+  line-height: 1.35;
+  color: rgba(15,35,42,.88);
+}
