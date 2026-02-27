@@ -807,25 +807,42 @@ svg{ max-width:none; height:auto; }
   overflow-wrap:anywhere;
   word-break:break-word;
 }
+/* =========================
+   COMMENT FORM — BALANCED UI
+   ========================= */
+
 .comment-form{
   display:flex;
-  gap:10px;
   align-items:center;
-  margin-top:10px;
+  gap:10px;
+  margin-top:12px;
 }
+
 .comment-form input{
   flex:1;
-  height:44px;
-  border-radius:16px;
-  border:1px solid rgba(23,140,168,.18);
+  height:42px;
   padding:0 14px;
-  background: rgba(255,255,255,.92);
-  font-weight:800;
+  border-radius:14px;
+  border:1px solid rgba(23,140,168,.18);
+  background: rgba(255,255,255,.85);
+  font-size:14px;
   outline:none;
+  transition: all .15s ease;
 }
+
 .comment-form input:focus{
-  border-color: rgba(31,181,208,.50);
-  box-shadow: 0 0 0 3px rgba(31,181,208,.14);
+  border-color: rgba(23,140,168,.45);
+  box-shadow: 0 0 0 3px rgba(23,140,168,.12);
+}
+
+/* bouton plus petit et compact */
+.comment-form button{
+  height:42px;
+  padding:0 16px;
+  border-radius:14px;
+  font-size:13px;
+  font-weight:900;
+  white-space:nowrap;
 }
 
 /* =========================
