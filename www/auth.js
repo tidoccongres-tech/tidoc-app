@@ -109,11 +109,12 @@ else if (wantedName && wantedName !== data.displayName) patch.displayName = want
   const finalName = (displayName || user.displayName || "Utilisateur").trim();
   const finalAvatar = avatarUrl || pickRandomAvatar();
 
-  const newDoc = {
+ const newDoc = {
   email: (user.email || "").toLowerCase(),
   displayName: finalName,
   avatarUrl: finalAvatar,
-  createdAt: serverTimestamp()
+  createdAt: serverTimestamp(),
+  updatedAt: serverTimestamp()
 };
 
   await setDoc(ref, newDoc, { merge: true });
