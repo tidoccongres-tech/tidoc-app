@@ -923,11 +923,18 @@ function renderEventCard(eventId, e = {}, { myWorkshopKeys = new Set(), regMap =
   const admin = isAdmin();
 
   const capPub  = Number(e.capacity || 0);
-const capStf  = Number(e.capacityStaff || 0);
+  const capStf  = Number(e.capacityStaff || 0);
 
-// ✅ SOURCE DE VÉRITÉ : sous-collection registrations (si dispo)
-const bookedP = Number(countsMap?.[eventId]?.pub   ?? e.bookedCount ?? 0);
-const bookedS = Number(countsMap?.[eventId]?.staff ?? e.bookedStaffCount ?? 0);
+  const bookedP = Number(countsMap?.[eventId]?.pub   ?? e.bookedCount ?? 0);
+  const bookedS = Number(countsMap?.[eventId]?.staff ?? e.bookedStaffCount ?? 0);
+
+  // ✅ on construit metaLine en JS NORMAL (pas dans le template)
+  const metaParts = [];
+  if (timeStr) metaParts.push(`🕒 ${escapeHTML(timeStr)}${endStr ? "–" + escapeHTML(endStr) : ""}`);
+  if (place) metaParts.push(`📍 <a href="${mapsUrl(place)}" target="_blank" rel="noopener">${escapeHTML(place)}</a>`);
+  if (type) metaParts.push(`🏷️ ${escapeHTML(type)}`);
+
+  const metaLine = metaParts.join(" • ");
 
   const sec = document.createElement("section");
   sec.className = "event-card";
@@ -944,29 +951,7 @@ const bookedS = Number(countsMap?.[eventId]?.staff ?? e.bookedStaffCount ?? 0);
         <div class="event-actions" data-actions></div>
       </div>
 
-        const metaLine = `
-    ${timeStr ? `🕒 ${escapeHTML(timeStr)}${endStr ? "–" + escapeHTML(endStr) : ""}` : ""}
-    ${place ? ` • 📍 <a href="${mapsUrl(place)}" target="_blank" rel="noopener">${escapeHTML(place)}</a>` : ""}
-    ${type ? ` • 🏷️ ${escapeHTML(type)}` : ""}
-  `;
-
-  sec.innerHTML = `
-    <div class="event-date">
-      <div class="day">${escapeHTML(day)}</div>
-      <div class="month">${escapeHTML(month)}</div>
-    </div>
-
-    <div class="event-content">
-      <div class="event-head">
-        <h3>${escapeHTML(title)}</h3>
-        <div class="event-actions" data-actions></div>
-      </div>
-
-      <!-- ✅ Meta SOUS le titre (tablette) -->
-      ${metaLine.trim() ? `<div class="event-meta-under">${metaLine}</div>` : ""}
-
-      <!-- ✅ Meta “ancienne” (desktop / mobile si tu veux) -->
-      ${metaLine.trim() ? `<div class="event-meta">${metaLine}</div>` : ""}
+      ${metaLine ? `<div class="event-meta-under">${metaLine}</div>` : ""}
 
       ${desc ? `<div class="event-desc">${escapeHTML(desc)}</div>` : ""}
 
@@ -998,7 +983,6 @@ const bookedS = Number(countsMap?.[eventId]?.staff ?? e.bookedStaffCount ?? 0);
 
     actions?.appendChild(btnList);
     actions?.appendChild(btnDel);
-
   }
 
   // USER button
