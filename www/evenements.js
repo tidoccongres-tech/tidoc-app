@@ -1171,7 +1171,6 @@ document.addEventListener("DOMContentLoaded", () => {
       applyAdminUI();
       await loadPackConfig();
       await loadEvents();
-      showMsg("🟢 OK");
     } catch(e){
       console.log("boot error:", e);
       if (eventsList) eventsList.innerHTML = `<section class="card"><p>❌ Boot: ${escapeHTML(e?.message || String(e))}</p></section>`;
