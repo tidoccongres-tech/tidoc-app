@@ -119,11 +119,10 @@ else if (wantedName && wantedName !== data.displayName) patch.displayName = want
   await setDoc(ref, newDoc, { merge: true });
 
   return {
-    email: newDoc.email,
-    displayName: finalName,
-    avatarUrl: finalAvatar,
-    role: newDoc.role
-  };
+  email: newDoc.email,
+  displayName: finalName,
+  avatarUrl: finalAvatar
+};
 }
 
 export async function getUserProfile(uid) {
