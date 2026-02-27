@@ -181,27 +181,25 @@ function waitForAuthReady() {
 // =====================
 export async function signupEmail({ email, password, displayName } = {}) {
   if (!email || !password) throw new Error("Email + mot de passe requis.");
-
   const name = (displayName || "").trim();
   if (!name) throw new Error("Pseudo requis.");
 
-  // 1) crée le compte Auth
   const cred = await createUserWithEmailAndPassword(auth, email, password);
 
+  // 1) set Auth profile
+  await updateProfile(cred.user, { displayName: name });
+
+  // 2) essaie de créer le doc users/{uid} (si ça rate, on garde le compte Auth)
   try {
-    // 2) réserve le pseudo (Firestore)
+    await ensureUserDoc(cred.user, { displayName: name, avatarUrl: pickRandomAvatar() });
+  } catch (e) {
+    console.error("users/{uid} failed (keeping Auth user):", e);
+  }
+
+  // 3) réserve le pseudo EN DERNIER (si ça rate -> là, tu peux supprimer le compte Auth)
+  try {
     const claimed = await claimUsername(cred.user, name);
 
-    // 3) maj profil Auth
-    await updateProfile(cred.user, { displayName: claimed.original });
-
-    // 4) crée/complète users/{uid}
-    await ensureUserDoc(cred.user, {
-      displayName: claimed.original,
-      avatarUrl: pickRandomAvatar()
-    });
-
-    // 5) stocke normalized dans users/{uid}
     await setDoc(doc(db, "users", cred.user.uid), {
       username: claimed.original,
       usernameNormalized: claimed.normalized,
@@ -211,8 +209,7 @@ export async function signupEmail({ email, password, displayName } = {}) {
     return cred.user;
 
   } catch (e) {
-    // 🔁 rollback : si pseudo/Firestore plante, on supprime l'utilisateur Auth
-    // (sinon tu te retrouves avec "email already in use" et pas de compte utilisable)
+    // ici, on peut rollback Auth car pseudo PAS réservé
     try { await deleteUser(cred.user); } catch (_) {}
     throw e;
   }
