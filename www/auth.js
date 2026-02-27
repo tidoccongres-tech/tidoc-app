@@ -116,7 +116,8 @@ else if (wantedName && wantedName !== data.displayName) patch.displayName = want
   createdAt: serverTimestamp(),
   updatedAt: serverTimestamp()
 };
-
+ console.log("Creating users doc payload:", newDoc);
+  
   await setDoc(ref, newDoc, { merge: true });
 
   return {
