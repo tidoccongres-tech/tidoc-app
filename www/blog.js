@@ -250,8 +250,9 @@ async function toggleLike(postId) {
           postId
         });
       }
-    } catch (_) {}
-  }
+    } catch (e) {
+  console.log("notif like failed:", e);
+}
 
   await loadPosts();
 }
@@ -358,8 +359,9 @@ async function addComment(postId, postData, inputEl, commentsWrap, sendBtn) {
           text: `${myBestName()} a commenté ton post`,
           postId
         });
-      }
-    } catch (_) {}
+      } catch (e) {
+  console.log("notif comment failed:", e);
+}
 
     if (inputEl) inputEl.value = "";
     await loadComments(postId, postData, commentsWrap);
