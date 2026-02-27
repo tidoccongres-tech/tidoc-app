@@ -1137,6 +1137,10 @@ function renderPartyTicketsList(parties = []) {
 
   if (!parties.length) {
     listBox.innerHTML = `
+      <div style="opacity:.8; font-weight:800; color:rgba(31,75,86,.75);">
+        Aucun billet Ti’Masqué importé pour l’instant.
+      </div>
+    `;
     return;
   }
 
