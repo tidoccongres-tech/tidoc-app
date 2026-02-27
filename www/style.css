@@ -3163,3 +3163,192 @@ body.ui-hidden #btnFocusMode {
   /* Optionnel : si les liens cassent la ligne bizarrement */
   .event-meta-under a{ word-break:break-word; }
 }
+
+/* =========================
+   NOTIFICATIONS UI
+   ========================= */
+
+.notif-list{
+  display:flex;
+  flex-direction:column;
+  gap:12px;
+}
+
+.notif-card{
+  position:relative;
+  overflow:hidden;
+  padding:14px;
+}
+
+.notif-card.unread{
+  opacity:1 !important;
+  border:1px solid rgba(23,140,168,.22);
+  box-shadow:0 10px 26px rgba(0,0,0,.06);
+}
+
+.notif-card.read{
+  opacity:.72;
+}
+
+.notif-row{
+  display:flex;
+  gap:12px;
+  align-items:flex-start;
+}
+
+.notif-avatar{
+  width:42px;
+  height:42px;
+  border-radius:14px;
+  flex:0 0 42px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  background:rgba(23,140,168,.10);
+  color:var(--tidoc);
+}
+
+.notif-avatar .ico{
+  width:22px;
+  height:22px;
+}
+
+.notif-main{
+  min-width:0;
+  flex:1;
+}
+
+.notif-top{
+  display:flex;
+  align-items:flex-start;
+  justify-content:space-between;
+  gap:10px;
+}
+
+.notif-title{
+  font-weight:950;
+  letter-spacing:.2px;
+  margin:0;
+  line-height:1.2;
+}
+
+.notif-time{
+  font-size:12px;
+  font-weight:800;
+  color:var(--muted);
+  white-space:nowrap;
+  margin-top:1px;
+}
+
+.notif-text{
+  margin:6px 0 0;
+  color:rgba(15,35,42,.78);
+  font-size:13px;
+  line-height:1.35;
+  word-break:break-word;
+}
+
+.notif-badges{
+  display:flex;
+  gap:8px;
+  flex-wrap:wrap;
+  margin-top:8px;
+}
+
+.notif-badge{
+  font-size:11px;
+  font-weight:950;
+  padding:6px 10px;
+  border-radius:999px;
+  background:rgba(0,0,0,.06);
+  color:rgba(0,0,0,.62);
+}
+
+.notif-badge.new{
+  background:rgba(23,140,168,.14);
+  color:#0e5f71;
+}
+
+.notif-media{
+  margin-top:10px;
+  width:100%;
+  border-radius:14px;
+  overflow:hidden;
+  border:1px solid rgba(0,0,0,.08);
+  background:rgba(0,0,0,.03);
+}
+
+.notif-media img{
+  width:100%;
+  height:auto;
+  display:block;
+}
+
+.notif-actions{
+  margin-top:10px;
+  display:flex;
+  gap:10px;
+  align-items:center;
+  flex-wrap:wrap;
+}
+
+/* bouton supprimer en top-right */
+.notif-del{
+  position:absolute;
+  top:10px;
+  right:10px;
+  border:0;
+  background:transparent;
+  color:rgba(0,0,0,.55);
+  font-weight:900;
+  font-size:13px;
+  padding:6px 8px;
+  border-radius:10px;
+}
+.notif-del:hover{
+  background:rgba(0,0,0,.06);
+}
+
+/* bloc promo plus “premium” */
+.notif-promo{
+  margin-top:12px;
+  padding:12px;
+  border-radius:16px;
+  background:rgba(23,140,168,.08);
+  border:1px solid rgba(23,140,168,.18);
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:10px;
+  font-weight:950;
+}
+.notif-promo code{
+  font-family:ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size:15px;
+  letter-spacing:1px;
+  background:rgba(255,255,255,.7);
+  padding:6px 10px;
+  border-radius:12px;
+  border:1px solid rgba(0,0,0,.08);
+}
+
+/* petite ligne “Ti’Doc” logo */
+.notif-brand{
+  display:flex;
+  align-items:center;
+  gap:10px;
+  margin-top:2px;
+  margin-bottom:8px;
+}
+.notif-brand img{
+  width:26px;
+  height:26px;
+  border-radius:10px;
+  object-fit:cover;
+}
+.notif-brand span{
+  font-size:12px;
+  color:var(--muted);
+  font-weight:900;
+}
+
