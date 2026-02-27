@@ -112,6 +112,27 @@ async function deleteNotif(notifId) {
   await deleteDoc(doc(db, "notifications", uid, "items", notifId));
 }
 
+function fmtNotifDate(ts){
+  try{
+    const d = ts?.toDate ? ts.toDate() : (ts ? new Date(ts) : null);
+    if (!d) return "";
+    return d.toLocaleString("fr-FR", { dateStyle:"short", timeStyle:"short" });
+  } catch {
+    return "";
+  }
+}
+
+function notifIconSvg(type=""){
+  const t = String(type || "").toLowerCase();
+
+  if (t === "like") return "❤️";
+  if (t === "comment") return "💬";
+  if (t === "workshop_promo") return "🎟️";
+  if (t === "newsletter") return "📰";
+
+  return "🔔";
+}
+
 // =========================
 // LOAD NOTIFS
 // =========================
