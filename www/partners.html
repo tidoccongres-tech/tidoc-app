@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Ti'Doc – Partenaires</title>
+
+  <link rel="stylesheet" href="style.css?v=10" />
+
+  <!-- PWA -->
+  <link rel="manifest" href="/tidoc-app/www/manifest.json" />
+  <meta name="theme-color" content="#178CA8" />
+
+  <!-- Icônes -->
+  <link rel="icon" href="/tidoc-app/www/icons/icon-192.png" />
+  <link rel="apple-touch-icon" sizes="180x180" href="/tidoc-app/www/icons/apple-touch-icon.png" />
+
+  <!-- iOS standalone -->
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-title" content="Ti'Doc" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+</head>
+
+<body>
+
+  <!-- Header dynamique -->
+  <script type="module" src="./header-user-menu.js"></script>
+
+  <main class="page">
+
+    <!-- Header section -->
+    <section class="card" style="margin-top:10px;">
+      <h2 style="margin:0;color:var(--tidoc)">Partenaires</h2>
+      <p style="margin:6px 0 0;color:var(--muted);font-weight:700;">
+        Merci à ceux qui nous soutiennent 🤝
+      </p>
+    </section>
+
+    <!-- Bouton admin (visible seulement si admin) -->
+    <button id="btnAddPartner"
+            class="create-post"
+            style="display:none;margin-top:12px;"
+            type="button">
+      <span class="create-post-plus">＋</span>
+      <span>Ajouter un partenaire</span>
+    </button>
+
+    <!-- Grille des logos -->
+    <section id="partnersGrid"
+             style="margin-top:16px; display:grid; grid-template-columns:repeat(auto-fill,minmax(120px,1fr)); gap:16px;">
+    </section>
+
+  </main>
+
+  <!-- Tabbar -->
+  <nav class="tabbar">
+    <a class="tab" href="index.html">…</a>
+    <a class="tab" href="blog.html">…</a>
+    <a class="tab" href="galerie.html">…</a>
+    <a class="tab" href="evenements.html">…</a>
+    <a class="tab" href="billets.html">…</a>
+  </nav>
+
+  <!-- Script -->
+  <script type="module" src="./partners.js"></script>
+
+</body>
+</html>
