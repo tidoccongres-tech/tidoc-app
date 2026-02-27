@@ -122,9 +122,21 @@ else if (wantedName && wantedName !== data.displayName) patch.displayName = want
 };
  console.log("Creating users doc payload:", newDoc);
   
-  await setDoc(ref, newDoc, { merge: true });
+  try {
+  // On essaye une création "pure"
+  await setDoc(ref, newDoc); // PAS de merge sur create
+} catch (e) {
+  // Si la doc existe déjà (course), on ne touche PAS createdAt
+  // On fait juste un patch safe
+  await setDoc(ref, {
+    email: newDoc.email,
+    displayName: finalName,
+    avatarUrl: finalAvatar,
+    updatedAt: serverTimestamp()
+  }, { merge: true });
+}
 
-  return {
+return {
   email: newDoc.email,
   displayName: finalName,
   avatarUrl: finalAvatar
