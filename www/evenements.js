@@ -664,7 +664,11 @@ async function loadParticipants(eventId){
     }
     if (listEl) listEl.textContent = text;
 
-    if (copyBtn){
+    // ✅ reset label bouton copier à chaque ouverture / refresh
+if (copyBtn) copyBtn.textContent = "Copier la liste";
+
+// ✅ handlers uniques (pas d’empilement)
+if (copyBtn){
   copyBtn.onclick = async () => {
     try{
       await navigator.clipboard.writeText(text);
@@ -676,8 +680,10 @@ async function loadParticipants(eventId){
   };
 }
 
+// ✅ reload safe
+const thisEventId = eventId;
 if (reloadBtn){
-  reloadBtn.onclick = () => loadParticipants(eventId);
+  reloadBtn.onclick = () => loadParticipants(thisEventId);
 }
 
   } catch (e){
