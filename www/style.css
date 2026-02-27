@@ -3145,24 +3145,21 @@ body.ui-hidden #btnFocusMode {
   white-space: nowrap;
 }
 
-/* Par défaut : on garde ton rendu actuel */
-.event-meta-under{ display:none; }
-
-/* Tablette : on affiche sous le titre et on masque la meta “ancienne” */
-@media (min-width: 768px) and (max-width: 1024px){
-  .event-meta{ display:none; }
-
-  .event-meta-under{
-    display:block;
-    margin:6px 0 0;
-    font-size:13px;
-    opacity:.85;
-    line-height:1.25;
-  }
-
-  /* Optionnel : si les liens cassent la ligne bizarrement */
-  .event-meta-under a{ word-break:break-word; }
+/* ✅ Affiche la ligne meta (heure/lieu/type) partout */
+.event-meta-under{
+  display:block;
+  margin-top:6px;
+  font-size:13px;
+  font-weight:850;
+  color: rgba(31,75,86,.72);
+  line-height:1.35;
 }
+.event-meta-under a{
+  color:#0f6f86;
+  text-decoration:none;
+  font-weight:900;
+}
+.event-meta-under a:hover{ text-decoration:underline; }
 
 /* =========================
    NOTIFICATIONS UI
