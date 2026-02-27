@@ -3727,3 +3727,76 @@ body.ui-hidden #btnFocusMode {
   white-space: normal;      /* ✅ permet de wrap le lien */
   overflow-wrap: anywhere;  /* ✅ coupe proprement si long */
 }
+
+/* =========================
+   STABILISATION — FINAL PATCH
+   (à laisser TOUT EN BAS)
+   ========================= */
+
+/* 1) Tickets : 1 seule vérité */
+#ticketsCard .ticket-head{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:12px;
+  flex-wrap:wrap;
+}
+#ticketsCard .ticket-head .ticket-title{
+  flex:1 1 auto;
+  min-width:180px;
+  margin:0;
+}
+#ticketsCard .ticket-actions-right{
+  display:flex;
+  align-items:center;
+  gap:10px;
+  flex:0 0 auto;
+  flex-wrap:nowrap;
+}
+@media (max-width:420px){
+  #ticketsCard .ticket-actions-right .admin-chip{
+    padding:10px 12px;
+    font-size:13px;
+    white-space:nowrap;
+  }
+}
+
+/* 2) Events : on force le scope #eventsList pour éviter collisions */
+#eventsList .event-card{ all: unset; display:block; } /* reset soft */
+#eventsList .event-card{
+  display:grid;
+  grid-template-columns:78px 1fr;
+  gap:12px;
+  padding:14px;
+  border-radius:22px;
+  border:1px solid rgba(23,140,168,.16);
+  background: linear-gradient(135deg, rgba(23,140,168,.10), rgba(255,255,255,.92));
+  box-shadow: 0 18px 38px rgba(0,0,0,.08), inset 0 1px 0 rgba(255,255,255,.65);
+}
+#eventsList .event-head{
+  display:flex;
+  justify-content:space-between;
+  gap:10px;
+  align-items:flex-start;
+}
+#eventsList .event-actions{
+  display:flex;
+  gap:8px;
+  flex-wrap:wrap;
+  justify-content:flex-end;
+  align-items:center;
+}
+@media (max-width:520px){
+  #eventsList .event-head{ flex-direction:column; align-items:stretch; }
+  #eventsList .event-actions{ justify-content:flex-start; width:100%; }
+}
+
+/* 3) Admin modals : pilotage par .open */
+#adminPacksModal, #adminPromoModal{
+  display:none;
+  pointer-events:none;
+}
+#adminPacksModal.open, #adminPromoModal.open{
+  display:flex;              /* ou block selon ton HTML */
+  pointer-events:auto;
+}
