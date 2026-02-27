@@ -477,8 +477,8 @@ function renderPostCard(postId, p) {
 
     <div class="comment-form" style="margin-top:10px;">
       <input type="text" placeholder="Écrire un commentaire…" data-cinput="${postId}" />
-      <button class="btn-premium btn-premium-primary" type="button" data-csend="${postId}">
-        Envoyer
+      <button class="btn-premium-primary comment-send" type="button" data-csend="${postId}">
+  Envoyer
       </button>
     </div>
   </div>
