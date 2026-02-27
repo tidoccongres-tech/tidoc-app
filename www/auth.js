@@ -186,29 +186,32 @@ export async function signupEmail({ email, password, displayName } = {}) {
   if (!name) throw new Error("Pseudo requis.");
 
   const cred = await createUserWithEmailAndPassword(auth, email, password);
-  await waitForAuthReady();
-  
+
+  // 1) Réserve le pseudo (unique)
+  const claimed = await claimUsername(cred.user, name);
+
+  // 2) Met à jour auth profile
+  await updateProfile(cred.user, { displayName: claimed.original });
+
+  // 3) Firestore : on tente, mais si ça plante on NE supprime PAS l’utilisateur Auth
   try {
-    // 1) Réserve le pseudo (unique)
-    const claimed = await claimUsername(cred.user, name);
-
-    // 2) Met à jour auth profile
-    await updateProfile(cred.user, { displayName: claimed.original });
-
-    // 3) Crée/maj doc user
     await ensureUserDoc(cred.user, {
       displayName: claimed.original,
       avatarUrl: pickRandomAvatar()
     });
 
-    // 4) Stocke aussi le normalized dans users/{uid} (utile)
     await setDoc(doc(db, "users", cred.user.uid), {
       username: claimed.original,
       usernameNormalized: claimed.normalized,
       updatedAt: serverTimestamp()
     }, { merge: true });
 
-    return cred.user;
+  } catch (e) {
+    console.error("🔥 Signup Firestore failed AFTER Auth success:", e);
+    // On garde le compte pour permettre la connexion
+  }
+
+  return cred.user;
   } catch (e) {
     // ✅ rollback : si Firestore/pseudo a échoué après création Auth,
     // on supprime le compte Auth pour éviter "compte existe déjà" ensuite.
