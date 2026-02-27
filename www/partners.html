@@ -3,66 +3,60 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Ti'Doc – Partenaires</title>
+  <title>Ti'Doc — Partenaires</title>
 
-  <link rel="stylesheet" href="style.css?v=10" />
-
-  <!-- PWA -->
-  <link rel="manifest" href="/tidoc-app/www/manifest.json" />
-  <meta name="theme-color" content="#178CA8" />
-
-  <!-- Icônes -->
-  <link rel="icon" href="/tidoc-app/www/icons/icon-192.png" />
-  <link rel="apple-touch-icon" sizes="180x180" href="/tidoc-app/www/icons/apple-touch-icon.png" />
-
-  <!-- iOS standalone -->
-  <meta name="apple-mobile-web-app-capable" content="yes" />
-  <meta name="apple-mobile-web-app-title" content="Ti'Doc" />
-  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <link rel="stylesheet" href="style.css?v=9" />
+  <!-- Option: si tu veux isoler le style partenaires -->
+  <link rel="stylesheet" href="partners.css?v=1" />
 </head>
 
 <body>
+  <main class="page partners-page">
+    <section class="card partners-hero">
+      <div class="partners-hero-row">
+        <div>
+          <h1 class="partners-title">Partenaires</h1>
+          <p class="partners-sub">
+            Merci à ceux qui rendent Ti’Doc possible 🤍
+          </p>
+        </div>
 
-  <!-- Header dynamique -->
-  <script type="module" src="./header-user-menu.js"></script>
+        <!-- Admin only -->
+        <button id="btnAddPartner" class="btn-premium btn-premium-primary partners-add" type="button" style="display:none;">
+          + Ajouter
+        </button>
+      </div>
 
-  <main class="page">
+      <div class="partners-kpis" id="partnersKpis" style="display:none;">
+        <div class="kpi">
+          <div class="kpi-num" id="kpiCount">0</div>
+          <div class="kpi-label">logos</div>
+        </div>
+        <div class="kpi">
+          <div class="kpi-num">✨</div>
+          <div class="kpi-label">premium</div>
+        </div>
+      </div>
+    </section>
 
-    <!-- Header section -->
-    <section class="card" style="margin-top:10px;">
-      <h2 style="margin:0;color:var(--tidoc)">Partenaires</h2>
-      <p style="margin:6px 0 0;color:var(--muted);font-weight:700;">
-        Merci à ceux qui nous soutiennent 🤝
+    <!-- Grid -->
+    <section class="partners-grid" id="partnersGrid">
+      <!-- skeleton injected -->
+    </section>
+
+    <!-- Empty -->
+    <section class="card partners-empty" id="partnersEmpty" style="display:none;">
+      <p style="margin:0;font-weight:900;color:var(--tidoc)">Aucun partenaire pour le moment</p>
+      <p style="margin:8px 0 0;color:var(--muted);font-weight:700;">
+        L’admin peut ajouter des logos dès que vous avez une collab.
       </p>
     </section>
-
-    <!-- Bouton admin (visible seulement si admin) -->
-    <button id="btnAddPartner"
-            class="create-post"
-            style="display:none;margin-top:12px;"
-            type="button">
-      <span class="create-post-plus">＋</span>
-      <span>Ajouter un partenaire</span>
-    </button>
-
-    <!-- Grille des logos -->
-    <section id="partnersGrid"
-             style="margin-top:16px; display:grid; grid-template-columns:repeat(auto-fill,minmax(120px,1fr)); gap:16px;">
-    </section>
-
   </main>
 
-  <!-- Tabbar -->
-  <nav class="tabbar">
-    <a class="tab" href="index.html">…</a>
-    <a class="tab" href="blog.html">…</a>
-    <a class="tab" href="galerie.html">…</a>
-    <a class="tab" href="evenements.html">…</a>
-    <a class="tab" href="billets.html">…</a>
-  </nav>
+  <!-- tabbar déjà gérée via tes pages si tu la mets partout (sinon tu peux la recopier ici) -->
 
-  <!-- Script -->
+  <script type="module" src="./auth.js"></script>
+  <script type="module" src="./header-user-menu.js"></script>
   <script type="module" src="./partners.js"></script>
-
 </body>
 </html>
