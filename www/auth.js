@@ -53,6 +53,10 @@ export async function setPseudo(newName){
 
   await updateProfile(u, { displayName: name });
 
+  // ✅ assure que users/{uid} existe avec les champs minimum
+  await ensureUserDoc(u, { displayName: name, avatarUrl: pickRandomAvatar() });
+
+  // ✅ ensuite seulement patch
   await setDoc(doc(db, "users", u.uid), {
     displayName: name,
     updatedAt: serverTimestamp()
