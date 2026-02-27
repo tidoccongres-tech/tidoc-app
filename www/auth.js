@@ -179,26 +179,33 @@ export async function signupEmail({ email, password, displayName } = {}) {
 
   const cred = await createUserWithEmailAndPassword(auth, email, password);
 
-  // 1) Réserve le pseudo (unique)
-  const claimed = await claimUsername(cred.user, name);
+  try {
+    // 1) Réserve le pseudo (unique)
+    const claimed = await claimUsername(cred.user, name);
 
-  // 2) Met à jour auth profile
-  await updateProfile(cred.user, { displayName: claimed.original });
+    // 2) Met à jour auth profile
+    await updateProfile(cred.user, { displayName: claimed.original });
 
-  // 3) Crée/maj doc user
-  await ensureUserDoc(cred.user, {
-    displayName: claimed.original,
-    avatarUrl: pickRandomAvatar()
-  });
+    // 3) Crée/maj doc user
+    await ensureUserDoc(cred.user, {
+      displayName: claimed.original,
+      avatarUrl: pickRandomAvatar()
+    });
 
-  // 4) Stocke aussi le normalized dans users/{uid} (utile)
-  await setDoc(doc(db, "users", cred.user.uid), {
-    username: claimed.original,
-    usernameNormalized: claimed.normalized,
-    updatedAt: serverTimestamp()
-  }, { merge: true });
+    // 4) Stocke aussi le normalized dans users/{uid} (utile)
+    await setDoc(doc(db, "users", cred.user.uid), {
+      username: claimed.original,
+      usernameNormalized: claimed.normalized,
+      updatedAt: serverTimestamp()
+    }, { merge: true });
 
-  return cred.user;
+    return cred.user;
+  } catch (e) {
+    // ✅ rollback : si Firestore/pseudo a échoué après création Auth,
+    // on supprime le compte Auth pour éviter "compte existe déjà" ensuite.
+    try { await deleteUser(cred.user); } catch(_) {}
+    throw e;
+  }
 }
 
 export async function loginEmail({ email, password } = {}) {
