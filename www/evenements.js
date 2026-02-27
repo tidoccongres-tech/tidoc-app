@@ -182,6 +182,7 @@ function clearForm(){
     eventStart: "",
     eventEnd: "",
     eventTitle: "",
+    eventSpeaker: "", // ✅ NEW
     eventPlace: "",
     eventDesc: "",
     eventCapacity: "",
@@ -338,11 +339,11 @@ async function createEvent(){
     const d     = document.getElementById("eventDate")?.value || "";
     const start = document.getElementById("eventStart")?.value || "";
     const end   = document.getElementById("eventEnd")?.value || "";
-    const title = document.getElementById("eventTitle")?.value?.trim() || "";
-    const place = document.getElementById("eventPlace")?.value?.trim() || "";
-    const type  = document.getElementById("eventType")?.value || "Autre";
-    const desc  = document.getElementById("eventDesc")?.value?.trim() || "";
-
+    const title   = document.getElementById("eventTitle")?.value?.trim() || "";
+    const speaker = document.getElementById("eventSpeaker")?.value?.trim() || ""; // ✅ NEW
+    const place   = document.getElementById("eventPlace")?.value?.trim() || "";
+    const type    = document.getElementById("eventType")?.value || "Autre";
+    const desc    = document.getElementById("eventDesc")?.value?.trim() || "";
     const capacity      = Number(document.getElementById("eventCapacity")?.value || 0);
     const capacityStaff = Number(document.getElementById("eventCapacityStaff")?.value || 0);
 
@@ -365,18 +366,24 @@ async function createEvent(){
     }
 
     const base = {
-      title, desc, place, type,
-      startAt, endAt,
+  title,
+  speaker: speaker || "", // ✅ NEW (safe)
+  desc,
+  place,
+  type,
 
-      capacity: Math.max(0, capacity),
-      capacityStaff: Math.max(0, capacityStaff),
+  startAt,
+  endAt,
 
-      bookedCount: 0,
-      bookedStaffCount: 0,
+  capacity: Math.max(0, capacity),
+  capacityStaff: Math.max(0, capacityStaff),
 
-      createdAt: serverTimestamp(),
-      createdBy: auth.currentUser?.uid || "",
-    };
+  bookedCount: 0,
+  bookedStaffCount: 0,
+
+  createdAt: serverTimestamp(),
+  createdBy: auth.currentUser?.uid || "",
+};
 
     if (isWorkshopEvent(type)){
       base.workshopKey = normalizeKey(title);
@@ -910,10 +917,11 @@ function renderEventCard(eventId, e = {}, { myWorkshopKeys = new Set(), regMap =
   const timeStr = start ? formatTime(start) : "";
   const endStr  = end ? formatTime(end) : "";
 
-  const title = String(e.title || "Évènement");
-  const place = String(e.place || "");
-  const type  = String(e.type || "Autre");
-  const desc  = String(e.desc || "");
+  const title   = String(e.title || "Évènement");
+const speaker = String(e.speaker || "").trim(); // ✅ NEW
+const place   = String(e.place || "");
+const type    = String(e.type || "Autre");
+const desc    = String(e.desc || "");
 
   const isWs = isWorkshopEvent(type);
   const wkKey = isWs ? getEventWorkshopKey(e) : "";
@@ -930,10 +938,11 @@ function renderEventCard(eventId, e = {}, { myWorkshopKeys = new Set(), regMap =
 
   // ✅ on construit metaLine en JS NORMAL (pas dans le template)
   const metaParts = [];
-  if (timeStr) metaParts.push(`🕒 ${escapeHTML(timeStr)}${endStr ? "–" + escapeHTML(endStr) : ""}`);
-  if (place) metaParts.push(`📍 <a href="${mapsUrl(place)}" target="_blank" rel="noopener">${escapeHTML(place)}</a>`);
-  if (type) metaParts.push(`🏷️ ${escapeHTML(type)}`);
-
+if (timeStr) metaParts.push(`🕒 ${escapeHTML(timeStr)}${endStr ? "–" + escapeHTML(endStr) : ""}`);
+if (speaker) metaParts.push(`👨‍⚕️ ${escapeHTML(speaker)}`); // ✅ NEW
+if (place) metaParts.push(`📍 <a href="${mapsUrl(place)}" target="_blank" rel="noopener">${escapeHTML(place)}</a>`);
+if (type) metaParts.push(`🏷️ ${escapeHTML(type)}`);
+  
   const metaLine = metaParts.join(" • ");
 
   const sec = document.createElement("section");
