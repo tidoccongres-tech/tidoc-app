@@ -842,7 +842,7 @@ async function broadcastPromoToTier(tier, helloAssoUrl){
 
 function renderPromoBroadcastCard(){
   const wrap = document.createElement("section");
-  wrap.className = "event-card";
+  wrap.className = "card promo-card";
   wrap.style.border = "2px dashed rgba(23,140,168,.35)";
   wrap.style.padding = "14px";
   wrap.style.marginBottom = "14px";
