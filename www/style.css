@@ -2847,3 +2847,23 @@ body.ui-hidden #btnFocusMode {
   line-height: 1.35;
   color: rgba(15,35,42,.88);
 }
+
+/* FIX MOBILE — éviter débordement horizontal */
+.comments-accordion{
+  padding-left: 14px;
+  padding-right: 14px;
+  box-sizing: border-box;
+}
+
+.comment-form{
+  width:100%;
+  box-sizing:border-box;
+}
+
+.comment-form input{
+  min-width:0; /* 🔥 ultra important pour flexbox */
+}
+
+.comment-form button{
+  flex-shrink:0; /* empêche le bouton d'être compressé bizarrement */
+}
