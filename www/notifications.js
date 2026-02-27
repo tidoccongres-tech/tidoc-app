@@ -10,7 +10,10 @@ import {
   updateDoc,
   addDoc,
   deleteDoc,
-  serverTimestamp
+  serverTimestamp,
+  collectionGroup,
+  where,
+  writeBatch
 } from "https://www.gstatic.com/firebasejs/10.12.4/firebase-firestore.js";
 import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.4/firebase-auth.js";
 
@@ -110,6 +113,42 @@ async function deleteNotif(notifId) {
   const uid = auth.currentUser?.uid;
   if (!uid) return;
   await deleteDoc(doc(db, "notifications", uid, "items", notifId));
+}
+
+async function deleteNewsletterEverywhere(newsletterId) {
+  if (!isAdminUser(auth.currentUser)) throw new Error("Admin only.");
+  if (!newsletterId) throw new Error("newsletterId manquant.");
+
+  // ⚠️ collectionGroup = toutes les sous-collections "items"
+  const qy = query(
+    collectionGroup(db, "items"),
+    where("type", "==", "newsletter"),
+    where("newsletterId", "==", newsletterId)
+  );
+
+  const snap = await getDocs(qy);
+
+  if (snap.empty) return 0;
+
+  let deleted = 0;
+  let batch = writeBatch(db);
+  let countInBatch = 0;
+
+  for (const d of snap.docs) {
+    batch.delete(d.ref);
+    deleted++;
+    countInBatch++;
+
+    // Firestore batch limit = 500
+    if (countInBatch === 450) { // marge sécurité
+      await batch.commit();
+      batch = writeBatch(db);
+      countInBatch = 0;
+    }
+  }
+
+  if (countInBatch > 0) await batch.commit();
+  return deleted;
 }
 
 function fmtNotifDate(ts){
@@ -239,12 +278,33 @@ async function loadNotifs() {
   // delete
   const delBtn = card.querySelector(`[data-del="${d.id}"]`);
   delBtn?.addEventListener("click", async (e) => {
-    e.preventDefault();
-    e.stopPropagation();
-    if (!confirm("Supprimer cette newsletter ?")) return;
-    try { await deleteNotif(d.id); card.remove(); }
-    catch (err) { alert("Impossible de supprimer (permissions)."); console.log(err); }
-  });
+  e.preventDefault();
+  e.stopPropagation();
+
+  if (!confirm("Supprimer cette newsletter chez tout le monde ?")) return;
+
+  try {
+    const newsletterId = String(n.newsletterId || "").trim();
+    if (!newsletterId) {
+      alert("❌ Cette newsletter est ancienne (pas de newsletterId).");
+      return;
+    }
+
+    delBtn.disabled = true;
+    delBtn.textContent = "Suppression…";
+
+    const nb = await deleteNewsletterEverywhere(newsletterId);
+
+    alert(`✅ Supprimée chez ${nb} utilisateur(s).`);
+    await loadNotifs(); // refresh
+  } catch (err) {
+    console.log(err);
+    alert("Impossible de supprimer partout (permissions / index).");
+  } finally {
+    delBtn.disabled = false;
+    delBtn.textContent = "Supprimer";
+  }
+});
 
   // copy promo
   const copyBtn = card.querySelector(`[data-copy="${d.id}"]`);
@@ -508,11 +568,13 @@ async function broadcastNewsletterToAll(payload) {
   if (!isAdminUser(auth.currentUser)) {
     throw new Error("Accès refusé (admin).");
   }
-
+  
   const usersSnap = await getDocs(collection(db, "users"));
 
   const fromUid = auth.currentUser.uid;
   const fromEmail = auth.currentUser.email;
+
+  const newsletterId = "nl_" + Date.now(); // ou crypto.randomUUID() si tu veux
 
   const jobs = [];
 
@@ -523,6 +585,7 @@ async function broadcastNewsletterToAll(payload) {
       addDoc(
         collection(db, "notifications", toUid, "items"),
         {
+          newsletterId,
           toUid,
           fromUid,
           fromEmail,
