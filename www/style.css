@@ -3106,3 +3106,13 @@ body.ui-hidden #btnFocusMode {
   gap:6px 10px;
   align-items:center;
 }
+
+
+.event-meta a{
+  max-width:100%;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+  display:inline-block;
+  vertical-align:bottom;
+}
