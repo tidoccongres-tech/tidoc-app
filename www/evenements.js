@@ -1071,35 +1071,38 @@ async function loadEvents(){
     const myWorkshopKeys = await loadMyWorkshopKeys();
 
     const uid = auth.currentUser?.uid || "";
-    const docs = snap.docs.map(d => ({ id: d.id, data: d.data() || {} }));
+const isLogged = !!uid;
 
-// ✅ Compteurs réels depuis registrations/{uid}
 const countsMap = {}; // { [eventId]: { pub:number, staff:number } }
 
-await Promise.all(docs.map(async (row) => {
-  const e = row.data || {};
-  if (isWorkshopEvent(e.type)) return; // workshops gérés HelloAsso
+if (isLogged) {
+  await Promise.all(docs.map(async (row) => {
+    const e = row.data || {};
+    if (isWorkshopEvent(e.type)) return;
 
-  try {
-    const regsCol = collection(db, "events", row.id, "registrations");
+    try {
+      const regsCol = collection(db, "events", row.id, "registrations");
+      const pubQ   = query(regsCol, where("isStaff", "==", false));
+      const staffQ = query(regsCol, where("isStaff", "==", true));
 
-    const pubQ   = query(regsCol, where("isStaff", "==", false));
-    const staffQ = query(regsCol, where("isStaff", "==", true));
+      const [pubC, staffC] = await Promise.all([
+        getCountFromServer(pubQ),
+        getCountFromServer(staffQ)
+      ]);
 
-    const [pubC, staffC] = await Promise.all([
-      getCountFromServer(pubQ),
-      getCountFromServer(staffQ)
-    ]);
-
-    countsMap[row.id] = {
-      pub:   Number(pubC.data().count || 0),
-      staff: Number(staffC.data().count || 0),
-    };
-  } catch (err) {
-    console.log("count error for", row.id, err);
-    countsMap[row.id] = { pub: 0, staff: 0 };
-  }
-}));
+      countsMap[row.id] = {
+        pub:   Number(pubC.data().count || 0),
+        staff: Number(staffC.data().count || 0),
+      };
+    } catch (err) {
+      console.log("count error for", row.id, err);
+      countsMap[row.id] = { pub: 0, staff: 0 };
+    }
+  }));
+} else {
+  // pas connecté => on ne tente aucun read interdit
+  docs.forEach(row => { countsMap[row.id] = null; });
+}
     
     // Map inscription (conf/autre)
     const regMap = {};
