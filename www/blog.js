@@ -251,12 +251,12 @@ async function toggleLike(postId) {
         });
       }
     } catch (e) {
-  console.log("notif like failed:", e);
-}
+      console.log("notif like failed:", e);
+    }
+  }
 
   await loadPosts();
 }
-
 /* =========================
    COMMENTS
    ========================= */
