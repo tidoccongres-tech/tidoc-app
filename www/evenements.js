@@ -182,11 +182,23 @@ function showForm(show){
 }
 
 function clearForm(){
-  ["eventDate","eventStart","eventEnd","eventTitle","eventPlace","eventDesc","eventCapacity","eventCapacityStaff","eventType"]
-    .forEach((id)=>{
-      const el = document.getElementById(id);
-      if (el) el.value = "";
-    });
+  const map = {
+    eventDate: "",
+    eventStart: "",
+    eventEnd: "",
+    eventTitle: "",
+    eventPlace: "",
+    eventDesc: "",
+    eventCapacity: "",
+    eventCapacityStaff: "0",
+    eventType: "Conférence"
+  };
+
+  Object.keys(map).forEach((id)=>{
+    const el = document.getElementById(id);
+    if (el) el.value = map[id];
+  });
+
   showMsg("");
 }
 
@@ -652,17 +664,21 @@ async function loadParticipants(eventId){
     }
     if (listEl) listEl.textContent = text;
 
-    copyBtn?.addEventListener("click", async ()=>{
-      try{
-        await navigator.clipboard.writeText(text);
-        copyBtn.textContent = "✅ Copié";
-        setTimeout(()=>{ copyBtn.textContent = "Copier la liste"; }, 1200);
-      } catch(_){
-        alert("Copie impossible sur cet appareil. Sélectionne le texte et copie manuellement.");
-      }
-    }, { once:true });
+    if (copyBtn){
+  copyBtn.onclick = async () => {
+    try{
+      await navigator.clipboard.writeText(text);
+      copyBtn.textContent = "✅ Copié";
+      setTimeout(()=>{ copyBtn.textContent = "Copier la liste"; }, 1200);
+    } catch(_){
+      alert("Copie impossible sur cet appareil. Sélectionne le texte et copie manuellement.");
+    }
+  };
+}
 
-    reloadBtn?.addEventListener("click", ()=> loadParticipants(eventId), { once:true });
+if (reloadBtn){
+  reloadBtn.onclick = () => loadParticipants(eventId);
+}
 
   } catch (e){
     console.log("loadParticipants error:", e);
@@ -1057,8 +1073,8 @@ await Promise.all(docs.map(async (row) => {
       pub:   Number(pubC.data().count || 0),
       staff: Number(staffC.data().count || 0),
     };
-  } catch (e) {
-    console.log("count error for", row.id, e);
+  } catch (err) {
+    console.log("count error for", row.id, err);
     countsMap[row.id] = { pub: 0, staff: 0 };
   }
 }));
