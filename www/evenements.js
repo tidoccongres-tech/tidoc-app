@@ -944,20 +944,38 @@ const bookedS = Number(countsMap?.[eventId]?.staff ?? e.bookedStaffCount ?? 0);
         <div class="event-actions" data-actions></div>
       </div>
 
-      <div class="event-meta">
-        ${timeStr ? `🕒 ${escapeHTML(timeStr)}${endStr ? "–" + escapeHTML(endStr) : ""}` : ""}
-        ${place ? ` • 📍 <a href="${mapsUrl(place)}" target="_blank" rel="noopener">${escapeHTML(place)}</a>` : ""}
-        ${type ? ` • 🏷️ ${escapeHTML(type)}` : ""}
+        const metaLine = `
+    ${timeStr ? `🕒 ${escapeHTML(timeStr)}${endStr ? "–" + escapeHTML(endStr) : ""}` : ""}
+    ${place ? ` • 📍 <a href="${mapsUrl(place)}" target="_blank" rel="noopener">${escapeHTML(place)}</a>` : ""}
+    ${type ? ` • 🏷️ ${escapeHTML(type)}` : ""}
+  `;
+
+  sec.innerHTML = `
+    <div class="event-date">
+      <div class="day">${escapeHTML(day)}</div>
+      <div class="month">${escapeHTML(month)}</div>
+    </div>
+
+    <div class="event-content">
+      <div class="event-head">
+        <h3>${escapeHTML(title)}</h3>
+        <div class="event-actions" data-actions></div>
       </div>
+
+      <!-- ✅ Meta SOUS le titre (tablette) -->
+      ${metaLine.trim() ? `<div class="event-meta-under">${metaLine}</div>` : ""}
+
+      <!-- ✅ Meta “ancienne” (desktop / mobile si tu veux) -->
+      ${metaLine.trim() ? `<div class="event-meta">${metaLine}</div>` : ""}
 
       ${desc ? `<div class="event-desc">${escapeHTML(desc)}</div>` : ""}
 
       <div class="event-chips">
-  ${capPub ? `<span class="chip">👥 Public: ${Math.max(0, capPub - bookedP)}/${capPub}</span>` : `<span class="chip">👥 Public: ∞</span>`}
-  ${capStf ? `<span class="chip">🛡️ Staff: ${Math.max(0, capStf - bookedS)}/${capStf}</span>` : ``}
-  ${isWs ? `<span class="chip">🔑 ${escapeHTML(wkKey || "—")}</span>` : ``}
-  ${hasWsTicket ? `<span class="chip chip-ok">✅ INSCRIT</span>` : ``}
-</div>
+        ${capPub ? `<span class="chip">👥 Public: ${Math.max(0, capPub - bookedP)}/${capPub}</span>` : `<span class="chip">👥 Public: ∞</span>`}
+        ${capStf ? `<span class="chip">🛡️ Staff: ${Math.max(0, capStf - bookedS)}/${capStf}</span>` : ``}
+        ${isWs ? `<span class="chip">🔑 ${escapeHTML(wkKey || "—")}</span>` : ``}
+        ${hasWsTicket ? `<span class="chip chip-ok">✅ INSCRIT</span>` : ``}
+      </div>
     </div>
   `;
 
