@@ -70,32 +70,28 @@ function safeHref(u=""){
 }
 
 function renderNotifLinkButton(n = {}) {
-  const url = String(n.linkUrl || "").trim();
-  if (!url) return "";
+  const href = safeHref(String(n.linkUrl || ""));
+  const label = String(n.linkLabel || "").trim();
 
-  const href = safeHref(url);
-  if (!href) return "";
-
-  const label = String(n.linkLabel || "Ouvrir").trim() || "Ouvrir";
-  const isPremium = String(n.type || "") === "workshop_promo";
-  const cls = isPremium ? "btn-helloasso-premium" : "btn-helloasso";
+  if (!href || !label) return "";
 
   const icon = `
     <svg class="ico" viewBox="0 0 24 24" fill="none" aria-hidden="true">
       <path d="M14 3h7v7" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
       <path d="M21 3l-9 9" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-      <path d="M10 5H6a3 3 0 0 0-3 3v10a3 3 0 0 0 3 3h10a3 3 0 0 0 3-3v-4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+      <path d="M10 5H6a3 3 0 0 0-3 3v10a3 3 0 0 0 3 3h10a3 3 0 0 0 3-3v-4"
+        stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
     </svg>
   `;
 
+  // ✅ même style que tes boutons premium
   return `
-    <div style="margin-top:10px;">
-      <a href="${href}" target="_blank" rel="noreferrer"
-         class="${cls}" style="text-decoration:none">
-        ${icon}
-        ${escapeHTML(label)}
-      </a>
-    </div>
+    <a class="btn-premium btn-premium-primary notif-link"
+       href="${href}" target="_blank" rel="noreferrer"
+       style="text-decoration:none">
+      ${icon}
+      ${escapeHTML(label)}
+    </a>
   `;
 }
 
@@ -208,8 +204,8 @@ async function loadNotifs() {
         ` : ""}
 
         <div class="notif-actions">
-          ${renderNotifLinkButton(n)}
-        </div>
+  ${renderNotifLinkButton(n)}
+</div>
       </div>
     </div>
   `;
