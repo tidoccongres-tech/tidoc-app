@@ -937,13 +937,24 @@ const desc    = String(e.desc || "");
   const bookedS = Number(countsMap?.[eventId]?.staff ?? e.bookedStaffCount ?? 0);
 
   // ✅ on construit metaLine en JS NORMAL (pas dans le template)
-  const metaParts = [];
-if (timeStr) metaParts.push(`🕒 ${escapeHTML(timeStr)}${endStr ? "–" + escapeHTML(endStr) : ""}`);
-if (speaker) metaParts.push(`👨‍⚕️ ${escapeHTML(speaker)}`); // ✅ NEW
-if (place) metaParts.push(`📍 <a href="${mapsUrl(place)}" target="_blank" rel="noopener">${escapeHTML(place)}</a>`);
-if (type) metaParts.push(`🏷️ ${escapeHTML(type)}`);
-  
-  const metaLine = metaParts.join(" • ");
+  // ✅ Meta en "items" (wrappables)
+const metaItems = [];
+if (timeStr) {
+  metaItems.push(`<span class="event-meta-item">🕒 ${escapeHTML(timeStr)}${endStr ? "–" + escapeHTML(endStr) : ""}</span>`);
+}
+if (speaker) {
+  metaItems.push(`<span class="event-meta-item">👨‍⚕️ ${escapeHTML(speaker)}</span>`);
+}
+if (place) {
+  metaItems.push(
+    `<span class="event-meta-item">📍 <a href="${mapsUrl(place)}" target="_blank" rel="noopener">${escapeHTML(place)}</a></span>`
+  );
+}
+if (type) {
+  metaItems.push(`<span class="event-meta-item">🏷️ ${escapeHTML(type)}</span>`);
+}
+
+const metaLine = metaItems.join("");
 
   const sec = document.createElement("section");
   sec.className = "event-card";
@@ -960,8 +971,7 @@ if (type) metaParts.push(`🏷️ ${escapeHTML(type)}`);
         <div class="event-actions" data-actions></div>
       </div>
 
-      ${metaLine ? `<div class="event-meta-under">${metaLine}</div>` : ""}
-
+      ${metaLine ? `<div class="event-meta-under event-meta-wrap">${metaLine}</div>` : ""}
       ${desc ? `<div class="event-desc">${escapeHTML(desc)}</div>` : ""}
 
       <div class="event-chips">
