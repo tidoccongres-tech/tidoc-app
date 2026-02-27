@@ -957,12 +957,12 @@ const bookedS = Number(countsMap?.[eventId]?.staff ?? e.bookedStaffCount ?? 0);
 
       ${desc ? `<div class="event-desc">${escapeHTML(desc)}</div>` : ""}
 
-      <div class="event-meta" style="margin-top:10px;">
-        ${capPub ? `Public: ${Math.max(0, capPub - bookedP)}/${capPub}` : `Public: ∞`}
-        ${capStf ? ` • Staff: ${Math.max(0, capStf - bookedS)}/${capStf}` : ``}
-        ${isWs ? ` • WorkshopKey: ${escapeHTML(wkKey || "—")}` : ``}
-        ${hasWsTicket ? ` • ✅ INSCRIT (billet détecté)` : ``}
-      </div>
+      <div class="event-chips">
+  ${capPub ? `<span class="chip">👥 Public: ${Math.max(0, capPub - bookedP)}/${capPub}</span>` : `<span class="chip">👥 Public: ∞</span>`}
+  ${capStf ? `<span class="chip">🛡️ Staff: ${Math.max(0, capStf - bookedS)}/${capStf}</span>` : ``}
+  ${isWs ? `<span class="chip">🔑 ${escapeHTML(wkKey || "—")}</span>` : ``}
+  ${hasWsTicket ? `<span class="chip chip-ok">✅ INSCRIT</span>` : ``}
+</div>
     </div>
   `;
 
