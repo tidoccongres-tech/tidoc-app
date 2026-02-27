@@ -11,6 +11,28 @@ const auth = AuthMod.auth;
 const db   = AuthMod.db;
 
 // =======================
+// PRIVATE ACCESS (TEMP)
+// =======================
+const GAME_LOCK = true;        // mets false quand prêt
+const GAME_PASS = "TIDOC2026"; // change le mot de passe
+
+(function gateGame(){
+  if (!GAME_LOCK) return;
+
+  const ok = sessionStorage.getItem("tidoc_game_ok") === "1";
+  if (ok) return;
+
+  const p = prompt("Accès privé — Ti’Truant arrive bientôt.\nEntre le code :");
+  if (p && p.trim() === GAME_PASS){
+    sessionStorage.setItem("tidoc_game_ok", "1");
+    return;
+  }
+
+  alert("Accès refusé.");
+  window.location.href = "./index.html";
+})();
+
+// =======================
 // UI
 // =======================
 const screenMenu  = document.getElementById("screenMenu") || document.getElementById("menuRoot");
