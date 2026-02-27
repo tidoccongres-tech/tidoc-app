@@ -109,12 +109,11 @@ else if (wantedName && wantedName !== data.displayName) patch.displayName = want
   const finalAvatar = avatarUrl || pickRandomAvatar();
 
   const newDoc = {
-    email: (user.email || "").toLowerCase(),
-    displayName: finalName,
-    avatarUrl: finalAvatar,
-    role: isAdminUser(user) ? "admin" : "user",
-    createdAt: serverTimestamp()
-  };
+  email: (user.email || "").toLowerCase(),
+  displayName: finalName,
+  avatarUrl: finalAvatar,
+  createdAt: serverTimestamp()
+};
 
   await setDoc(ref, newDoc, { merge: true });
 
