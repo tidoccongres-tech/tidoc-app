@@ -3677,3 +3677,21 @@ body.ui-hidden #btnFocusMode {
   font-weight:850;
   color: rgba(31,75,86,.80);
 }
+
+.partner-del{
+  position:absolute;
+  top:10px;
+  right:10px;
+  border:none;
+  background:rgba(255,255,255,.9);
+  border-radius:12px;
+  padding:8px;
+  cursor:pointer;
+  box-shadow:0 10px 20px rgba(0,0,0,.12);
+}
+.partner-del .trash-ico{
+  width:18px;
+  height:18px;
+  display:block;
+  fill: #178CA8;
+}
