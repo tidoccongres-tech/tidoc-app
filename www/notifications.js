@@ -62,10 +62,15 @@ function escapeHTML(s = "") {
 }
 
 function safeHref(u=""){
-  const url = String(u||"").trim();
+  let url = String(u||"").trim();
   if (!url) return "";
-  // optionnel : force http(s)
+
+  // ✅ auto-prefix si l’admin colle "www..." ou "helloasso.com/.."
+  if (!/^https?:\/\//i.test(url)) url = "https://" + url;
+
+  // ✅ bloque quand même les trucs chelous
   if (!/^https?:\/\//i.test(url)) return "";
+
   return url.replaceAll('"', "%22").replaceAll("'", "%27");
 }
 
