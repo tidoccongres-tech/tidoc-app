@@ -3857,3 +3857,21 @@ button, a{
 .home-hero h1, .home-header h1{
   letter-spacing: -.3px;
 }
+
+/* =========================
+   HOME — MOMENTS GRID POLISH
+========================= */
+.moments-grid img,
+.home-moments img{
+  border-radius: 16px;
+  box-shadow: 0 14px 28px rgba(0,0,0,.10);
+  transition: transform .18s ease, filter .18s ease;
+}
+
+@media (hover:hover){
+  .moments-grid a:hover img,
+  .home-moments a:hover img{
+    transform: scale(1.015);
+    filter: saturate(1.03) contrast(1.02);
+  }
+}
