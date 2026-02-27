@@ -2670,3 +2670,84 @@ body.ui-hidden #btnChatToggle {
 body.ui-hidden #btnFocusMode {
   display: grid !important;
 }
+
+/* =========================
+   BLOG — ULTRA PREMIUM FEED
+   ========================= */
+.post-head-left{
+  display:flex;
+  align-items:flex-start;
+  gap:12px;
+  min-width:0;
+}
+
+.post-avatar{
+  width:42px;
+  height:42px;
+  border-radius:16px;
+  background: linear-gradient(135deg, rgba(23,140,168,.22), rgba(255,255,255,.92));
+  border:1px solid rgba(23,140,168,.18);
+  box-shadow:0 14px 26px rgba(0,0,0,.08);
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  font-weight:950;
+  color:#0f4f60;
+  flex:0 0 auto;
+}
+
+.post-head-meta{
+  min-width:0;
+  flex:1;
+}
+
+.post-author-chip{
+  display:inline-flex;
+  align-items:center;
+  gap:6px;
+  padding:6px 10px;
+  border-radius:999px;
+  border:1px solid rgba(23,140,168,.14);
+  background: rgba(255,255,255,.70);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
+
+.post-sub .dot{
+  margin:0 6px;
+  opacity:.55;
+}
+
+.post-date{
+  font-weight:850;
+  color: rgba(31,75,86,.70);
+}
+
+/* actions */
+.post-actions-premium{
+  gap:10px;
+}
+
+.like-pill{
+  width:auto;
+  padding:0 14px;
+  gap:10px;
+}
+
+.like-pill .like-count{
+  margin-left:2px;
+  font-weight:950;
+}
+
+/* comments accordion look */
+.comments-accordion{
+  border-top:1px solid rgba(23,140,168,.10);
+  padding-top:12px;
+}
+
+/* list container (un peu plus clean) */
+.comments-list{
+  display:flex;
+  flex-direction:column;
+  gap:10px;
+}
