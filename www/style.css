@@ -3031,3 +3031,26 @@ body.ui-hidden #btnFocusMode {
   .event-actions{ gap:6px; }
   .pill-btn{ height:36px; padding:0 10px; }
 }
+
+.event-chips{
+  display:flex;
+  flex-wrap:wrap;
+  gap:8px;
+  margin-top:10px;
+}
+.chip{
+  display:inline-flex;
+  align-items:center;
+  gap:6px;
+  padding:6px 10px;
+  border-radius:999px;
+  border:1px solid rgba(23,140,168,.14);
+  background: rgba(255,255,255,.72);
+  font-size:12px;
+  font-weight:900;
+  color: rgba(15,35,42,.82);
+}
+.chip-ok{
+  background: rgba(40,190,120,.12);
+  border-color: rgba(40,190,120,.22);
+}
