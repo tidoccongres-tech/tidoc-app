@@ -282,25 +282,33 @@ async function loadComments(postId, postData, containerEl) {
     const delOk = canDeleteComment(c);
 
     const row = document.createElement("div");
-    row.className = "comment";
+row.className = "comment-item";
 
-    row.innerHTML = `
-      <div class="comment-row">
-        <div style="min-width:0;">
-          <div class="comment-author">
-            ${escapeHTML(prettyName)}${isAdminEmail(c.authorEmail) ? `<span class="crown-inline">${CROWN_GRAY_SVG}</span>` : ""}
-          </div>
-          <div class="comment-text">${escapeHTML(c.text || "")}</div>
-        </div>
+const dateStr = fmtDate(c.createdAt); // ✅ date/heure Firestore
 
-        ${delOk ? `
-          <button class="comment-del" type="button" aria-label="Supprimer le commentaire" title="Supprimer"
-                  data-cdel="${postId}::${commentId}">
-            ${TRASH_TIDOC_SVG}
-          </button>
-        ` : ""}
+row.innerHTML = `
+  <div class="comment-avatar" aria-hidden="true">
+    ${escapeHTML(prettyName.slice(0,1).toUpperCase())}
+  </div>
+
+  <div style="min-width:0; flex:1;">
+    <div class="comment-head">
+      <div class="comment-author">
+        ${escapeHTML(prettyName)}${isAdminEmail(c.authorEmail) ? `<span class="crown-inline">${CROWN_GRAY_SVG}</span>` : ""}
       </div>
-    `;
+      ${dateStr ? `<div class="comment-date">• ${escapeHTML(dateStr)}</div>` : ``}
+    </div>
+
+    <div class="comment-text">${escapeHTML(c.text || "")}</div>
+  </div>
+
+  ${delOk ? `
+    <button class="comment-del" type="button" aria-label="Supprimer le commentaire" title="Supprimer"
+            data-cdel="${postId}::${commentId}">
+      ${TRASH_TIDOC_SVG}
+    </button>
+  ` : ""}
+`;
 
     if (delOk) {
       row.querySelector(`[data-cdel="${postId}::${commentId}"]`)?.addEventListener("click", async () => {
