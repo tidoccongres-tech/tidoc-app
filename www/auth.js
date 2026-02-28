@@ -60,7 +60,7 @@ export async function setPseudo(newName){
   // ✅ ensuite seulement patch
   await setDoc(doc(db, "users", u.uid), {
     displayName: name,
-    updatedAt: serverTimestamp()
+    updatedAt: Timestamp.now()
   }, { merge:true });
 
   try { localStorage.setItem("tidoc_name", name); } catch(_){}
