@@ -1070,7 +1070,7 @@ async function loadEvents(){
 
     const myWorkshopKeys = await loadMyWorkshopKeys();
 
-    const uid = auth.currentUser?.uid || "";
+const uid = auth.currentUser?.uid || "";
 const isLogged = !!uid;
 
 const countsMap = {}; // { [eventId]: { pub:number, staff:number } }
@@ -1100,67 +1100,62 @@ if (isLogged) {
     }
   }));
 } else {
-  // pas connecté => on ne tente aucun read interdit
+  // pas connecté => on ne tente aucun read "registrations"
   docs.forEach(row => { countsMap[row.id] = null; });
 }
-    
-    // Map inscription (conf/autre)
-    const regMap = {};
-    if (uid){
-      await Promise.all(docs.map(async (row)=>{
-        const e = row.data || {};
-        if (isWorkshopEvent(e.type)) return;
-        try{
-          const r = await getDoc(doc(db, "events", row.id, "registrations", uid));
-          if (r.exists()) regMap[row.id] = true;
-        } catch {}
-      }));
-    }
 
-    // tri priorité
-    const scored = docs.map(row => {
-      const e = row.data || {};
-      const isWs = isWorkshopEvent(e.type);
-      const wkKey = isWs ? getEventWorkshopKey(e) : "";
-      const hasWsTicket = isWs && myWorkshopKeys.has(wkKey);
-      const isReg = !!regMap[row.id];
+// Map inscription (conf/autre) — uniquement si connecté
+const regMap = {};
+if (uid) {
+  await Promise.all(docs.map(async (row) => {
+    const e = row.data || {};
+    if (isWorkshopEvent(e.type)) return;
 
-      let score = 0;
-      if (hasWsTicket) score += 200;
-      if (isReg) score += 150;
+    try {
+      const r = await getDoc(doc(db, "events", row.id, "registrations", uid));
+      if (r.exists()) regMap[row.id] = true;
+    } catch (_) {}
+  }));
+}
 
-      return { ...row, score };
-    });
+// tri priorité (inscrit / workshop ticket)
+const scored = docs.map(row => {
+  const e = row.data || {};
+  const isWs = isWorkshopEvent(e.type);
+  const wkKey = isWs ? getEventWorkshopKey(e) : "";
+  const hasWsTicket = isWs && myWorkshopKeys.has(wkKey);
+  const isReg = !!regMap[row.id];
 
-    scored.sort((a, b) => {
-      if (b.score !== a.score) return b.score - a.score;
-      const da = a.data?.startAt?.toMillis ? a.data.startAt.toMillis() : 0;
-      const dbb = b.data?.startAt?.toMillis ? b.data.startAt.toMillis() : 0;
-      return da - dbb;
-    });
+  let score = 0;
+  if (hasWsTicket) score += 200;
+  if (isReg) score += 150;
 
-    // rendu
-    eventsList.innerHTML = "";
+  return { ...row, score };
+});
 
-    // bloc admin promo en haut (si présent dans HTML)
-    const promoZone = document.getElementById("promoTopZone");
-    if (promoZone){
-      promoZone.innerHTML = "";
-      if (isAdmin()){
-        promoZone.appendChild(renderPromoBroadcastCard());
-      }
-    }
+scored.sort((a, b) => {
+  if (b.score !== a.score) return b.score - a.score;
+  const da = a.data?.startAt?.toMillis ? a.data.startAt.toMillis() : 0;
+  const dbb = b.data?.startAt?.toMillis ? b.data.startAt.toMillis() : 0;
+  return da - dbb;
+});
 
-    scored.forEach((row)=>{
-      const card = renderEventCard(row.id, row.data, { myWorkshopKeys, regMap, countsMap });
-      if (card) eventsList.appendChild(card);
-    });
+// rendu
+eventsList.innerHTML = "";
 
-  } catch (e) {
-    console.log("loadEvents error:", e);
-    eventsList.innerHTML = `<section class="card"><p>❌ ${escapeHTML(e?.message || String(e))}</p></section>`;
+// bloc admin promo en haut (si présent dans HTML)
+const promoZone = document.getElementById("promoTopZone");
+if (promoZone) {
+  promoZone.innerHTML = "";
+  if (isAdmin()) {
+    promoZone.appendChild(renderPromoBroadcastCard());
   }
 }
+
+scored.forEach((row) => {
+  const card = renderEventCard(row.id, row.data, { myWorkshopKeys, regMap, countsMap });
+  if (card) eventsList.appendChild(card);
+});
 
 // =====================
 // BOOT (1 seul endroit) ✅
