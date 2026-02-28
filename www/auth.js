@@ -103,7 +103,7 @@ const authName = (user.displayName || "").trim();
 if (!data.displayName) patch.displayName = wantedName || authName || "Utilisateur";
 else if (wantedName && wantedName !== data.displayName) patch.displayName = wantedName;
     if (Object.keys(patch).length) {
-      patch.updatedAt = serverTimestamp();
+      patch.updatedAt = Timestamp.now();
       await setDoc(ref, patch, { merge: true });
       return { ...data, ...patch };
     }
@@ -115,13 +115,16 @@ else if (wantedName && wantedName !== data.displayName) patch.displayName = want
   const finalName = (displayName || user.displayName || "Utilisateur").trim();
   const finalAvatar = avatarUrl || pickRandomAvatar();
 
- const newDoc = {
+ const now = Timestamp.now();
+const newDoc = {
   email: (user.email || "").toLowerCase(),
   displayName: finalName,
   avatarUrl: finalAvatar,
-  createdAt: serverTimestamp(),
-  updatedAt: serverTimestamp()
+  createdAt: now,
+  updatedAt: now
 };
+await setDoc(ref, newDoc);
+  
  console.log("Creating users doc payload:", newDoc);
   
   try {
@@ -134,7 +137,7 @@ else if (wantedName && wantedName !== data.displayName) patch.displayName = want
     email: newDoc.email,
     displayName: finalName,
     avatarUrl: finalAvatar,
-    updatedAt: serverTimestamp()
+    updatedAt: Timestamp.now()
   }, { merge: true });
 }
 
