@@ -217,6 +217,8 @@ export async function signupEmail({ email, password, displayName } = {}) {
     });
   });
 
+  await cred.user.getIdToken(true);
+  
   const normalized = normalizeUsername(name);
   const unameRef = doc(db, "usernames", normalized);
 
