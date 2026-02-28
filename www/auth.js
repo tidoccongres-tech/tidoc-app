@@ -245,30 +245,31 @@ const userRef = doc(db, "users", cred.user.uid);
 const nowTs = Timestamp.now();
 const avatar = pickRandomAvatar();
 
-const createPayload = {
-  email: String(cred.user.email || "").toLowerCase(),
-  displayName: claimed.original,
-  avatarUrl: avatar,
-  username: claimed.original,
-  usernameNormalized: claimed.normalized,
-  createdAt: nowTs,
-  updatedAt: nowTs
-};
+const snap = await getDoc(userRef);
 
-try {
-  // 1) on tente une création "pure"
-  await setDoc(userRef, createPayload);
+if (!snap.exists()) {
+  // CREATE (avec createdAt)
+  await setDoc(userRef, {
+    email: String(cred.user.email || "").toLowerCase(),
+    displayName: claimed.original,
+    avatarUrl: avatar,
+    username: claimed.original,
+    usernameNormalized: claimed.normalized,
+    createdAt: nowTs,
+    updatedAt: nowTs
+  });
   step("STEP 5b: users doc CREATED");
-} catch (e) {
-  const code = e?.code || "";
-  if (code === "already-exists" || code === "aborted") {
-    await setDoc(
-      userRef,
-      { displayName: claimed.original, avatarUrl: avatar, username: claimed.original, usernameNormalized: claimed.normalized, updatedAt: nowTs },
-      { merge: true }
-    );
-    step("STEP 5b: users doc PATCHED");
-  } else {
+} else {
+  // PATCH (sans toucher createdAt)
+  await setDoc(userRef, {
+    displayName: claimed.original,
+    avatarUrl: snap.data()?.avatarUrl || avatar,
+    username: claimed.original,
+    usernameNormalized: claimed.normalized,
+    updatedAt: nowTs
+  }, { merge: true });
+  step("STEP 5b: users doc PATCHED");
+} else {
     
     console.log("STEP 5 FAILED:", e);
     alert("STEP 5 FAILED:\n" + code + "\n" + (e?.message || e));
