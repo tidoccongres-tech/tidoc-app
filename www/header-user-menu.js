@@ -256,16 +256,16 @@ async function getPrettyName(user){
     }catch(_){}
   }
 
-  // 2) Cache
-  const cached = (localStorage.getItem(LS_NAME) || "").trim();
-  if (cached) return cached;
+  // 2) Auth (priorité : souvent dispo juste après updateProfile)
+const dn = (user.displayName || "").trim();
+if (dn) {
+  try { localStorage.setItem(LS_NAME, dn); } catch(_){}
+  return dn;
+}
 
-  // 3) Auth
-  const dn = (user.displayName || "").trim();
-  if (dn) { localStorage.setItem(LS_NAME, dn); return dn; }
-
-  const email = (user.email || "").trim();
-  if (email.includes("@")) return email.split("@")[0];
+// 3) Cache
+const cached = (localStorage.getItem(LS_NAME) || "").trim();
+if (cached) return cached;
 
   return "Utilisateur";
 }
