@@ -232,35 +232,46 @@ export async function signupEmail({ email, password, displayName } = {}) {
     await updateProfile(cred.user, { displayName: claimed.original });
 
     // 5) users/{uid}
-    const userRef = doc(db, "users", cred.user.uid);
-    const snapUser = await getDoc(userRef);
+    // 5) users/{uid}  ✅ robuste (create si absent, sinon patch)
+const userRef = doc(db, "users", cred.user.uid);
+const nowTs = Timestamp.now();
 
-    const payload = {
+const avatar = pickRandomAvatar();
+
+await runTransaction(db, async (tx) => {
+  const uSnap = await tx.get(userRef);
+
+  if (!uSnap.exists()) {
+    // CREATE
+    tx.set(userRef, {
+      email: (cred.user.email || "").toLowerCase(),
       displayName: claimed.original,
-      avatarUrl: pickRandomAvatar(),
-      updatedAt: serverTimestamp(),
+      avatarUrl: avatar,
+
       username: claimed.original,
-      usernameNormalized: claimed.normalized
-    };
+      usernameNormalized: claimed.normalized,
 
-    // ✅ UNIQUEMENT si création (doc inexistante)
-    if (!snapUser.exists()) {
-      payload.email = (cred.user.email || "").toLowerCase();
-      payload.createdAt = serverTimestamp();
-    }
+      createdAt: nowTs,
+      updatedAt: nowTs
+    });
+  } else {
+    // UPDATE MINIMAL (si rules autorisent update partiel)
+    tx.set(userRef, {
+      displayName: claimed.original,
+      avatarUrl: uSnap.data()?.avatarUrl || avatar, // garde l'existant si déjà présent
+      username: claimed.original,
+      usernameNormalized: claimed.normalized,
+      updatedAt: nowTs
+    }, { merge: true });
+  }
+});
 
-    alert("STEP 4b: payload keys = " + Object.keys(payload).join(", "));
-    await setDoc(userRef, payload, { merge: true });
-    alert("STEP 4c: setDoc OK");
+// ✅ cache + refresh UI immédiat (header)
+try { localStorage.setItem("tidoc_name", claimed.original); } catch(_){}
+try { localStorage.setItem("tidoc_avatar", avatar); } catch(_){}
 
-    // ✅ cache + refresh UI immédiat (header)
-    try { localStorage.setItem("tidoc_name", claimed.original); } catch(_){}
-    try { localStorage.setItem("tidoc_avatar", payload.avatarUrl); } catch(_){}
-
-    window.dispatchEvent(new CustomEvent("tidoc:avatar", {
-      detail: { url: payload.avatarUrl }
-    }));
-    window.dispatchEvent(new CustomEvent("tidoc:auth"));
+window.dispatchEvent(new CustomEvent("tidoc:avatar", { detail: { url: avatar } }));
+window.dispatchEvent(new CustomEvent("tidoc:auth"));
 
     alert("STEP 5: SUCCESS");
     return cred.user;
