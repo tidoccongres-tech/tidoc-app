@@ -251,7 +251,6 @@ export async function signupEmail({ email, password, displayName } = {}) {
         const uSnap = await tx.get(userRef);
 
         if (!uSnap.exists()) {
-          // CREATE
           tx.set(userRef, {
             email: String(cred.user.email || "").toLowerCase(),
             displayName: claimed.original,
@@ -262,7 +261,6 @@ export async function signupEmail({ email, password, displayName } = {}) {
             updatedAt: nowTs,
           });
         } else {
-          // UPDATE (merge)
           const prev = uSnap.data() || {};
           tx.set(
             userRef,
@@ -283,8 +281,8 @@ export async function signupEmail({ email, password, displayName } = {}) {
       console.log("STEP 5 FAILED:", e);
       alert(
         "STEP 5 FAILED:\n" +
-        (e?.code || "") + "\n" +
-        (e?.message || e)
+          (e?.code || "") + "\n" +
+          (e?.message || e)
       );
       throw e;
     }
