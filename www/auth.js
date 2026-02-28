@@ -260,22 +260,16 @@ try {
   await setDoc(userRef, createPayload);
   step("STEP 5b: users doc CREATED");
 } catch (e) {
-  // 2) si ça existe déjà, on patch SANS toucher createdAt
   const code = e?.code || "";
-  if (code === "already-exists") {
+  if (code === "already-exists" || code === "aborted") {
     await setDoc(
       userRef,
-      {
-        displayName: claimed.original,
-        avatarUrl: avatar,
-        username: claimed.original,
-        usernameNormalized: claimed.normalized,
-        updatedAt: nowTs
-      },
+      { displayName: claimed.original, avatarUrl: avatar, username: claimed.original, usernameNormalized: claimed.normalized, updatedAt: nowTs },
       { merge: true }
     );
     step("STEP 5b: users doc PATCHED");
   } else {
+    
     console.log("STEP 5 FAILED:", e);
     alert("STEP 5 FAILED:\n" + code + "\n" + (e?.message || e));
     throw e;
