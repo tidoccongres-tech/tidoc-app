@@ -23,7 +23,8 @@ import {
   setDoc,
   getDoc,
   serverTimestamp,
-  runTransaction
+  runTransaction,
+  Timestamp   // 👈 AJOUT ICI
 } from "https://www.gstatic.com/firebasejs/10.12.4/firebase-firestore.js";
 
 // =====================
@@ -178,10 +179,10 @@ export async function claimUsername(user, displayNameRaw) {
     if (snap.exists()) throw new Error("Pseudo déjà pris 😕");
 
     // ✅ IMPORTANT : pas de serverTimestamp ici
-    tx.set(ref, {
-      uid: user.uid,
-      original
-      // createdAt supprimé
+   tx.set(ref, {
+  uid: user.uid,
+  original,
+  createdAt: Timestamp.now()
     });
   });
 
