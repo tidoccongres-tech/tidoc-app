@@ -238,18 +238,23 @@ export async function signupEmail({ email, password, displayName } = {}) {
     return cred.user;
 
   } catch (e) {
-    // rollback pseudo si réservé
-    try {
-      // supprime la réservation (si tes rules interdisent delete -> fais-le manuellement en admin)
-      // sinon laisse tomber, mais au moins tu sais pourquoi ça bloque.
-      // await deleteDoc(unameRef);
-    } catch (_) {}
+  // ✅ DEBUG iPad (affiche vraiment le code Firestore / Auth)
+  const code = e?.code || "no-code";
+  const msg  = e?.message || String(e);
 
-    // rollback auth user pour éviter comptes fantômes
-    try { await deleteUser(cred.user); } catch (_) {}
+  console.log("SIGNUP ERROR CODE:", code);
+  console.log("SIGNUP ERROR MSG :", msg);
+  alert("Signup error:\n" + code + "\n" + msg);
 
-    throw e;
-  }
+  // rollback pseudo si réservé
+  try {
+    // await deleteDoc(unameRef);
+  } catch (_) {}
+
+  // rollback auth user pour éviter comptes fantômes
+  try { await deleteUser(cred.user); } catch (_) {}
+
+  throw e;
 }
 
 export async function loginEmail({ email, password } = {}) {
