@@ -224,7 +224,6 @@ export async function signupEmail({ email, password, displayName } = {}) {
 
     cred = await createUserWithEmailAndPassword(auth, email, password);
 
-    step("STEP 2: wait onAuthStateChanged");
     await new Promise((resolve) => {
       const unsub = onAuthStateChanged(auth, (u) => {
         if (u) {
@@ -241,8 +240,6 @@ export async function signupEmail({ email, password, displayName } = {}) {
     await updateProfile(cred.user, { displayName: claimed.original });
 
      // STEP 5: écrire users/{uid}
-step("STEP 5: write users/{uid}");
-
 const userRef = doc(db, "users", cred.user.uid);
 const nowTs = Timestamp.now();
 const avatar = pickRandomAvatar();
@@ -261,7 +258,7 @@ try {
       createdAt: nowTs,
       updatedAt: nowTs
     });
-    step("STEP 5b: users doc CREATED");
+   
   } else {
     // PATCH (sans toucher createdAt)
     await setDoc(userRef, {
@@ -271,7 +268,7 @@ try {
       usernameNormalized: claimed.normalized,
       updatedAt: nowTs
     }, { merge: true });
-    step("STEP 5b: users doc PATCHED");
+    
   }
 } catch (e) {
   console.log("STEP 5 FAILED:", e);
@@ -279,14 +276,14 @@ try {
   throw e;
 }
 
-    step("STEP 6: cache + events");
+    
     try { localStorage.setItem("tidoc_name", claimed.original); } catch (_) {}
     try { localStorage.setItem("tidoc_avatar", avatar); } catch (_) {}
 
     window.dispatchEvent(new CustomEvent("tidoc:avatar", { detail: { url: avatar } }));
     window.dispatchEvent(new CustomEvent("tidoc:auth"));
 
-    step("STEP 7: SUCCESS");
+
     return cred.user;
 
   } catch (e) {
