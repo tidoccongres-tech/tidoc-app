@@ -240,66 +240,54 @@ export async function signupEmail({ email, password, displayName } = {}) {
 
     await updateProfile(cred.user, { displayName: claimed.original });
 
-    step("step("STEP 5: transaction users/{uid}");
-const userRef = doc(db, "users", cred.user.uid);
-const nowTs = Timestamp.now();
-const avatar = pickRandomAvatar();
+        step("STEP 5: transaction users/{uid}");
 
-try {
-  await runTransaction(db, async (tx) => {
-    const uSnap = await tx.get(userRef);
+    const userRef = doc(db, "users", cred.user.uid);
+    const nowTs = Timestamp.now();
+    const avatar = pickRandomAvatar();
 
-    if (!uSnap.exists()) {
-      // CREATE
-      tx.set(userRef, {
-        email: String(cred.user.email || "").toLowerCase(),
-        displayName: claimed.original,
-        avatarUrl: avatar,
-        username: claimed.original,
-        usernameNormalized: claimed.normalized,
-        createdAt: nowTs,
-        updatedAt: nowTs,
+    try {
+      await runTransaction(db, async (tx) => {
+        const uSnap = await tx.get(userRef);
+
+        if (!uSnap.exists()) {
+          // CREATE
+          tx.set(userRef, {
+            email: String(cred.user.email || "").toLowerCase(),
+            displayName: claimed.original,
+            avatarUrl: avatar,
+            username: claimed.original,
+            usernameNormalized: claimed.normalized,
+            createdAt: nowTs,
+            updatedAt: nowTs,
+          });
+        } else {
+          // UPDATE (merge)
+          const prev = uSnap.data() || {};
+          tx.set(
+            userRef,
+            {
+              displayName: claimed.original,
+              avatarUrl: String(prev.avatarUrl || avatar),
+              username: claimed.original,
+              usernameNormalized: claimed.normalized,
+              updatedAt: nowTs,
+            },
+            { merge: true }
+          );
+        }
       });
-    } else {
-      // UPDATE (merge)
-      const prev = uSnap.data() || {};
-      tx.set(
-        userRef,
-        {
-          displayName: claimed.original,
-          avatarUrl: String(prev.avatarUrl || avatar),
-          username: claimed.original,
-          usernameNormalized: claimed.normalized,
-          updatedAt: nowTs,
-        },
-        { merge: true }
+
+      step("STEP 5b: transaction OK");
+    } catch (e) {
+      console.log("STEP 5 FAILED:", e);
+      alert(
+        "STEP 5 FAILED:\n" +
+        (e?.code || "") + "\n" +
+        (e?.message || e)
       );
+      throw e;
     }
-  });
-
-  step("STEP 5b: transaction OK");
-
-} catch (e) {
-  console.log("STEP 5 FAILED:", e);
-  alert(
-    "STEP 5 FAILED:\n" +
-    (e?.code || "") + "\n" +
-    (e?.message || e)
-  );
-  throw e;
-}
-
-  step("STEP 5b: transaction OK");
-
-} catch (e) {
-  console.log("STEP 5 FAILED:", e);
-  alert(
-    "STEP 5 FAILED:\n" +
-    (e?.code || "") + "\n" +
-    (e?.message || e)
-  );
-  throw e;
-}
 
     step("STEP 6: cache + events");
     try { localStorage.setItem("tidoc_name", claimed.original); } catch (_) {}
