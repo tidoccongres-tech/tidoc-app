@@ -235,8 +235,8 @@ export async function signupEmail({ email, password, displayName } = {}) {
 const userRef = doc(db, "users", cred.user.uid);
 const snapUser = await getDoc(userRef);
 
+// payload "update-safe" (pas d'email ici)
 const payload = {
-  email: (cred.user.email || "").toLowerCase(),
   displayName: claimed.original,
   avatarUrl: pickRandomAvatar(),
   updatedAt: serverTimestamp(),
@@ -244,12 +244,18 @@ const payload = {
   usernameNormalized: claimed.normalized
 };
 
-// ✅ createdAt seulement si le doc n’existe pas
+// ✅ UNIQUEMENT si création (doc inexistante)
 if (!snapUser.exists()) {
+  payload.email = (cred.user.email || "").toLowerCase();
   payload.createdAt = serverTimestamp();
 }
 
+// 🔎 debug ultra clair
+alert("STEP 4b: payload keys = " + Object.keys(payload).join(", "));
+
 await setDoc(userRef, payload, { merge: true });
+
+alert("STEP 4c: setDoc OK");
 
 // ✅ cache + refresh UI immédiat (header)
 try { localStorage.setItem("tidoc_name", claimed.original); } catch(_){}
