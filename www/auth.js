@@ -202,77 +202,70 @@ function waitForAuthReady() {
 // AUTH ACTIONS
 // =====================
 export async function signupEmail({ email, password, displayName } = {}) {
-
   // ✅ évite course avec ensureUserDoc pendant signup
   window.__TIDOC_SIGNUP_IN_PROGRESS__ = true;
 
+  let cred = null;
+
   try {
-  if (!email || !password) throw new Error("Email + mot de passe requis.");
+    if (!email || !password) throw new Error("Email + mot de passe requis.");
 
-  const name = (displayName || "").trim();
-  if (!name) throw new Error("Pseudo requis.");
+    const name = (displayName || "").trim();
+    if (!name) throw new Error("Pseudo requis.");
 
-  // 1) Auth
-  const cred = await createUserWithEmailAndPassword(auth, email, password);
+    // 1) Auth
+    cred = await createUserWithEmailAndPassword(auth, email, password);
 
-  // important: attendre que Firestore voie bien l'user connecté
-  await new Promise((resolve) => {
-    const unsub = onAuthStateChanged(auth, (u) => {
-      if (u) { unsub(); resolve(u); }
+    // 2) attendre que l'user soit bien "visible"
+    await new Promise((resolve) => {
+      const unsub = onAuthStateChanged(auth, (u) => {
+        if (u) { unsub(); resolve(u); }
+      });
     });
-  });
 
-  await cred.user.getIdToken(true);
-  
-  const normalized = normalizeUsername(name);
-  const unameRef = doc(db, "usernames", normalized);
+    await cred.user.getIdToken(true);
 
-  try {
+    // 3) Reserve pseudo
+    const claimed = await claimUsername(cred.user, name);
 
-  const claimed = await claimUsername(cred.user, name);
+    // 4) Auth profile name
+    await updateProfile(cred.user, { displayName: claimed.original });
 
-  await updateProfile(cred.user, { displayName: claimed.original });
+    // 5) users/{uid}
+    const userRef = doc(db, "users", cred.user.uid);
+    const snapUser = await getDoc(userRef);
 
-const userRef = doc(db, "users", cred.user.uid);
-const snapUser = await getDoc(userRef);
+    const payload = {
+      displayName: claimed.original,
+      avatarUrl: pickRandomAvatar(),
+      updatedAt: serverTimestamp(),
+      username: claimed.original,
+      usernameNormalized: claimed.normalized
+    };
 
-// payload "update-safe" (pas d'email ici)
-const payload = {
-  displayName: claimed.original,
-  avatarUrl: pickRandomAvatar(),
-  updatedAt: serverTimestamp(),
-  username: claimed.original,
-  usernameNormalized: claimed.normalized
-};
+    // ✅ UNIQUEMENT si création (doc inexistante)
+    if (!snapUser.exists()) {
+      payload.email = (cred.user.email || "").toLowerCase();
+      payload.createdAt = serverTimestamp();
+    }
 
-// ✅ UNIQUEMENT si création (doc inexistante)
-if (!snapUser.exists()) {
-  payload.email = (cred.user.email || "").toLowerCase();
-  payload.createdAt = serverTimestamp();
-}
+    alert("STEP 4b: payload keys = " + Object.keys(payload).join(", "));
+    await setDoc(userRef, payload, { merge: true });
+    alert("STEP 4c: setDoc OK");
 
-// 🔎 debug ultra clair
-alert("STEP 4b: payload keys = " + Object.keys(payload).join(", "));
+    // ✅ cache + refresh UI immédiat (header)
+    try { localStorage.setItem("tidoc_name", claimed.original); } catch(_){}
+    try { localStorage.setItem("tidoc_avatar", payload.avatarUrl); } catch(_){}
 
-await setDoc(userRef, payload, { merge: true });
+    window.dispatchEvent(new CustomEvent("tidoc:avatar", {
+      detail: { url: payload.avatarUrl }
+    }));
+    window.dispatchEvent(new CustomEvent("tidoc:auth"));
 
-alert("STEP 4c: setDoc OK");
+    alert("STEP 5: SUCCESS");
+    return cred.user;
 
-// ✅ cache + refresh UI immédiat (header)
-try { localStorage.setItem("tidoc_name", claimed.original); } catch(_){}
-try { localStorage.setItem("tidoc_avatar", payload.avatarUrl); } catch(_){}
-
-window.dispatchEvent(new CustomEvent("tidoc:avatar", {
-  detail: { url: payload.avatarUrl }
-}));
-
-window.dispatchEvent(new CustomEvent("tidoc:auth"));
-
-alert("STEP 5: SUCCESS");
-return cred.user;
-
-   } catch (e) {
-
+  } catch (e) {
     const code = e?.code || "no-code";
     const msg  = e?.message || String(e);
 
@@ -280,31 +273,12 @@ return cred.user;
     console.log("SIGNUP ERROR MSG :", msg);
     alert("Signup error:\n" + code + "\n" + msg);
 
-    try { await deleteUser(cred.user); } catch (_) {}
+    // rollback auth user si créé
+    try { if (cred?.user) await deleteUser(cred.user); } catch (_) {}
 
     throw e;
 
   } finally {
-
-    // ✅ on libère le flag
-    window.__TIDOC_SIGNUP_IN_PROGRESS__ = false;
-  }
-}  } catch (e) {
-
-    const code = e?.code || "no-code";
-    const msg  = e?.message || String(e);
-
-    console.log("SIGNUP ERROR CODE:", code);
-    console.log("SIGNUP ERROR MSG :", msg);
-    alert("Signup error:\n" + code + "\n" + msg);
-
-    try { await deleteUser(cred.user); } catch (_) {}
-
-    throw e;
-
-  } finally {
-
-    // ✅ on libère le flag
     window.__TIDOC_SIGNUP_IN_PROGRESS__ = false;
   }
 }
