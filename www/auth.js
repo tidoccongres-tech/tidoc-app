@@ -112,40 +112,39 @@ else if (wantedName && wantedName !== data.displayName) patch.displayName = want
   }
 
   // ✅ sinon : crée doc
+    // ✅ sinon : crée doc
   const finalName = (displayName || user.displayName || "Utilisateur").trim();
   const finalAvatar = avatarUrl || pickRandomAvatar();
 
- const now = Timestamp.now();
-const newDoc = {
-  email: (user.email || "").toLowerCase(),
-  displayName: finalName,
-  avatarUrl: finalAvatar,
-  createdAt: now,
-  updatedAt: now
-};
-await setDoc(ref, newDoc);
-  
- console.log("Creating users doc payload:", newDoc);
-  
-  try {
-  // On essaye une création "pure"
-  await setDoc(ref, newDoc); // PAS de merge sur create
-} catch (e) {
-  // Si la doc existe déjà (course), on ne touche PAS createdAt
-  // On fait juste un patch safe
-  await setDoc(ref, {
-    email: newDoc.email,
+  const now = Timestamp.now();
+  const newDoc = {
+    email: (user.email || "").toLowerCase(),
     displayName: finalName,
     avatarUrl: finalAvatar,
-    updatedAt: Timestamp.now()
-  }, { merge: true });
-}
+    createdAt: now,
+    updatedAt: now
+  };
 
-return {
-  email: newDoc.email,
-  displayName: finalName,
-  avatarUrl: finalAvatar
-};
+  console.log("Creating users doc payload:", newDoc);
+
+  try {
+    // création "pure"
+    await setDoc(ref, newDoc);
+  } catch (e) {
+    // si la doc existe déjà (race), patch sans toucher createdAt
+    await setDoc(ref, {
+      email: newDoc.email,
+      displayName: finalName,
+      avatarUrl: finalAvatar,
+      updatedAt: Timestamp.now()
+    }, { merge: true });
+  }
+
+  return {
+    email: newDoc.email,
+    displayName: finalName,
+    avatarUrl: finalAvatar
+  };
 }
 
 export async function getUserProfile(uid) {
