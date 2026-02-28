@@ -218,24 +218,30 @@ export async function signupEmail({ email, password, displayName } = {}) {
   const unameRef = doc(db, "usernames", normalized);
 
   try {
-    // 2) Réserve le pseudo (transaction)
-    const claimed = await claimUsername(cred.user, name);
 
-    // 3) Update profil Auth
-    await updateProfile(cred.user, { displayName: claimed.original });
+  alert("STEP 2: claimUsername");
+  const claimed = await claimUsername(cred.user, name);
 
-    // 4) Crée le doc users/{uid} (il faut que rules CREATE acceptent)
-    await setDoc(doc(db, "users", cred.user.uid), {
-      email: (cred.user.email || "").toLowerCase(),
-      displayName: claimed.original,
-      avatarUrl: pickRandomAvatar(),
-      createdAt: serverTimestamp(),
-      updatedAt: serverTimestamp(),
-      username: claimed.original,
-      usernameNormalized: claimed.normalized
-    }); // <-- PAS de merge sur la création
+  alert("STEP 3: updateProfile");
+  await updateProfile(cred.user, { displayName: claimed.original });
 
-    return cred.user;
+  alert("STEP 4: setDoc users");
+
+  const ref = doc(db, "users", cred.user.uid);
+
+  await setDoc(ref, {
+    email: (cred.user.email || "").toLowerCase(),
+    displayName: claimed.original,
+    avatarUrl: pickRandomAvatar(),
+    createdAt: serverTimestamp(),
+    updatedAt: serverTimestamp(),
+    username: claimed.original,
+    usernameNormalized: claimed.normalized
+  });
+
+  alert("STEP 5: SUCCESS");
+
+  return cred.user;
 
   } catch (e) {
   // ✅ DEBUG iPad (affiche vraiment le code Firestore / Auth)
