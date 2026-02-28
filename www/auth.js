@@ -246,33 +246,31 @@ const userRef = doc(db, "users", cred.user.uid);
 const nowTs = Timestamp.now();
 const avatar = pickRandomAvatar();
 
-try {
-  const snap = await getDoc(userRef);
+const snap = await getDoc(userRef);
 
-  if (!snap.exists()) {
-    // CREATE (avec createdAt)
-    await setDoc(userRef, {
-      email: String(cred.user.email || "").toLowerCase(),
-      displayName: claimed.original,
-      avatarUrl: avatar,
-      username: claimed.original,
-      usernameNormalized: claimed.normalized,
-      createdAt: nowTs,
-      updatedAt: nowTs
-    });
-    step("STEP 5b: users doc CREATED");
-  } else {
-    // PATCH (sans toucher createdAt)
-    const prev = snap.data() || {};
-    await setDoc(userRef, {
-      displayName: claimed.original,
-      avatarUrl: prev.avatarUrl || avatar,
-      username: claimed.original,
-      usernameNormalized: claimed.normalized,
-      updatedAt: nowTs
-    }, { merge: true });
-    step("STEP 5b: users doc PATCHED");
-  }
+if (!snap.exists()) {
+  // CREATE (avec createdAt)
+  await setDoc(userRef, {
+    email: String(cred.user.email || "").toLowerCase(),
+    displayName: claimed.original,
+    avatarUrl: avatar,
+    username: claimed.original,
+    usernameNormalized: claimed.normalized,
+    createdAt: nowTs,
+    updatedAt: nowTs
+  });
+  step("STEP 5b: users doc CREATED");
+} else {
+  // PATCH (sans toucher createdAt)
+  await setDoc(userRef, {
+    displayName: claimed.original,
+    avatarUrl: snap.data()?.avatarUrl || avatar,
+    username: claimed.original,
+    usernameNormalized: claimed.normalized,
+    updatedAt: nowTs
+  }, { merge: true });
+  step("STEP 5b: users doc PATCHED");
+}
 
 } catch (e) {
   console.log("STEP 5 FAILED:", e);
