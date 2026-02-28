@@ -387,7 +387,13 @@ onAuthStateChanged(auth, async (user) => {
   window.dispatchEvent(new CustomEvent("tidoc:auth", { detail: base }));
 
   // ✅ complète avec Firestore (avatar/role/nom)
-  try {
+    try {
+
+    // ✅ si signup en cours, on laisse signupEmail gérer users/{uid}
+    if (window.__TIDOC_SIGNUP_IN_PROGRESS__) {
+      return;
+    }
+
     const profile = await ensureUserDoc(user);
 
     try {
