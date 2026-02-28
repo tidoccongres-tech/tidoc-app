@@ -224,13 +224,9 @@ export async function signupEmail({ email, password, displayName } = {}) {
 
   try {
 
-  alert("STEP 2: claimUsername");
   const claimed = await claimUsername(cred.user, name);
 
-  alert("STEP 3: updateProfile");
   await updateProfile(cred.user, { displayName: claimed.original });
-
-  alert("STEP 4: setDoc users");
 
 const userRef = doc(db, "users", cred.user.uid);
 const snapUser = await getDoc(userRef);
