@@ -231,7 +231,6 @@ export async function signupEmail({ email, password, displayName } = {}) {
     // 4) Auth profile name
     await updateProfile(cred.user, { displayName: claimed.original });
 
-    // 5) users/{uid}
     // 5) users/{uid}  ✅ robuste (create si absent, sinon patch)
 const userRef = doc(db, "users", cred.user.uid);
 const nowTs = Timestamp.now();
