@@ -232,21 +232,27 @@ export async function signupEmail({ email, password, displayName } = {}) {
 
   alert("STEP 4: setDoc users");
 
-  const ref = doc(db, "users", cred.user.uid);
+const userRef = doc(db, "users", cred.user.uid);
+const snapUser = await getDoc(userRef);
 
-  await setDoc(ref, {
-    email: (cred.user.email || "").toLowerCase(),
-    displayName: claimed.original,
-    avatarUrl: pickRandomAvatar(),
-    createdAt: serverTimestamp(),
-    updatedAt: serverTimestamp(),
-    username: claimed.original,
-    usernameNormalized: claimed.normalized
-  });
+const payload = {
+  email: (cred.user.email || "").toLowerCase(),
+  displayName: claimed.original,
+  avatarUrl: pickRandomAvatar(),
+  updatedAt: serverTimestamp(),
+  username: claimed.original,
+  usernameNormalized: claimed.normalized
+};
 
-  alert("STEP 5: SUCCESS");
+// ✅ createdAt seulement si le doc n’existe pas
+if (!snapUser.exists()) {
+  payload.createdAt = serverTimestamp();
+}
 
-  return cred.user;
+await setDoc(userRef, payload, { merge: true });
+
+alert("STEP 5: SUCCESS");
+return cred.user;
 
   } catch (e) {
   // ✅ DEBUG iPad (affiche vraiment le code Firestore / Auth)
