@@ -214,14 +214,12 @@ export async function signupEmail({ email, password, displayName } = {}) {
   };
 
   try {
-    step("STEP 0: START");
 
     if (!email || !password) throw new Error("Email + mot de passe requis.");
 
     const name = String(displayName || "").trim();
     if (!name) throw new Error("Pseudo requis.");
 
-    step("STEP 1: createUserWithEmailAndPassword");
     cred = await createUserWithEmailAndPassword(auth, email, password);
 
     step("STEP 2: wait onAuthStateChanged");
@@ -240,52 +238,49 @@ export async function signupEmail({ email, password, displayName } = {}) {
 
     await updateProfile(cred.user, { displayName: claimed.original });
 
-        step("STEP 5: transaction users/{uid}");
+     // STEP 5: écrire users/{uid}
+step("STEP 5: write users/{uid}");
 
-    const userRef = doc(db, "users", cred.user.uid);
-    const nowTs = Timestamp.now();
-    const avatar = pickRandomAvatar();
+const userRef = doc(db, "users", cred.user.uid);
+const nowTs = Timestamp.now();
+const avatar = pickRandomAvatar();
 
-    try {
-      await runTransaction(db, async (tx) => {
-        const uSnap = await tx.get(userRef);
+const createPayload = {
+  email: String(cred.user.email || "").toLowerCase(),
+  displayName: claimed.original,
+  avatarUrl: avatar,
+  username: claimed.original,
+  usernameNormalized: claimed.normalized,
+  createdAt: nowTs,
+  updatedAt: nowTs
+};
 
-        if (!uSnap.exists()) {
-          tx.set(userRef, {
-            email: String(cred.user.email || "").toLowerCase(),
-            displayName: claimed.original,
-            avatarUrl: avatar,
-            username: claimed.original,
-            usernameNormalized: claimed.normalized,
-            createdAt: nowTs,
-            updatedAt: nowTs,
-          });
-        } else {
-          const prev = uSnap.data() || {};
-          tx.set(
-            userRef,
-            {
-              displayName: claimed.original,
-              avatarUrl: String(prev.avatarUrl || avatar),
-              username: claimed.original,
-              usernameNormalized: claimed.normalized,
-              updatedAt: nowTs,
-            },
-            { merge: true }
-          );
-        }
-      });
-
-      step("STEP 5b: transaction OK");
-    } catch (e) {
-      console.log("STEP 5 FAILED:", e);
-      alert(
-        "STEP 5 FAILED:\n" +
-          (e?.code || "") + "\n" +
-          (e?.message || e)
-      );
-      throw e;
-    }
+try {
+  // 1) on tente une création "pure"
+  await setDoc(userRef, createPayload);
+  step("STEP 5b: users doc CREATED");
+} catch (e) {
+  // 2) si ça existe déjà, on patch SANS toucher createdAt
+  const code = e?.code || "";
+  if (code === "already-exists") {
+    await setDoc(
+      userRef,
+      {
+        displayName: claimed.original,
+        avatarUrl: avatar,
+        username: claimed.original,
+        usernameNormalized: claimed.normalized,
+        updatedAt: nowTs
+      },
+      { merge: true }
+    );
+    step("STEP 5b: users doc PATCHED");
+  } else {
+    console.log("STEP 5 FAILED:", e);
+    alert("STEP 5 FAILED:\n" + code + "\n" + (e?.message || e));
+    throw e;
+  }
+}
 
     step("STEP 6: cache + events");
     try { localStorage.setItem("tidoc_name", claimed.original); } catch (_) {}
