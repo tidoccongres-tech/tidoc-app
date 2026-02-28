@@ -176,10 +176,12 @@ export async function claimUsername(user, displayNameRaw) {
   await runTransaction(db, async (tx) => {
     const snap = await tx.get(ref);
     if (snap.exists()) throw new Error("Pseudo déjà pris 😕");
+
+    // ✅ IMPORTANT : pas de serverTimestamp ici
     tx.set(ref, {
       uid: user.uid,
-      original,
-      createdAt: serverTimestamp()
+      original
+      // createdAt supprimé
     });
   });
 
