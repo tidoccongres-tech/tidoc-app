@@ -239,39 +239,38 @@ export async function signupEmail({ email, password, displayName } = {}) {
     await updateProfile(cred.user, { displayName: claimed.original });
 
      // STEP 5: écrire users/{uid}
-// STEP 5: écrire users/{uid}
 step("STEP 5: write users/{uid}");
 
 const userRef = doc(db, "users", cred.user.uid);
 const nowTs = Timestamp.now();
 const avatar = pickRandomAvatar();
 
-const snap = await getDoc(userRef);
+try {
+  const snap = await getDoc(userRef);
 
-if (!snap.exists()) {
-  // CREATE (avec createdAt)
-  await setDoc(userRef, {
-    email: String(cred.user.email || "").toLowerCase(),
-    displayName: claimed.original,
-    avatarUrl: avatar,
-    username: claimed.original,
-    usernameNormalized: claimed.normalized,
-    createdAt: nowTs,
-    updatedAt: nowTs
-  });
-  step("STEP 5b: users doc CREATED");
-} else {
-  // PATCH (sans toucher createdAt)
-  await setDoc(userRef, {
-    displayName: claimed.original,
-    avatarUrl: snap.data()?.avatarUrl || avatar,
-    username: claimed.original,
-    usernameNormalized: claimed.normalized,
-    updatedAt: nowTs
-  }, { merge: true });
-  step("STEP 5b: users doc PATCHED");
-}
-
+  if (!snap.exists()) {
+    // CREATE (avec createdAt)
+    await setDoc(userRef, {
+      email: String(cred.user.email || "").toLowerCase(),
+      displayName: claimed.original,
+      avatarUrl: avatar,
+      username: claimed.original,
+      usernameNormalized: claimed.normalized,
+      createdAt: nowTs,
+      updatedAt: nowTs
+    });
+    step("STEP 5b: users doc CREATED");
+  } else {
+    // PATCH (sans toucher createdAt)
+    await setDoc(userRef, {
+      displayName: claimed.original,
+      avatarUrl: snap.data()?.avatarUrl || avatar,
+      username: claimed.original,
+      usernameNormalized: claimed.normalized,
+      updatedAt: nowTs
+    }, { merge: true });
+    step("STEP 5b: users doc PATCHED");
+  }
 } catch (e) {
   console.log("STEP 5 FAILED:", e);
   alert("STEP 5 FAILED:\n" + (e?.code || "") + "\n" + (e?.message || e));
