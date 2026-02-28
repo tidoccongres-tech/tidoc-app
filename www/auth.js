@@ -240,7 +240,7 @@ export async function signupEmail({ email, password, displayName } = {}) {
 
     await updateProfile(cred.user, { displayName: claimed.original });
 
-    step("STEP 5: transaction users/{uid}");
+    step("step("STEP 5: transaction users/{uid}");
 const userRef = doc(db, "users", cred.user.uid);
 const nowTs = Timestamp.now();
 const avatar = pickRandomAvatar();
@@ -261,7 +261,7 @@ try {
         updatedAt: nowTs,
       });
     } else {
-      // UPDATE
+      // UPDATE (merge)
       const prev = uSnap.data() || {};
       tx.set(
         userRef,
@@ -276,6 +276,18 @@ try {
       );
     }
   });
+
+  step("STEP 5b: transaction OK");
+
+} catch (e) {
+  console.log("STEP 5 FAILED:", e);
+  alert(
+    "STEP 5 FAILED:\n" +
+    (e?.code || "") + "\n" +
+    (e?.message || e)
+  );
+  throw e;
+}
 
   step("STEP 5b: transaction OK");
 
