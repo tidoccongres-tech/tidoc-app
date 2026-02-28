@@ -253,9 +253,13 @@ await setDoc(userRef, payload, { merge: true });
 
 // ✅ cache + refresh UI immédiat (header)
 try { localStorage.setItem("tidoc_name", claimed.original); } catch(_){}
-window.dispatchEvent(new CustomEvent("tidoc:auth", {
-  detail: { displayName: claimed.original }
-}));    
+try { localStorage.setItem("tidoc_avatar", payload.avatarUrl); } catch(_){}
+
+window.dispatchEvent(new CustomEvent("tidoc:avatar", {
+  detail: { url: payload.avatarUrl }
+}));
+
+window.dispatchEvent(new CustomEvent("tidoc:auth"));
 
 alert("STEP 5: SUCCESS");
 return cred.user;
