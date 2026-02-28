@@ -202,82 +202,96 @@ function waitForAuthReady() {
 // AUTH ACTIONS
 // =====================
 export async function signupEmail({ email, password, displayName } = {}) {
-  // ✅ évite course avec ensureUserDoc pendant signup
   window.__TIDOC_SIGNUP_IN_PROGRESS__ = true;
 
   let cred = null;
 
+  // helper debug
+  const step = (label) => {
+    console.log("[SIGNUP]", label);
+    // tu peux commenter l’alert si ça t’énerve
+    alert(label);
+  };
+
   try {
+    step("STEP 0: START");
+
     if (!email || !password) throw new Error("Email + mot de passe requis.");
 
-    const name = (displayName || "").trim();
+    const name = String(displayName || "").trim();
     if (!name) throw new Error("Pseudo requis.");
 
-    // 1) Auth
+    step("STEP 1: createUserWithEmailAndPassword");
     cred = await createUserWithEmailAndPassword(auth, email, password);
 
-    // 2) attendre que l'user soit bien "visible"
+    step("STEP 2: wait onAuthStateChanged");
     await new Promise((resolve) => {
       const unsub = onAuthStateChanged(auth, (u) => {
-        if (u) { unsub(); resolve(u); }
+        if (u) {
+          unsub();
+          resolve(u);
+        }
       });
     });
 
+    step("STEP 2b: getIdToken");
     await cred.user.getIdToken(true);
 
-    // 3) Reserve pseudo
+    step("STEP 3: claimUsername");
     const claimed = await claimUsername(cred.user, name);
 
-    // 4) Auth profile name
+    step("STEP 4: updateProfile");
     await updateProfile(cred.user, { displayName: claimed.original });
 
-    // 5) users/{uid}  ✅ robuste (create si absent, sinon patch)
-const userRef = doc(db, "users", cred.user.uid);
-const nowTs = Timestamp.now();
+    step("STEP 5: transaction users/{uid}");
+    const userRef = doc(db, "users", cred.user.uid);
+    const nowTs = Timestamp.now();
+    const avatar = pickRandomAvatar();
 
-const avatar = pickRandomAvatar();
+    await runTransaction(db, async (tx) => {
+      const uSnap = await tx.get(userRef);
 
-await runTransaction(db, async (tx) => {
-  const uSnap = await tx.get(userRef);
-
-  if (!uSnap.exists()) {
-    // CREATE
-    tx.set(userRef, {
-      email: (cred.user.email || "").toLowerCase(),
-      displayName: claimed.original,
-      avatarUrl: avatar,
-
-      username: claimed.original,
-      usernameNormalized: claimed.normalized,
-
-      createdAt: nowTs,
-      updatedAt: nowTs
+      if (!uSnap.exists()) {
+        // CREATE
+        tx.set(userRef, {
+          email: String(cred.user.email || "").toLowerCase(),
+          displayName: claimed.original,
+          avatarUrl: avatar,
+          username: claimed.original,
+          usernameNormalized: claimed.normalized,
+          createdAt: nowTs,
+          updatedAt: nowTs,
+        });
+      } else {
+        // UPDATE MINIMAL (merge)
+        const prev = uSnap.data() || {};
+        tx.set(
+          userRef,
+          {
+            displayName: claimed.original,
+            avatarUrl: String(prev.avatarUrl || avatar),
+            username: claimed.original,
+            usernameNormalized: claimed.normalized,
+            updatedAt: nowTs,
+          },
+          { merge: true }
+        );
+      }
     });
-  } else {
-    // UPDATE MINIMAL (si rules autorisent update partiel)
-    tx.set(userRef, {
-      displayName: claimed.original,
-      avatarUrl: uSnap.data()?.avatarUrl || avatar, // garde l'existant si déjà présent
-      username: claimed.original,
-      usernameNormalized: claimed.normalized,
-      updatedAt: nowTs
-    }, { merge: true });
-  }
-});
 
-// ✅ cache + refresh UI immédiat (header)
-try { localStorage.setItem("tidoc_name", claimed.original); } catch(_){}
-try { localStorage.setItem("tidoc_avatar", avatar); } catch(_){}
+    step("STEP 6: cache + events");
+    try { localStorage.setItem("tidoc_name", claimed.original); } catch (_) {}
+    try { localStorage.setItem("tidoc_avatar", avatar); } catch (_) {}
 
-window.dispatchEvent(new CustomEvent("tidoc:avatar", { detail: { url: avatar } }));
-window.dispatchEvent(new CustomEvent("tidoc:auth"));
+    window.dispatchEvent(new CustomEvent("tidoc:avatar", { detail: { url: avatar } }));
+    window.dispatchEvent(new CustomEvent("tidoc:auth"));
 
-    alert("STEP 5: SUCCESS");
+    step("STEP 7: SUCCESS");
     return cred.user;
 
   } catch (e) {
     const code = e?.code || "no-code";
-    const msg  = e?.message || String(e);
+    const msg = e?.message || String(e);
 
     console.log("SIGNUP ERROR CODE:", code);
     console.log("SIGNUP ERROR MSG :", msg);
@@ -292,7 +306,6 @@ window.dispatchEvent(new CustomEvent("tidoc:auth"));
     window.__TIDOC_SIGNUP_IN_PROGRESS__ = false;
   }
 }
-
 export async function loginEmail({ email, password } = {}) {
   if (!email || !password) throw new Error("Email + mot de passe requis.");
   const cred = await signInWithEmailAndPassword(auth, email, password);
