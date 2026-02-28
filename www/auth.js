@@ -251,6 +251,12 @@ if (!snapUser.exists()) {
 
 await setDoc(userRef, payload, { merge: true });
 
+// ✅ cache + refresh UI immédiat (header)
+try { localStorage.setItem("tidoc_name", claimed.original); } catch(_){}
+window.dispatchEvent(new CustomEvent("tidoc:auth", {
+  detail: { displayName: claimed.original }
+}));    
+
 alert("STEP 5: SUCCESS");
 return cred.user;
 
