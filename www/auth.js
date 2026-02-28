@@ -262,6 +262,7 @@ export async function signupEmail({ email, password, displayName } = {}) {
 
   throw e;
 }
+  }
 
 export async function loginEmail({ email, password } = {}) {
   if (!email || !password) throw new Error("Email + mot de passe requis.");
