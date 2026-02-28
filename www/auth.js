@@ -202,6 +202,11 @@ function waitForAuthReady() {
 // AUTH ACTIONS
 // =====================
 export async function signupEmail({ email, password, displayName } = {}) {
+
+  // ✅ évite course avec ensureUserDoc pendant signup
+  window.__TIDOC_SIGNUP_IN_PROGRESS__ = true;
+
+  try {
   if (!email || !password) throw new Error("Email + mot de passe requis.");
 
   const name = (displayName || "").trim();
@@ -266,26 +271,43 @@ window.dispatchEvent(new CustomEvent("tidoc:auth"));
 alert("STEP 5: SUCCESS");
 return cred.user;
 
-  } catch (e) {
-  // ✅ DEBUG iPad (affiche vraiment le code Firestore / Auth)
-  const code = e?.code || "no-code";
-  const msg  = e?.message || String(e);
+   } catch (e) {
 
-  console.log("SIGNUP ERROR CODE:", code);
-  console.log("SIGNUP ERROR MSG :", msg);
-  alert("Signup error:\n" + code + "\n" + msg);
+    const code = e?.code || "no-code";
+    const msg  = e?.message || String(e);
 
-  // rollback pseudo si réservé
-  try {
-    // await deleteDoc(unameRef);
-  } catch (_) {}
+    console.log("SIGNUP ERROR CODE:", code);
+    console.log("SIGNUP ERROR MSG :", msg);
+    alert("Signup error:\n" + code + "\n" + msg);
 
-  // rollback auth user pour éviter comptes fantômes
-  try { await deleteUser(cred.user); } catch (_) {}
+    try { await deleteUser(cred.user); } catch (_) {}
 
-  throw e;
-}
+    throw e;
+
+  } finally {
+
+    // ✅ on libère le flag
+    window.__TIDOC_SIGNUP_IN_PROGRESS__ = false;
   }
+}  } catch (e) {
+
+    const code = e?.code || "no-code";
+    const msg  = e?.message || String(e);
+
+    console.log("SIGNUP ERROR CODE:", code);
+    console.log("SIGNUP ERROR MSG :", msg);
+    alert("Signup error:\n" + code + "\n" + msg);
+
+    try { await deleteUser(cred.user); } catch (_) {}
+
+    throw e;
+
+  } finally {
+
+    // ✅ on libère le flag
+    window.__TIDOC_SIGNUP_IN_PROGRESS__ = false;
+  }
+}
 
 export async function loginEmail({ email, password } = {}) {
   if (!email || !password) throw new Error("Email + mot de passe requis.");
