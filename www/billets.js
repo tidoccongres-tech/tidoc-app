@@ -1163,7 +1163,7 @@ function renderPartyTicketsList(parties = []) {
   `).join("");
 
   listBox.innerHTML = `
-    <div style="margin-top:6px; font-weight:900; color:var(--tidoc);">🎭 Billets Ti’Masqué importés</div>
+    <div style="margin-top:6px; font-weight:900; color:var(--tidoc);">🎭 Billets The Ti’Rendez-vous importés</div>
     <div style="margin-top:10px; display:flex; flex-direction:column; gap:10px;">
       ${items}
     </div>
