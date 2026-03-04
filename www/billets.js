@@ -573,7 +573,7 @@ async function savePartyTicket({ qrText, holderName, ticketNumber, partyTitle })
   const id = `${u.uid}_${qrHash}`;
   const ref = doc(db, "userPartyTickets", id);
 
-  const title = String(partyTitle || "Ti’Masqué").trim();
+  const title = String(partyTitle || "The Ti'Rendez-vous").trim();
   const partyKey = normalizeKey(title) || "ti-masque";
 
   await setDoc(ref, {
@@ -593,10 +593,10 @@ async function deletePartyTicketByHash(qrHash) {
   const u = auth.currentUser;
   if (!u) { setStatus("🔒 Connecte-toi."); return; }
 
-  const ok = confirm("Supprimer ce billet Ti’Masqué ?");
+  const ok = confirm("Supprimer ce billet The Ti'Rendez-vous ?");
   if (!ok) return;
 
-  setStatus("⏳ Suppression du billet Ti’Masqué…");
+  setStatus("⏳ Suppression du billet The Ti'Rendez-vous…");
 
   try {
     const id = `${u.uid}_${qrHash}`;
@@ -614,10 +614,10 @@ async function deletePartyTicketByHash(qrHash) {
     }
 
     await loadSavedTicket();
-    setStatus("✅ Billet Ti’Masqué supprimé");
+    setStatus("✅ Billet The Ti'Rendez-vous supprimé");
   } catch (e) {
     console.error("deletePartyTicketByHash error:", e);
-    setStatus("❌ " + (e?.message || "Erreur suppression billet Ti’Masqué"));
+    setStatus("❌ " + (e?.message || "Erreur suppression billet The Ti'Rendez-vous"));
   }
 }
 
@@ -852,7 +852,7 @@ async function ocrCanvas(canvas) {
 // Parsing (PDF texte / OCR texte)
 // =====================
 // à mettre UNE FOIS en haut du fichier (hors fonction)
-const PARTY_DEFAULT_TITLE = "Ti’Masqué";
+const PARTY_DEFAULT_TITLE = "The Ti'Rendez-vous";
 const PARTY_KEYWORDS = [
   "ti-masque",
   "ti-masqué",
@@ -1149,16 +1149,16 @@ function renderPartyTicketsList(parties = []) {
       <button class="delete-btn party-del-btn"
               type="button"
               data-party-hash="${escapeHTML(p.qrHash || "")}"
-              aria-label="Supprimer le billet Ti’Masqué"
+              aria-label="Supprimer le billet The Ti'Rendez-vous"
               title="Supprimer"
               style="position:absolute; top:10px; right:10px;">
         ${TRASH_TIDOC_SVG}
       </button>
 
-      <div style="font-weight:900; color:#0f4f60;">🎭 ${escapeHTML(p.partyTitle || "Ti’Masqué")}</div>
+      <div style="font-weight:900; color:#0f4f60;">🎭 ${escapeHTML(p.partyTitle || "The Ti'Rendez-vous")}</div>
       <div style="margin-top:6px;"><b>Nom :</b> ${escapeHTML(p.holderName || "—")}</div>
       <div><b>N° billet :</b> ${escapeHTML(p.ticketNumber || "—")}</div>
-      <div style="margin-top:6px;"><b>Type :</b> Ti’Masqué</div>
+      <div style="margin-top:6px;"><b>Type :</b> The Ti'Rendez-vous</div>
     </div>
   `).join("");
 
@@ -1410,7 +1410,7 @@ function openScanMode({ mainTicket = null, workshops = [], parties = [] } = {}) 
     `;
 
     section.innerHTML = `
-      <div style="font-weight:950; color:var(--tidoc);">🎭 Ti’Masqué — QR à scanner</div>
+      <div style="font-weight:950; color:var(--tidoc);">🎭 The Ti'Rendez-vous — QR à scanner</div>
       <div id="scanPartyWrap" style="margin-top:12px; display:flex; flex-direction:column; gap:12px;"></div>
     `;
 
@@ -1435,7 +1435,7 @@ function openScanMode({ mainTicket = null, workshops = [], parties = [] } = {}) 
       card.innerHTML = `
         <div style="min-width:220px;">
           <div style="font-weight:950; color:#0f4f60; margin-bottom:8px;">
-            🎭 ${escapeHTML(p.partyTitle || "Ti’Masqué")}
+            🎭 ${escapeHTML(p.partyTitle || "The Ti'Rendez-vous")}
           </div>
           <div id="${qrid}" style="width:220px;height:220px; background:#fff; border-radius:12px; padding:8px;"></div>
         </div>
@@ -1444,7 +1444,7 @@ function openScanMode({ mainTicket = null, workshops = [], parties = [] } = {}) 
   <div style="font-weight:900;">${escapeHTML(p.holderName || "—")}</div>
   <div style="opacity:.85; font-weight:800;">N° billet : ${escapeHTML(p.ticketNumber || "—")}</div>
   <div style="margin-top:6px; font-size:12px; font-weight:800; opacity:.7;">
-    Montre ce QR à l’entrée de la soirée Ti’Masqué.
+    Montre ce QR à l’entrée de la soirée The Ti'Rendez-vous.
   </div>
 </div>
       `;
@@ -1700,8 +1700,8 @@ const p = String(packKey || "").toLowerCase();
       await loadSavedTicket();
 
       setStatus(r?.already
-        ? "ℹ️ Billet Ti’Masqué déjà importé"
-        : "✅ Billet Ti’Masqué importé");
+        ? "ℹ️ Billet The Ti'Rendez-vous déjà importé"
+        : "✅ Billet The Ti'Rendez-vous importé");
 
       return;
     }
