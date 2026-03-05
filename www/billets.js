@@ -617,7 +617,7 @@ async function savePartyTicket({ qrText, holderName, ticketNumber, partyTitle })
   const ref = doc(db, "userPartyTickets", id);
 
   const title = String(partyTitle || "The Ti'Rendez-vous").trim();
-  const partyKey = normalizeKey(title) || "ti-masque";
+  const partyKey = normalizeKey(title) || "ti-rendez-vous";
 
   await setDoc(ref, {
     uid: u.uid,
@@ -897,16 +897,16 @@ async function ocrCanvas(canvas) {
 // à mettre UNE FOIS en haut du fichier (hors fonction)
 const PARTY_DEFAULT_TITLE = "The Ti'Rendez-vous";
 const PARTY_KEYWORDS = [
-  "ti-masque",
-  "ti-masqué",
-  "ti masque",
-  "ti masqué",
-  "timasque",
-  "timasqué",
-  "ti’masqué",
-  "ti'masqué",
-  "ti’masque",
-  "ti'masque",
+  "ti-rendez-vous",
+  "ti rendez-vous",
+  "tirendezvous",
+  "ti'rendez-vous",
+  "ti’rendez-vous",
+  "the ti'rendez-vous",
+  "the ti’rendez-vous",
+  "the ti rendez-vous",
+  "rendez-vous",
+  "rendez vous",
 ];
 
 function parseMetaFromText(raw = "") {
