@@ -11,6 +11,49 @@ import {
   doc, getDoc, setDoc, updateDoc, deleteDoc, runTransaction,
   serverTimestamp, collection, query, where, getDocs
 } from "https://www.gstatic.com/firebasejs/10.12.4/firebase-firestore.js";
+
+async function hasRegistration(eventId) {
+  const u = auth.currentUser;
+  if (!u) return false;
+  const regRef = doc(db, "events", eventId, "registrations", u.uid);
+  const snap = await getDoc(regRef);
+  return snap.exists();
+}
+
+async function hasWorkshopTicketForEvent({ eventTitle, eventKey }) {
+  const u = auth.currentUser;
+  if (!u) return false;
+
+  // on check dans userWorkshopTickets
+  // (adaptable: workshopKey ou workshopTitle)
+  const key = String(eventKey || "").trim();
+  const title = String(eventTitle || "").trim();
+
+  // 1) match par workshopKey
+  if (key) {
+    const q1 = query(
+      collection(db, "userWorkshopTickets"),
+      where("uid", "==", u.uid),
+      where("workshopKey", "==", key)
+    );
+    const s1 = await getDocs(q1);
+    if (!s1.empty) return true;
+  }
+
+  // 2) match par workshopTitle
+  if (title) {
+    const q2 = query(
+      collection(db, "userWorkshopTickets"),
+      where("uid", "==", u.uid),
+      where("workshopTitle", "==", title)
+    );
+    const s2 = await getDocs(q2);
+    if (!s2.empty) return true;
+  }
+
+  return false;
+}
+
 // =====================
 // UI
 // =====================
@@ -1573,6 +1616,65 @@ async function loadSavedTicket() {
 }
 
 // =====================
+// AUTO-REGISTER WORKSHOP (quand billet workshop importé)
+// =====================
+async function findWorkshopEventIdByKeyOrTitle({ workshopKey, workshopTitle }) {
+  const key = String(workshopKey || "").trim();
+  const title = String(workshopTitle || "").trim();
+
+  // 1) try match by workshopKey
+  if (key) {
+    try {
+      const q1 = query(
+        collection(db, "events"),
+        where("type", "==", "workshop"),
+        where("key", "==", key)
+      );
+      const s1 = await getDocs(q1);
+      if (!s1.empty) return s1.docs[0].id;
+    } catch (_) {}
+  }
+
+  // 2) fallback match by title
+  if (title) {
+    try {
+      const q2 = query(
+        collection(db, "events"),
+        where("type", "==", "workshop"),
+        where("title", "==", title)
+      );
+      const s2 = await getDocs(q2);
+      if (!s2.empty) return s2.docs[0].id;
+    } catch (_) {}
+  }
+
+  return null;
+}
+
+async function autoRegisterWorkshopFromTicket({ workshopKey, workshopTitle }) {
+  const u = auth.currentUser;
+  if (!u) return { ok: false, reason: "no-auth" };
+
+  const eventId = await findWorkshopEventIdByKeyOrTitle({ workshopKey, workshopTitle });
+  if (!eventId) return { ok: false, reason: "no-matching-event" };
+
+  const regRef = doc(db, "events", eventId, "registrations", u.uid);
+  const regSnap = await getDoc(regRef);
+
+  // déjà inscrit => rien à faire
+  if (regSnap.exists()) return { ok: true, already: true, eventId };
+
+  // create registration (rules OK si { uid: u.uid })
+  await setDoc(regRef, {
+    uid: u.uid,
+    createdAt: serverTimestamp(),
+    via: "ticket_workshop"
+  });
+
+  return { ok: true, created: true, eventId };
+}
+
+// =====================
 // MAIN IMPORT HANDLER
 // =====================
 async function handleFile(file) {
@@ -1708,23 +1810,41 @@ const p = String(packKey || "").toLowerCase();
 
     // 🧪 Workshop
     if (p === "workshop") {
-      const r = await saveWorkshopTicket({
-        qrText,
-        packKey,
-        holderName,
-        ticketNumber,
-        workshopTitle
-      });
+  const r = await saveWorkshopTicket({
+    qrText,
+    packKey,
+    holderName,
+    ticketNumber,
+    workshopTitle
+  });
 
-      await syncNameFromTicket(holderName);
-      await loadSavedTicket();
+  // ✅ auto-inscription au workshop correspondant
+  try {
+    const workshopKey = normalizeKey(workshopTitle || "");
+    const reg = await autoRegisterWorkshopFromTicket({
+      workshopKey,
+      workshopTitle
+    });
 
-      setStatus(r?.already
-        ? "ℹ️ Billet workshop déjà importé"
-        : "✅ Billet workshop importé");
-
-      return;
+    // optionnel : feedback
+    if (reg?.ok && reg?.created) {
+      console.log("✅ Auto-registered workshop:", reg.eventId);
+    } else if (reg?.reason === "no-matching-event") {
+      console.log("ℹ️ Aucun event workshop ne matche ce billet (title/key).");
     }
+  } catch (e) {
+    console.warn("autoRegisterWorkshopFromTicket error:", e);
+  }
+
+  await syncNameFromTicket(holderName);
+  await loadSavedTicket();
+
+  setStatus(r?.already
+    ? "ℹ️ Billet workshop déjà importé"
+    : "✅ Billet workshop importé (inscription auto si event trouvé)");
+
+  return;
+}
 
     // 🎫 Billet principal
     await saveTicketToFirestore({
