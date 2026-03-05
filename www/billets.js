@@ -1011,7 +1011,7 @@ function parseMetaFromText(raw = "") {
   if (looksTiMasque) {
     // Si une ligne du type "Ti-Masqué : NOM", on récupère NOM
     for (const l of lines) {
-      const m = l.match(/ti\s*[-’']?\s*masqu[eé]\s*[:\-–—]?\s*(.+)$/i);
+      const m = l.match(/(?:the\s*)?ti\s*[-’']?\s*(?:masqu[eé]|rendez[- ]?vous)\s*[:\-–—]?\s*(.+)$/i);
       if (m && m[1]) {
         const tail = String(m[1]).trim();
         if (tail && tail.length >= 2) { partyTitle = tail; break; }
