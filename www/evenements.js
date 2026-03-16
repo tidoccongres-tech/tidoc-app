@@ -10,9 +10,7 @@
 import * as AuthMod from "./auth.js";
 import {
   collection, addDoc, getDocs, getDoc, doc, deleteDoc,
-  runTransaction, serverTimestamp, query, orderBy, Timestamp, limit,
-  setDoc, where,
-  getCountFromServer
+  serverTimestamp, query, orderBy, Timestamp
 } from "https://www.gstatic.com/firebasejs/10.12.4/firebase-firestore.js";
 import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.4/firebase-auth.js";
 
@@ -113,30 +111,6 @@ const TRASH_SVG = `
 // HELPERS
 // =====================
 // ---- TIER NORMALISATION (robuste) ----
-function tierFromPackKey(pk = "") {
-  const s = String(pk || "")
-    .replaceAll("\u00A0", " ")
-    .trim()
-    .toLowerCase();
-
-  // accepte anciennes valeurs / variantes
-  if (s.includes("premium") || s.includes("prem")) return "premium";
-  if (s.includes("standard") || s.includes("stand")) return "standard";
-  if (s.includes("essentiel") || s.includes("essent") || s.includes("essential")) return "essentiel";
-
-  return ""; // pas un tier promo
-}
-
-// ✅ AJOUTE ICI :
-function normalizePackKey(pk=""){
-  const s = String(pk || "").trim().toLowerCase();
-  if (s.includes("staff")) return "staff";
-  if (s.includes("premium") || s.includes("prem")) return "premium";
-  if (s.includes("standard") || s.includes("stand")) return "standard";
-  if (s.includes("essentiel") || s.includes("essent")) return "essentiel";
-  if (s.includes("workshop") || s.includes("atelier")) return "workshop";
-  return s;
-}
 
 function isAdmin(){
   const u = auth.currentUser;
@@ -178,17 +152,15 @@ function showForm(show){
 
 function clearForm(){
   const map = {
-    eventDate: "",
-    eventStart: "",
-    eventEnd: "",
-    eventTitle: "",
-    eventSpeaker: "", // ✅ NEW
-    eventPlace: "",
-    eventDesc: "",
-    eventCapacity: "",
-    eventCapacityStaff: "0",
-    eventType: "Conférence"
-  };
+  eventDate: "",
+  eventStart: "",
+  eventEnd: "",
+  eventTitle: "",
+  eventSpeaker: "",
+  eventPlace: "",
+  eventDesc: "",
+  eventType: "Conférence"
+};
 
   Object.keys(map).forEach((id)=>{
     const el = document.getElementById(id);
@@ -202,131 +174,6 @@ function applyAdminUI(){
   const admin = isAdmin();
   if (openEventForm) openEventForm.style.display = admin ? "flex" : "none";
   if (!admin) showForm(false);
-}
-
-// workshopKey normalisation
-function normalizeKey(v = "") {
-  return String(v || "")
-    .trim()
-    .toLowerCase()
-    .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
-    .replace(/[^a-z0-9._ -]/g, "")
-    .replace(/\s+/g, " ")
-    .replaceAll(" ", "-");
-}
-
-function isWorkshopEvent(evType=""){
-  return String(evType).toLowerCase().includes("workshop");
-}
-
-function getEventWorkshopKey(e){
-  const explicit = String(e.workshopKey || "").trim();
-  return explicit ? explicit : normalizeKey(String(e.title || ""));
-}
-
-async function updateWorkshopMeta(eventId, { helloAssoUrl, workshopKey } = {}){
-  if (!isAdmin()) return alert("Réservé à l’admin Ti’Doc.");
-
-  const evRef = doc(db, "events", eventId);
-
-  const payload = {};
-  if (typeof helloAssoUrl === "string") payload.helloAssoUrl = helloAssoUrl.trim();
-  if (typeof workshopKey === "string") payload.workshopKey = workshopKey.trim();
-
-  if ("helloAssoUrl" in payload && payload.helloAssoUrl && !/^https?:\/\//i.test(payload.helloAssoUrl)){
-    alert("Le lien HelloAsso doit commencer par http(s)://");
-    return;
-  }
-  if ("workshopKey" in payload){
-    payload.workshopKey = normalizeKey(payload.workshopKey);
-  }
-
-  try{
-    await setDoc(evRef, { ...payload, updatedAt: serverTimestamp() }, { merge:true });
-  } catch(e){
-    console.log("updateWorkshopMeta error:", e);
-    alert("Impossible de modifier (rules ?).");
-  }
-}
-
-// =====================
-// RIGHTS / TICKET
-// =====================
-async function getMyRights(){
-  const uid = auth.currentUser?.uid;
-  if (!uid) return { ok:false, reason:"nologin" };
-
-  const tSnap = await getDoc(doc(db, "userTickets", uid));
-  if (!tSnap.exists()) return { ok:false, reason:"noticket" };
-
-  const packKey = normalizePackKey(tSnap.data()?.packKey || "");
-  const pack = PACKS[packKey];
-  
-  if (!pack) return { ok:false, reason:"badpack" };
-  const uSnap = await getDoc(doc(db, "userUsage", uid));
-  const usage = uSnap.exists() ? (uSnap.data() || {}) : {};
-
-  const confUsed = Number(usage.conferenceUsed || 0);
-  const wsUsed   = Number(usage.workshopUsed || 0);
-  const otherUsed = Number(usage.otherUsed || 0);
-
-  // ✅ IMPORTANT: otherAllowed exist (sinon crash sur events type "Autre")
-  const otherAllowed = 9999;
-
-  return {
-    ok:true,
-    packKey,
-    isStaff: packKey === "staff",
-
-    confUsed,
-    wsUsed,
-    otherUsed,
-
-    wsAllowed: Number(pack.workshopDiscountPacks ?? 0),
-    confAllowed: Number(pack.conferencesAllowed ?? 0),
-    otherAllowed,
-
-    wsLeft: Math.max(0, Number(pack.workshopDiscountPacks ?? 0) - wsUsed),
-    confLeft: Math.max(0, Number(pack.conferencesAllowed ?? 0) - confUsed),
-    otherLeft: Math.max(0, otherAllowed - otherUsed),
-  };
-}
-
-async function requireTicketOrRedirect(){
-  const r = await getMyRights();
-  if (r.ok) return r;
-
-  if (r.reason === "noticket" || r.reason === "badpack") {
-    alert("Tu dois importer ton billet pour t’inscrire.");
-    location.href = "./billets.html";
-    return null;
-  }
-  alert("Connexion requise.");
-  return null;
-}
-
-// =====================
-// WORKSHOP ACCESS (tickets)
-// =====================
-async function loadMyWorkshopKeys(){
-  const uid = auth.currentUser?.uid;
-  if (!uid) return new Set();
-
-  const keys = new Set();
-  try{
-    const qy = query(collection(db, "userWorkshopTickets"), where("uid", "==", uid), limit(500));
-    const snap = await getDocs(qy);
-    snap.forEach((d)=>{
-      const data = d.data() || {};
-      const wk = String(data.workshopKey || "");
-      const title = String(data.workshopTitle || "");
-      if (wk) keys.add(wk);
-      else if (title) keys.add(normalizeKey(title));
-    });
-  } catch(e){
-    console.log("loadMyWorkshopKeys error:", e);
-  }
-  return keys;
 }
 
 // =====================
@@ -344,13 +191,11 @@ async function createEvent(){
     const place   = document.getElementById("eventPlace")?.value?.trim() || "";
     const type    = document.getElementById("eventType")?.value || "Autre";
     const desc    = document.getElementById("eventDesc")?.value?.trim() || "";
-    const capacity      = Number(document.getElementById("eventCapacity")?.value || 0);
-    const capacityStaff = Number(document.getElementById("eventCapacityStaff")?.value || 0);
 
-    if (capacity < 0 || capacityStaff < 0) { showMsg("Les places doivent être >= 0."); return; }
-    if ((capacity + capacityStaff) < 1) { showMsg("Ajoute au moins 1 place (public + staff)."); return; }
-    if (!d || !title) { showMsg("Il faut au minimum une date + un titre."); return; }
-
+if (!d || !title) {
+  showMsg("Il faut au minimum une date + un titre.");
+  return;
+}
     const startHHMM = start || "00:00";
     const [sh, sm] = startHHMM.split(":").map(Number);
     const startDate = new Date(d + "T00:00:00");
@@ -365,29 +210,17 @@ async function createEvent(){
       endAt = Timestamp.fromDate(endDate);
     }
 
-    const base = {
+   const base = {
   title,
-  speaker: speaker || "", // ✅ NEW (safe)
+  speaker: speaker || "",
   desc,
   place,
   type,
-
   startAt,
   endAt,
-
-  capacity: Math.max(0, capacity),
-  capacityStaff: Math.max(0, capacityStaff),
-
-  bookedCount: 0,
-  bookedStaffCount: 0,
-
   createdAt: serverTimestamp(),
   createdBy: auth.currentUser?.uid || "",
 };
-
-    if (isWorkshopEvent(type)){
-      base.workshopKey = normalizeKey(title);
-    }
 
     await addDoc(collection(db, "events"), base);
 
@@ -402,14 +235,12 @@ async function createEvent(){
 }
 
 async function deleteEventAndCleanup(eventId){
-  const regsSnap = await getDocs(collection(db, "events", eventId, "registrations"));
-  await Promise.all(regsSnap.docs.map(d => deleteDoc(d.ref)));
   await deleteDoc(doc(db, "events", eventId));
 }
 
 async function deleteEvent(eventId){
   if (!isAdmin()) return;
-  if (!confirm("Supprimer cet évènement ? Cela désinscrira tous les participants.")) return;
+  if (!confirm("Supprimer cet évènement ?")) return;
 
   try{
     await deleteEventAndCleanup(eventId);
@@ -420,147 +251,6 @@ async function deleteEvent(eventId){
   }
 }
 
-// =====================
-// REGISTRATION (JOIN / LEAVE) — Conf/Autre uniquement
-// =====================
-function eventTypeKey(evType=""){
-  const t = String(evType).toLowerCase();
-  if (t.includes("workshop")) return "ws";
-  if (t.includes("conf")) return "conf";
-  return "other";
-}
-
-async function registerToEvent(eventId){
-  const uid = auth.currentUser?.uid;
-  if (!uid) { location.href="./login.html"; return; }
-
-  // block workshops in-app
-  const evSnapPeek = await getDoc(doc(db, "events", eventId));
-  if (evSnapPeek.exists()){
-    const evPeek = evSnapPeek.data() || {};
-    if (isWorkshopEvent(evPeek.type)){
-      alert("Les workshops se font uniquement via HelloAsso 🙂");
-      return;
-    }
-  }
-
-  const rights = await requireTicketOrRedirect();
-  if (!rights) return;
-
-  const evRef    = doc(db, "events", eventId);
-  const regRef   = doc(db, "events", eventId, "registrations", uid);
-  const usageRef = doc(db, "userUsage", uid);
-
-  await runTransaction(db, async (tx)=>{
-    const evSnap = await tx.get(evRef);
-    if (!evSnap.exists()) throw new Error("Évènement introuvable.");
-
-    const ev = evSnap.data() || {};
-    if (isWorkshopEvent(ev.type)) throw new Error("Les workshops se font uniquement via HelloAsso.");
-
-    // déjà inscrit ?
-    const regSnap = await tx.get(regRef);
-    if (regSnap.exists()) throw new Error("Tu es déjà inscrit(e).");
-
-    // capacité (lecture OK) — mais on ne touche plus events/ côté user
-    const capPublic  = Number(ev.capacity || 0);
-    const capStaff   = Number(ev.capacityStaff || 0);
-    const bookedPub  = Number(ev.bookedCount || 0);
-    const bookedStf  = Number(ev.bookedStaffCount || 0);
-
-    if (rights.isStaff){
-      if (capStaff > 0 && bookedStf >= capStaff) throw new Error("Plus de places STAFF disponibles.");
-    } else {
-      if (capPublic > 0 && bookedPub >= capPublic) throw new Error("Plus de places disponibles.");
-    }
-
-    const typeKey = eventTypeKey(ev.type);
-
-    // USAGE
-    const uSnap = await tx.get(usageRef);
-    const usage = uSnap.exists() ? (uSnap.data() || {}) : {};
-
-    const confUsed  = Number(usage.conferenceUsed || 0);
-    const otherUsed = Number(usage.otherUsed || 0);
-
-    // si doc absent => on le crée (rules allow create)
-    if (!uSnap.exists()) {
-      tx.set(usageRef, { workshopUsed: 0, conferenceUsed: 0, otherUsed: 0 });
-    }
-
-    if (typeKey === "conf"){
-      if (confUsed >= rights.confAllowed) throw new Error("Tu n’as plus de conférence disponible.");
-      tx.update(usageRef, { conferenceUsed: confUsed + 1 });
-    } else {
-      if (otherUsed >= rights.otherAllowed) throw new Error("Tu n’as plus de quota “Autre” disponible.");
-      tx.update(usageRef, { otherUsed: otherUsed + 1 });
-    }
-
-    // REGISTRATION (rules OK)
-    tx.set(regRef, {
-      uid,
-      isStaff: !!rights.isStaff,
-      createdAt: serverTimestamp()
-    });
-
-    // ✅ IMPORTANT : PAS de tx.update(evRef, bookedCount...) (interdit par rules)
-  });
-}
-
-async function unregisterFromEvent(eventId){
-  const uid = auth.currentUser?.uid;
-  if (!uid) { location.href="./login.html"; return; }
-
-  // block workshops in-app
-  const evSnapPeek = await getDoc(doc(db, "events", eventId));
-  if (evSnapPeek.exists()){
-    const evPeek = evSnapPeek.data() || {};
-    if (isWorkshopEvent(evPeek.type)){
-      alert("Les workshops se gèrent sur HelloAsso 🙂");
-      return;
-    }
-  }
-
-  const evRef    = doc(db, "events", eventId);
-  const regRef   = doc(db, "events", eventId, "registrations", uid);
-  const usageRef = doc(db, "userUsage", uid);
-
-  await runTransaction(db, async (tx)=>{
-    const evSnap = await tx.get(evRef);
-    if (!evSnap.exists()) throw new Error("Évènement introuvable.");
-
-    const ev = evSnap.data() || {};
-    if (isWorkshopEvent(ev.type)) throw new Error("Les workshops se gèrent sur HelloAsso.");
-
-    const regSnap = await tx.get(regRef);
-    if (!regSnap.exists()) throw new Error("Tu n’es pas inscrit(e).");
-
-    const typeKey = eventTypeKey(ev.type);
-
-    // USAGE
-    const uSnap = await tx.get(usageRef);
-    const usage = uSnap.exists() ? (uSnap.data() || {}) : {};
-
-    const confUsed  = Number(usage.conferenceUsed || 0);
-    const otherUsed = Number(usage.otherUsed || 0);
-
-    // si doc absent => on le crée (safe)
-    if (!uSnap.exists()) {
-      tx.set(usageRef, { workshopUsed: 0, conferenceUsed: 0, otherUsed: 0 });
-    }
-
-    if (typeKey === "conf"){
-      tx.update(usageRef, { conferenceUsed: Math.max(0, confUsed - 1) });
-    } else {
-      tx.update(usageRef, { otherUsed: Math.max(0, otherUsed - 1) });
-    }
-
-    tx.delete(regRef);
-
-    // ✅ IMPORTANT : PAS de tx.update(evRef, bookedCount...) (interdit par rules)
-  });
-}
-    
 // =====================
 // ADMIN: LISTE PARTICIPANTS
 // =====================
@@ -695,221 +385,9 @@ if (reloadBtn){
 }
 
 // =====================
-// PROMO GLOBAL (ADMIN) — UI + NOTIFS
-// (tu as déjà la logique, ici on garde le rendu top-zone)
-// =====================
-async function sendNotif(toUid, payload){
-  await addDoc(collection(db, "notifications", toUid, "items"), {
-    toUid,
-    fromUid: auth.currentUser?.uid || "",
-    fromEmail: auth.currentUser?.email || "",
-    read: false,
-    createdAt: serverTimestamp(),
-    ...payload
-  });
-}
-
-async function assignPromoCodeToUserIfNeeded(uid, tier){
-  tier = String(tier || "").toLowerCase();
-  if (!["premium","standard","essentiel"].includes(tier)) return "";
-
-  const userRef  = doc(db, "userTickets", uid);
-  const poolsRef = doc(db, "config", "promoPools");
-
-  const res = await runTransaction(db, async (tx) => {
-    // ✅ READ 1: userTickets
-    const userSnap = await tx.get(userRef);
-    if (!userSnap.exists()) return { code:"" };
-
-    const userData = userSnap.data() || {};
-
-    // ✅ tier réel dérivé du packKey (évite mismatch rules)
-    const realTier = tierFromPackKey(userData.packKey);
-    if (!["premium","standard","essentiel"].includes(realTier)) return { code:"" };
-
-    // déjà un code
-    const existing = String(userData.promoCode || "").trim();
-    if (existing) return { code: existing, already:true };
-
-    const qrHash = String(userData.qrHash || "").trim();
-    if (!qrHash) return { code:"" };
-
-    const claimRef  = doc(db, "promoClaims", qrHash);
-    const claimSnap = await tx.get(claimRef);
-
-    // ✅ READ 2: pools
-    const poolsSnap = await tx.get(poolsRef);
-
-    // --- déjà claim => réapplique sur userTickets ---
-    if (claimSnap.exists()){
-      const claim = claimSnap.data() || {};
-      const code = String(claim.code || "").trim();
-      const claimTier = tierFromPackKey(claim.tier || realTier) || realTier;
-
-      if (code){
-        tx.set(userRef, {
-          promoCode: code,
-          promoTier: claimTier,
-          promoAssignedAt: claim.assignedAt || serverTimestamp(),
-        }, { merge:true });
-      }
-      return { code };
-    }
-
-    // --- consommer pool ---
-    const poolsData = poolsSnap.exists() ? (poolsSnap.data() || {}) : {};
-    const list = Array.isArray(poolsData[realTier])
-      ? poolsData[realTier].map(x=>String(x||"").trim()).filter(Boolean)
-      : [];
-
-    if (!list.length) return { code:"" };
-
-    const code = list[0];
-    const rest = list.slice(1);
-
-    // ✅ READ 3: promoCodes registre
-   const codeId  = String(code).toLowerCase();
-const codeRef = doc(db, "promoCodes", codeId);
-
-// ✅ pas de read (rules), on écrit direct
-tx.set(codeRef, {
-  code,
-  tier: realTier,
-  assignedTo: uid,
-  assignedAt: serverTimestamp(),
-  copiedAt: null,
-  redeemedAt: null
-}, { merge: true });
-
-    return { code };
-  });
-
-  return String(res?.code || "").trim();
-}
-
-async function broadcastPromoToTier(tier, helloAssoUrl){
-  if (!isAdmin()) throw new Error("Réservé à l’admin Ti’Doc.");
-  tier = String(tier || "").toLowerCase();
-  if (!["premium","standard","essentiel"].includes(tier)) throw new Error("Tier invalide.");
-
-    const usersSnap = await getDocs(collection(db, "userTickets"));
-    const recipients = [];
-    usersSnap.forEach(d => {
-    const data = d.data() || {};
-    const pkTier = tierFromPackKey(data.packKey || "");
-    if (pkTier && pkTier === tier) {
-      recipients.push({
-        uid: d.id,
-        promoCode: String(data.promoCode || "").trim()
-      });
-    }
-  });
-
-  if (!recipients.length) return 0;
-
-  const title = `🎟️ Code promo workshops — ${tier.toUpperCase()}`;
-
-    const failed = [];
-  for (const u of recipients){
-  if (u.promoCode) continue;
-
-  try {
-    u.promoCode = await assignPromoCodeToUserIfNeeded(u.uid, tier);
-    u.assignError = u.promoCode ? "" : "POOL_VIDE_OU_TIER_INVALIDE";
-  } catch (e) {
-    console.log("assignPromoCodeToUserIfNeeded failed for", u.uid, e);
-    u.assignError = e?.message || String(e);
-  }
-}
-  
- await Promise.all(recipients.map(u => {
-  const code = String(u.promoCode || "").trim();
-
-  let text;
-  if (code) {
-    text = `Ton code promo personnel est : ${code}`;
-  } else if (u.assignError && u.assignError !== "POOL_VIDE_OU_TIER_INVALIDE") {
-    text = `❌ Erreur attribution code : ${u.assignError}`;
-  } else {
-    text = `Codes promo temporairement indisponibles. Contacte l’admin.`;
-  }
-
-  return sendNotif(u.uid, {
-    type: "workshop_promo",
-    title,
-    text,
-    promoCode: code,
-    linkLabel: "Ouvrir HelloAsso",
-    linkUrl: String(helloAssoUrl || "").trim()
-  });
-}));
-
-  return recipients.length;
-}
-
-function renderPromoBroadcastCard(){
-  const wrap = document.createElement("section");
-  wrap.className = "card promo-card";
-  wrap.style.border = "2px dashed rgba(23,140,168,.35)";
-  wrap.style.padding = "14px";
-  wrap.style.marginBottom = "14px";
-  wrap.style.background = "rgba(23,140,168,.04)";
-
-  wrap.innerHTML = `
-    <div style="display:flex; flex-direction:column; gap:10px;">
-      <div style="font-weight:950; color:#0e5f71; font-size:16px;">🎟️ Envoi codes promo (workshops)</div>
-
-      <label style="display:flex; flex-direction:column; gap:6px;">
-        <span style="font-weight:900;">Lien HelloAsso (global)</span>
-        <input id="promoGlobalHelloAsso" type="text" placeholder="https://..."
-          style="padding:10px 12px; border-radius:12px; border:1px solid rgba(0,0,0,.15);">
-      </label>
-
-      <div style="display:flex; gap:10px; flex-wrap:wrap;">
-        <button class="btn-premium btn-premium-outline" type="button" data-send-tier="premium">Envoyer → Premium</button>
-        <button class="btn-premium btn-premium-outline" type="button" data-send-tier="standard">Envoyer → Standard</button>
-        <button class="btn-premium btn-premium-outline" type="button" data-send-tier="essentiel">Envoyer → Essentiel</button>
-      </div>
-
-      <div id="promoBroadcastMsg" style="font-size:12px; font-weight:900; color:rgba(15,35,42,.65);"></div>
-    </div>
-  `;
-
-  const input = wrap.querySelector("#promoGlobalHelloAsso");
-  const msg   = wrap.querySelector("#promoBroadcastMsg");
-
-  wrap.querySelectorAll("button[data-send-tier]").forEach(btn => {
-    btn.addEventListener("click", async ()=>{
-      const tier  = String(btn.getAttribute("data-send-tier") || "").toLowerCase();
-      const hello = String(input?.value || "").trim();
-
-      if (!/^https?:\/\//i.test(hello)) {
-        alert("Mets un lien HelloAsso valide (http(s)://...)");
-        return;
-      }
-
-      try{
-        btn.disabled = true;
-        if (msg) msg.textContent = "⏳ Envoi…";
-        const n = await broadcastPromoToTier(tier, hello);
-        if (msg) msg.textContent = `✅ Envoyé à ${n} utilisateur(s) (${tier}).`;
-      } catch(e){
-        console.log("broadcastPromoToTier error:", e);
-        if (msg) msg.textContent = "❌ " + (e?.message || String(e));
-        alert("❌ " + (e?.message || String(e)));
-      } finally {
-        btn.disabled = false;
-      }
-    });
-  });
-
-  return wrap;
-}
-
-// =====================
 // RENDER EVENT CARD
 // =====================
-function renderEventCard(eventId, e = {}, { myWorkshopKeys = new Set(), regMap = {}, countsMap = {} } = {}){
+function renderEventCard(eventId, e = {}){
   const start = e.startAt?.toDate ? e.startAt.toDate() : null;
   const end   = e.endAt?.toDate ? e.endAt.toDate() : null;
 
@@ -918,43 +396,30 @@ function renderEventCard(eventId, e = {}, { myWorkshopKeys = new Set(), regMap =
   const endStr  = end ? formatTime(end) : "";
 
   const title   = String(e.title || "Évènement");
-const speaker = String(e.speaker || "").trim(); // ✅ NEW
-const place   = String(e.place || "");
-const type    = String(e.type || "Autre");
-const desc    = String(e.desc || "");
+  const speaker = String(e.speaker || "").trim();
+  const place   = String(e.place || "");
+  const type    = String(e.type || "Autre");
+  const desc    = String(e.desc || "");
 
-  const isWs = isWorkshopEvent(type);
-  const wkKey = isWs ? getEventWorkshopKey(e) : "";
-  const hasWsTicket = isWs && myWorkshopKeys.has(wkKey);
-
-  const isReg = !!regMap[eventId];
   const admin = isAdmin();
 
-  const capPub  = Number(e.capacity || 0);
-  const capStf  = Number(e.capacityStaff || 0);
+  const metaItems = [];
+  if (timeStr) {
+    metaItems.push(`<span class="event-meta-item">🕒 ${escapeHTML(timeStr)}${endStr ? "–" + escapeHTML(endStr) : ""}</span>`);
+  }
+  if (speaker) {
+    metaItems.push(`<span class="event-meta-item">👨‍⚕️ ${escapeHTML(speaker)}</span>`);
+  }
+  if (place) {
+    metaItems.push(
+      `<span class="event-meta-item">📍 <a href="${mapsUrl(place)}" target="_blank" rel="noopener">${escapeHTML(place)}</a></span>`
+    );
+  }
+  if (type) {
+    metaItems.push(`<span class="event-meta-item">🏷️ ${escapeHTML(type)}</span>`);
+  }
 
-  const bookedP = Number(countsMap?.[eventId]?.pub   ?? e.bookedCount ?? 0);
-  const bookedS = Number(countsMap?.[eventId]?.staff ?? e.bookedStaffCount ?? 0);
-
-  // ✅ on construit metaLine en JS NORMAL (pas dans le template)
-  // ✅ Meta en "items" (wrappables)
-const metaItems = [];
-if (timeStr) {
-  metaItems.push(`<span class="event-meta-item">🕒 ${escapeHTML(timeStr)}${endStr ? "–" + escapeHTML(endStr) : ""}</span>`);
-}
-if (speaker) {
-  metaItems.push(`<span class="event-meta-item">👨‍⚕️ ${escapeHTML(speaker)}</span>`);
-}
-if (place) {
-  metaItems.push(
-    `<span class="event-meta-item">📍 <a href="${mapsUrl(place)}" target="_blank" rel="noopener">${escapeHTML(place)}</a></span>`
-  );
-}
-if (type) {
-  metaItems.push(`<span class="event-meta-item">🏷️ ${escapeHTML(type)}</span>`);
-}
-
-const metaLine = metaItems.join("");
+  const metaLine = metaItems.join("");
 
   const sec = document.createElement("section");
   sec.className = "event-card";
@@ -973,79 +438,19 @@ const metaLine = metaItems.join("");
 
       ${metaLine ? `<div class="event-meta-under event-meta-wrap">${metaLine}</div>` : ""}
       ${desc ? `<div class="event-desc">${escapeHTML(desc)}</div>` : ""}
-
-      <div class="event-chips">
-        ${capPub ? `<span class="chip">👥 Public: ${Math.max(0, capPub - bookedP)}/${capPub}</span>` : `<span class="chip">👥 Public: ∞</span>`}
-        ${capStf ? `<span class="chip">🛡️ Staff: ${Math.max(0, capStf - bookedS)}/${capStf}</span>` : ``}
-        ${isWs ? `<span class="chip">🔑 ${escapeHTML(wkKey || "—")}</span>` : ``}
-        ${hasWsTicket ? `<span class="chip chip-ok">✅ INSCRIT</span>` : ``}
-      </div>
     </div>
   `;
 
   const actions = sec.querySelector("[data-actions]");
 
-  // ADMIN buttons
   if (admin){
-    const btnList = document.createElement("button");
-    btnList.className = "pill-btn";
-    btnList.type = "button";
-    btnList.textContent = "Liste participants";
-    btnList.addEventListener("click", () => loadParticipants(eventId));
-
     const btnDel = document.createElement("button");
     btnDel.className = "icon-danger";
     btnDel.type = "button";
     btnDel.innerHTML = TRASH_SVG;
     btnDel.title = "Supprimer";
     btnDel.addEventListener("click", () => deleteEvent(eventId));
-
-    actions?.appendChild(btnList);
     actions?.appendChild(btnDel);
-  }
-
-  // USER button
-  const uid = auth.currentUser?.uid;
-
-  if (isWs){
-    const hello = String(e.helloAssoUrl || "").trim();
-
-    const a = document.createElement("a");
-    a.className = "btn-premium btn-premium-primary";
-    a.href = hello || "#";
-    a.target = "_blank";
-    a.rel = "noopener";
-    a.textContent = hasWsTicket ? "✅ INSCRIT" : "Ouvrir HelloAsso";
-
-    if (!hello){
-      a.className = "btn-premium btn-premium-outline";
-      a.textContent = admin ? "⚠️ Ajouter HelloAsso" : "Workshop";
-      a.addEventListener("click", (ev)=>ev.preventDefault());
-    }
-
-    actions?.appendChild(a);
-
-  } else {
-    const btn = document.createElement("button");
-    btn.className = isReg ? "btn-premium btn-premium-outline" : "btn-premium btn-premium-primary";
-    btn.type = "button";
-    btn.textContent = isReg ? "Se désinscrire" : "S’inscrire";
-
-    btn.addEventListener("click", async ()=>{
-      try{
-        if (!uid){ location.href="./login.html"; return; }
-        btn.disabled = true;
-        if (isReg) await unregisterFromEvent(eventId);
-        else await registerToEvent(eventId);
-        await loadEvents();
-      } catch(err){
-        alert(err?.message || String(err));
-      } finally {
-        btn.disabled = false;
-      }
-    });
-
-    actions?.appendChild(btn);
   }
 
   return sec;
@@ -1068,95 +473,15 @@ async function loadEvents(){
       return;
     }
 
-    // ✅ IMPORTANT : on fabrique "docs" (sinon tes docs.map crash)
     const docs = snap.docs.map(d => ({ id: d.id, data: d.data() }));
 
-    const myWorkshopKeys = await loadMyWorkshopKeys();
-
-    const uid = auth.currentUser?.uid || "";
-    const isLogged = !!uid;
-
-    const countsMap = {}; // { [eventId]: { pub:number, staff:number } }
-
-    if (isLogged) {
-      await Promise.all(docs.map(async (row) => {
-        const e = row.data || {};
-        if (isWorkshopEvent(e.type)) return;
-
-        try {
-          const regsCol = collection(db, "events", row.id, "registrations");
-          const pubQ   = query(regsCol, where("isStaff", "==", false));
-          const staffQ = query(regsCol, where("isStaff", "==", true));
-
-          const [pubC, staffC] = await Promise.all([
-            getCountFromServer(pubQ),
-            getCountFromServer(staffQ)
-          ]);
-
-          countsMap[row.id] = {
-            pub:   Number(pubC.data().count || 0),
-            staff: Number(staffC.data().count || 0),
-          };
-        } catch (err) {
-          console.log("count error for", row.id, err);
-          countsMap[row.id] = { pub: 0, staff: 0 };
-        }
-      }));
-    } else {
-      // pas connecté => on ne tente aucun read "registrations"
-      docs.forEach(row => { countsMap[row.id] = null; });
-    }
-
-    // Map inscription (conf/autre) — uniquement si connecté
-    const regMap = {};
-    if (uid) {
-      await Promise.all(docs.map(async (row) => {
-        const e = row.data || {};
-        if (isWorkshopEvent(e.type)) return;
-
-        try {
-          const r = await getDoc(doc(db, "events", row.id, "registrations", uid));
-          if (r.exists()) regMap[row.id] = true;
-        } catch (_) {}
-      }));
-    }
-
-    // tri priorité (inscrit / workshop ticket)
-    const scored = docs.map(row => {
-      const e = row.data || {};
-      const isWs = isWorkshopEvent(e.type);
-      const wkKey = isWs ? getEventWorkshopKey(e) : "";
-      const hasWsTicket = isWs && myWorkshopKeys.has(wkKey);
-      const isReg = !!regMap[row.id];
-
-      let score = 0;
-      if (hasWsTicket) score += 200;
-      if (isReg) score += 150;
-
-      return { ...row, score };
-    });
-
-    scored.sort((a, b) => {
-      if (b.score !== a.score) return b.score - a.score;
-      const da = a.data?.startAt?.toMillis ? a.data.startAt.toMillis() : 0;
-      const dbb = b.data?.startAt?.toMillis ? b.data.startAt.toMillis() : 0;
-      return da - dbb;
-    });
-
-    // rendu
     eventsList.innerHTML = "";
 
-    // bloc admin promo en haut (si présent dans HTML)
     const promoZone = document.getElementById("promoTopZone");
-    if (promoZone) {
-      promoZone.innerHTML = "";
-      if (isAdmin()) {
-        promoZone.appendChild(renderPromoBroadcastCard());
-      }
-    }
+    if (promoZone) promoZone.innerHTML = "";
 
-    scored.forEach((row) => {
-      const card = renderEventCard(row.id, row.data, { myWorkshopKeys, regMap, countsMap });
+    docs.forEach((row) => {
+      const card = renderEventCard(row.id, row.data);
       if (card) eventsList.appendChild(card);
     });
 
@@ -1195,13 +520,12 @@ document.addEventListener("DOMContentLoaded", () => {
   });
 
   onAuthStateChanged(auth, async () => {
-    try{
-      applyAdminUI();
-      await loadPackConfig();
-      await loadEvents();
-    } catch(e){
-      console.log("boot error:", e);
-      if (eventsList) eventsList.innerHTML = `<section class="card"><p>❌ Boot: ${escapeHTML(e?.message || String(e))}</p></section>`;
-    }
-  });
+  try{
+    applyAdminUI();
+    await loadEvents();
+  } catch(e){
+    console.log("boot error:", e);
+    if (eventsList) eventsList.innerHTML = `<section class="card"><p>❌ Boot: ${escapeHTML(e?.message || String(e))}</p></section>`;
+  }
+});
 });
