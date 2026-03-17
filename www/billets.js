@@ -755,7 +755,7 @@ async function deleteMyTicketAndUnclaim() {
 
   const userId = u.uid;
 
-  try {
+    try {
     // 1️⃣ Lire le billet principal pour récupérer le qrHash
     const ticketRef = doc(db, "userTickets", userId);
     const snap = await getDoc(ticketRef);
@@ -765,13 +765,23 @@ async function deleteMyTicketAndUnclaim() {
     // 2️⃣ Supprimer billet principal
     await deleteDoc(ticketRef).catch(() => {});
 
-    // 3️⃣ Supprimer billets workshop
-    const wsQ = query(collection(db, "userWorkshopTickets"), where("uid", "==", userId));
-    const wsSnap = await getDocs(wsQ);
-    const wsDeletes = wsSnap.docs.map(d => deleteDoc(d.ref));
-    await Promise.allSettled(wsDeletes);
+    // 3️⃣ Charger tous les billets secondaires
+    const [wsSnap, confSnap, sandwichSnap, partySnap] = await Promise.all([
+      getDocs(query(collection(db, "userWorkshopTickets"), where("uid", "==", userId))),
+      getDocs(query(collection(db, "userConferenceTickets"), where("uid", "==", userId))),
+      getDocs(query(collection(db, "userSandwichTickets"), where("uid", "==", userId))),
+      getDocs(query(collection(db, "userPartyTickets"), where("uid", "==", userId)))
+    ]);
 
-    // 4️⃣ Supprimer toutes les inscriptions événements
+    // 4️⃣ Supprimer billets workshop / conférence / sandwich / soirée
+    await Promise.allSettled([
+      ...wsSnap.docs.map(d => deleteDoc(d.ref)),
+      ...confSnap.docs.map(d => deleteDoc(d.ref)),
+      ...sandwichSnap.docs.map(d => deleteDoc(d.ref)),
+      ...partySnap.docs.map(d => deleteDoc(d.ref))
+    ]);
+
+    // 5️⃣ Supprimer toutes les inscriptions événements
     const eventsSnap = await getDocs(collection(db, "events"));
     const deleteRegs = [];
     eventsSnap.forEach(ev => {
@@ -780,10 +790,10 @@ async function deleteMyTicketAndUnclaim() {
     });
     await Promise.allSettled(deleteRegs);
 
-    // 5️⃣ Supprimer document usage (quotas)
+    // 6️⃣ Supprimer document usage (quotas)
     await deleteDoc(doc(db, "userUsage", userId)).catch(() => {});
 
-    // 6️⃣ Libérer QR claim (si existait)
+    // 7️⃣ Libérer le QR claim du billet principal
     if (qrHash) {
       const claimRef = doc(db, "qrClaims", qrHash);
       await runTransaction(db, async (tx) => {
@@ -794,13 +804,73 @@ async function deleteMyTicketAndUnclaim() {
       }).catch(() => {});
     }
 
-    // 7️⃣ Effacer le nom associé au billet
+    // 8️⃣ Libérer les QR claims des workshops
+    await Promise.allSettled(
+      wsSnap.docs.map(d => {
+        const h = String(d.data()?.qrHash || "");
+        if (!h) return Promise.resolve();
+        return runTransaction(db, async (tx) => {
+          const claimRef = doc(db, "qrClaims", h);
+          const cs = await tx.get(claimRef);
+          if (!cs.exists()) return;
+          const uid = String(cs.data()?.uid || "");
+          if (uid === userId) tx.delete(claimRef);
+        }).catch(() => {});
+      })
+    );
+
+    // 9️⃣ Libérer les QR claims des conférences
+    await Promise.allSettled(
+      confSnap.docs.map(d => {
+        const h = String(d.data()?.qrHash || "");
+        if (!h) return Promise.resolve();
+        return runTransaction(db, async (tx) => {
+          const claimRef = doc(db, "qrClaims", h);
+          const cs = await tx.get(claimRef);
+          if (!cs.exists()) return;
+          const uid = String(cs.data()?.uid || "");
+          if (uid === userId) tx.delete(claimRef);
+        }).catch(() => {});
+      })
+    );
+
+    // 🔟 Libérer les QR claims des sandwiches
+    await Promise.allSettled(
+      sandwichSnap.docs.map(d => {
+        const h = String(d.data()?.qrHash || "");
+        if (!h) return Promise.resolve();
+        return runTransaction(db, async (tx) => {
+          const claimRef = doc(db, "qrClaims", h);
+          const cs = await tx.get(claimRef);
+          if (!cs.exists()) return;
+          const uid = String(cs.data()?.uid || "");
+          if (uid === userId) tx.delete(claimRef);
+        }).catch(() => {});
+      })
+    );
+
+    // 11️⃣ Libérer les QR claims des soirées
+    await Promise.allSettled(
+      partySnap.docs.map(d => {
+        const h = String(d.data()?.qrHash || "");
+        if (!h) return Promise.resolve();
+        return runTransaction(db, async (tx) => {
+          const claimRef = doc(db, "qrClaims", h);
+          const cs = await tx.get(claimRef);
+          if (!cs.exists()) return;
+          const uid = String(cs.data()?.uid || "");
+          if (uid === userId) tx.delete(claimRef);
+        }).catch(() => {});
+      })
+    );
+
+    // 12️⃣ Effacer le nom associé au billet
     await setDoc(doc(db, "users", userId), {
       ticketHolderName: "",
       ticketUpdatedAt: serverTimestamp()
     }, { merge: true }).catch(() => {});
 
-    // 8️⃣ Nettoyage interface
+    // 13️⃣ Nettoyage interface
     if (boxEl) boxEl.textContent = "Aucun billet importé pour l’instant.";
     clearTicketPreview();
     await loadSavedTicket().catch(() => {});
