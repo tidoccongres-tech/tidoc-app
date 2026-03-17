@@ -1178,6 +1178,7 @@ if (!sandwichTitle) {
   partyTitle,
   rawText: raw
 };
+}
 
 // =====================
 // Render main ticket + promo + workshops list
@@ -1860,7 +1861,7 @@ LAST_SANDWICHES = sandwiches;
     setStatus((workshops.length || parties.length) ? "✅ Billets chargés" : "");
     if (!boxEl) return;
 
-    if (!workshops.length && !parties.length) {
+       if (!workshops.length && !parties.length && !conferences.length && !sandwiches.length) {
       boxEl.textContent = "Aucun billet importé pour l’instant.";
       return;
     }
@@ -1902,12 +1903,18 @@ LAST_SANDWICHES = sandwiches;
   });
 
   // on ajoute la box Ti’Masqué sous la box workshops
-  if (boxEl && !boxEl.querySelector("#partyTicketsListBox")) {
-    boxEl.insertAdjacentHTML("beforeend", `<div id="partyTicketsListBox" style="margin-top:12px;"></div>`);
+    if (boxEl && !boxEl.querySelector("#partyTicketsListBox")) {
+    boxEl.insertAdjacentHTML("beforeend", `
+      <div id="partyTicketsListBox" style="margin-top:12px;"></div>
+      <div id="conferenceTicketsListBox" style="margin-top:12px;"></div>
+      <div id="sandwichTicketsListBox" style="margin-top:12px;"></div>
+    `);
   }
 
   renderWorkshopsList(workshops);
   renderPartyTicketsList(parties);
+  renderConferenceTicketsList(conferences);
+  renderSandwichTicketsList(sandwiches);
 }
 
 // =====================
@@ -2027,6 +2034,8 @@ else clearTicketPreview();
       workshopTitle = meta?.workshopTitle || "";
       partyTitle = meta?.partyTitle || "";
       rawText = meta?.rawText || text || "";
+      conferenceTitle = meta?.conferenceTitle || "";
+      sandwichTitle = meta?.sandwichTitle || "";
     }
     else {
       throw new Error("Format non supporté (PDF ou image uniquement).");
