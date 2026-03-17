@@ -10,7 +10,7 @@
 import * as AuthMod from "./auth.js";
 import {
   collection, addDoc, getDocs, getDoc, doc, deleteDoc,
-  serverTimestamp, query, orderBy, Timestamp
+  serverTimestamp, query, orderBy, Timestamp, limit
 } from "https://www.gstatic.com/firebasejs/10.12.4/firebase-firestore.js";
 import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.4/firebase-auth.js";
 
@@ -235,6 +235,8 @@ if (!d || !title) {
 }
 
 async function deleteEventAndCleanup(eventId){
+  const regsSnap = await getDocs(collection(db, "events", eventId, "registrations"));
+  await Promise.all(regsSnap.docs.map(d => deleteDoc(d.ref)));
   await deleteDoc(doc(db, "events", eventId));
 }
 
