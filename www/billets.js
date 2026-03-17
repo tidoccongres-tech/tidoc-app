@@ -63,6 +63,8 @@ const boxEl     = document.getElementById("ticketBox");
 let LAST_MAIN_TICKET = null;     // { qrText, packKey, holderName, ticketNumber }
 let LAST_WORKSHOPS = [];         // array of workshop docs
 let LAST_PARTIES = []; // billets Ti’Masqué (array)
+let LAST_CONFERENCES = []; // billets conférence (array)
+let LAST_SANDWICHES = [];  // billets sandwich (array)
 
 function setStatus(t = "") { if (statusEl) statusEl.textContent = t; }
 function escapeHTML(s = "") {
@@ -594,6 +596,73 @@ async function saveWorkshopTicket({ qrText, packKey, holderName, ticketNumber, w
   return { already: false };
 }
 
+async function saveConferenceTicket({ qrText, holderName, ticketNumber, conferenceTitle }) {
+  const u = auth.currentUser;
+  if (!u) throw new Error("Connexion requise.");
+
+  const qrHash = await sha256Hex(qrText);
+
+  const q = query(
+    collection(db, "userConferenceTickets"),
+    where("uid", "==", u.uid),
+    where("qrHash", "==", qrHash)
+  );
+  const snap = await getDocs(q);
+  if (!snap.empty) return { already: true };
+
+  const id = `${u.uid}_${qrHash}`;
+  const ref = doc(db, "userConferenceTickets", id);
+
+  const title = String(conferenceTitle || "").trim();
+  const key = title ? normalizeKey(title) : "";
+
+  await setDoc(ref, {
+    uid: u.uid,
+    qrText,
+    qrHash,
+    holderName: holderName || "",
+    ticketNumber: ticketNumber || "",
+    conferenceTitle: title,
+    conferenceKey: key,
+    createdAt: serverTimestamp()
+  });
+
+  return { already: false };
+}
+async function saveSandwichTicket({ qrText, holderName, ticketNumber, sandwichTitle }) {
+  const u = auth.currentUser;
+  if (!u) throw new Error("Connexion requise.");
+
+  const qrHash = await sha256Hex(qrText);
+
+  const q = query(
+    collection(db, "userSandwichTickets"),
+    where("uid", "==", u.uid),
+    where("qrHash", "==", qrHash)
+  );
+  const snap = await getDocs(q);
+  if (!snap.empty) return { already: true };
+
+  const id = `${u.uid}_${qrHash}`;
+  const ref = doc(db, "userSandwichTickets", id);
+
+  const title = String(sandwichTitle || "").trim();
+  const key = title ? normalizeKey(title) : "";
+
+  await setDoc(ref, {
+    uid: u.uid,
+    qrText,
+    qrHash,
+    holderName: holderName || "",
+    ticketNumber: ticketNumber || "",
+    sandwichTitle: title,
+    sandwichKey: key,
+    createdAt: serverTimestamp()
+  });
+
+  return { already: false };
+}
+
 // =====================
 // Save party ticket (Ti’Masqué) (multi)
 // =====================
@@ -775,6 +844,46 @@ async function deleteWorkshopTicketByHash(qrHash) {
   }
 }
 
+async function deleteConferenceTicketByHash(qrHash) {
+  const u = auth.currentUser;
+  if (!u) { setStatus("🔒 Connecte-toi."); return; }
+
+  const ok = confirm("Supprimer ce billet conférence ?");
+  if (!ok) return;
+
+  setStatus("⏳ Suppression du billet conférence…");
+
+  try {
+    const id = `${u.uid}_${qrHash}`;
+    await deleteDoc(doc(db, "userConferenceTickets", id)).catch(() => {});
+    await loadSavedTicket();
+    setStatus("✅ Billet conférence supprimé");
+  } catch (e) {
+    console.error("deleteConferenceTicketByHash error:", e);
+    setStatus("❌ " + (e?.message || "Erreur suppression billet conférence"));
+  }
+}
+
+async function deleteSandwichTicketByHash(qrHash) {
+  const u = auth.currentUser;
+  if (!u) { setStatus("🔒 Connecte-toi."); return; }
+
+  const ok = confirm("Supprimer ce billet sandwich ?");
+  if (!ok) return;
+
+  setStatus("⏳ Suppression du billet sandwich…");
+
+  try {
+    const id = `${u.uid}_${qrHash}`;
+    await deleteDoc(doc(db, "userSandwichTickets", id)).catch(() => {});
+    await loadSavedTicket();
+    setStatus("✅ Billet sandwich supprimé");
+  } catch (e) {
+    console.error("deleteSandwichTicketByHash error:", e);
+    setStatus("❌ " + (e?.message || "Erreur suppression billet sandwich"));
+  }
+}
+
 // =====================
 // QR scan (jsQR)
 // =====================
@@ -912,7 +1021,7 @@ const PARTY_KEYWORDS = [
 function parseMetaFromText(raw = "") {
   const lines = String(raw).split(/\r?\n/).map(l => l.replace(/\s+/g, " ").trim()).filter(Boolean);
   const full = lines.join(" ");
-
+  
   // pack (inclut workshop/atelier + staffeurs)
   let packKey = "";
   const mp = full.match(/pack\s*(essentiel|standard|premium|workshop|atelier|staffeurs?|staff)/i);
@@ -988,6 +1097,44 @@ function parseMetaFromText(raw = "") {
     }
   }
 
+  let conferenceTitle = "";
+  for (const l of lines) {
+  const mc = l.match(/\b(conference|conférence)\b\s*[:\-–—]?\s*(.+)$/i);
+  if (mc && mc[2]) {
+    const tail = String(mc[2]).trim();
+    if (tail && !/^pack\b/i.test(tail)) {
+      conferenceTitle = tail;
+      break;
+    }
+  }
+}
+
+if (!conferenceTitle) {
+  const mc2 = full.match(/\b(conference|conférence)\b\s*[:\-–—]?\s*([A-Za-zÀ-ÖØ-öø-ÿ0-9'’"()\/+ .]{3,})/i);
+  if (mc2 && mc2[2]) {
+    conferenceTitle = String(mc2[2]).trim();
+  }
+}
+
+let sandwichTitle = "";
+for (const l of lines) {
+  const ms = l.match(/\b(sandwich|repas|meal|menu)\b\s*[:\-–—]?\s*(.+)$/i);
+  if (ms && ms[2]) {
+    const tail = String(ms[2]).trim();
+    if (tail && !/^pack\b/i.test(tail)) {
+      sandwichTitle = tail;
+      break;
+    }
+  }
+}
+
+if (!sandwichTitle) {
+  const ms2 = full.match(/\b(sandwich|repas|meal|menu)\b\s*[:\-–—]?\s*([A-Za-zÀ-ÖØ-öø-ÿ0-9'’"()\/+ .]{2,})/i);
+  if (ms2 && ms2[2]) {
+    sandwichTitle = String(ms2[2]).trim();
+  }
+}
+
   // =====================
   // Party title (Ti-Masqué)
   // =====================
@@ -1021,8 +1168,16 @@ function parseMetaFromText(raw = "") {
   }
 
   // ✅ IMPORTANT : on retourne aussi partyTitle
-  return { holderName, packKey, ticketNumber, workshopTitle, partyTitle, rawText: raw };
-}
+  return {
+  holderName,
+  packKey,
+  ticketNumber,
+  workshopTitle,
+  conferenceTitle,
+  sandwichTitle,
+  partyTitle,
+  rawText: raw
+};
 
 // =====================
 // Render main ticket + promo + workshops list
@@ -1171,6 +1326,104 @@ function renderWorkshopsList(workshops = []) {
   });
 }
 
+function renderConferenceTicketsList(conferences = []) {
+  const listBox =
+    boxEl?.querySelector("#conferenceTicketsListBox") ||
+    document.getElementById("conferenceTicketsListBox");
+
+  if (!listBox) return;
+
+  if (!conferences.length) {
+    listBox.innerHTML = `
+      <div style="opacity:.8; font-weight:800; color:rgba(31,75,86,.75);">
+        Aucun billet conférence importé pour l’instant.
+      </div>
+    `;
+    return;
+  }
+
+  const items = conferences.map((c) => `
+    <div style="position:relative; border:1px solid var(--line); border-radius:14px; padding:12px; background:#fff;">
+      <button class="delete-btn conf-del-btn"
+              type="button"
+              data-conf-hash="${escapeHTML(c.qrHash || "")}"
+              aria-label="Supprimer le billet conférence"
+              title="Supprimer"
+              style="position:absolute; top:10px; right:10px;">
+        ${TRASH_TIDOC_SVG}
+      </button>
+
+      <div style="font-weight:900; color:#0f4f60;">🎤 ${escapeHTML(c.conferenceTitle || "Conférence")}</div>
+      <div style="margin-top:6px;"><b>Nom :</b> ${escapeHTML(c.holderName || "—")}</div>
+      <div><b>N° billet :</b> ${escapeHTML(c.ticketNumber || "—")}</div>
+    </div>
+  `).join("");
+
+  listBox.innerHTML = `
+    <div style="margin-top:6px; font-weight:900; color:var(--tidoc);">🎟️ Billets conférence importés</div>
+    <div style="margin-top:10px; display:flex; flex-direction:column; gap:10px;">
+      ${items}
+    </div>
+  `;
+
+  listBox.querySelectorAll(".conf-del-btn").forEach(btn => {
+    btn.addEventListener("click", async () => {
+      const h = btn.getAttribute("data-conf-hash") || "";
+      if (!h) return;
+      await deleteConferenceTicketByHash(h);
+    });
+  });
+}
+
+function renderSandwichTicketsList(sandwiches = []) {
+  const listBox =
+    boxEl?.querySelector("#sandwichTicketsListBox") ||
+    document.getElementById("sandwichTicketsListBox");
+
+  if (!listBox) return;
+
+  if (!sandwiches.length) {
+    listBox.innerHTML = `
+      <div style="opacity:.8; font-weight:800; color:rgba(31,75,86,.75);">
+        Aucun billet sandwich importé pour l’instant.
+      </div>
+    `;
+    return;
+  }
+
+  const items = sandwiches.map((s) => `
+    <div style="position:relative; border:1px solid var(--line); border-radius:14px; padding:12px; background:#fff;">
+      <button class="delete-btn sandwich-del-btn"
+              type="button"
+              data-sandwich-hash="${escapeHTML(s.qrHash || "")}"
+              aria-label="Supprimer le billet sandwich"
+              title="Supprimer"
+              style="position:absolute; top:10px; right:10px;">
+        ${TRASH_TIDOC_SVG}
+      </button>
+
+      <div style="font-weight:900; color:#0f4f60;">🥪 ${escapeHTML(s.sandwichTitle || "Sandwich")}</div>
+      <div style="margin-top:6px;"><b>Nom :</b> ${escapeHTML(s.holderName || "—")}</div>
+      <div><b>N° billet :</b> ${escapeHTML(s.ticketNumber || "—")}</div>
+    </div>
+  `).join("");
+
+  listBox.innerHTML = `
+    <div style="margin-top:6px; font-weight:900; color:var(--tidoc);">🥪 Billets sandwich importés</div>
+    <div style="margin-top:10px; display:flex; flex-direction:column; gap:10px;">
+      ${items}
+    </div>
+  `;
+
+  listBox.querySelectorAll(".sandwich-del-btn").forEach(btn => {
+    btn.addEventListener("click", async () => {
+      const h = btn.getAttribute("data-sandwich-hash") || "";
+      if (!h) return;
+      await deleteSandwichTicketByHash(h);
+    });
+  });
+}  
+  
 function renderPartyTicketsList(parties = []) {
   const listBox =
     boxEl?.querySelector("#partyTicketsListBox") ||
@@ -1528,6 +1781,8 @@ async function loadSavedTicket() {
     LAST_MAIN_TICKET = null;
     LAST_WORKSHOPS = [];
     LAST_PARTIES = [];
+    LAST_CONFERENCES = [];
+    LAST_SANDWICHES = [];
     if (scanBtn) scanBtn.style.display = "none";
     return;
   }
@@ -1546,6 +1801,37 @@ async function loadSavedTicket() {
   }
   LAST_WORKSHOPS = workshops;
 
+// ===== CONFERENCES =====
+let conferences = [];
+try {
+  const cQ = query(
+    collection(db, "userConferenceTickets"),
+    where("uid", "==", u.uid)
+  );
+  const cSnap = await getDocs(cQ);
+  conferences = cSnap.docs.map(d => d.data() || {}).filter(Boolean);
+} catch (e) {
+  console.warn("conference tickets load error:", e);
+  conferences = [];
+}
+LAST_CONFERENCES = conferences;
+
+
+// ===== SANDWICHES =====
+let sandwiches = [];
+try {
+  const sQ = query(
+    collection(db, "userSandwichTickets"),
+    where("uid", "==", u.uid)
+  );
+  const sSnap = await getDocs(sQ);
+  sandwiches = sSnap.docs.map(d => d.data() || {}).filter(Boolean);
+} catch (e) {
+  console.warn("sandwich tickets load error:", e);
+  sandwiches = [];
+}
+LAST_SANDWICHES = sandwiches;
+  
   // ---- parties (Ti’Masqué) ----
   let parties = [];
   try {
@@ -1559,7 +1845,12 @@ async function loadSavedTicket() {
   LAST_PARTIES = parties;
 
   // scan icon: on l’affiche si main OU workshops OU parties
-  const hasAnyQR = !!(snap.exists() && (snap.data()?.qrText)) || workshops.length || parties.length;
+  const hasAnyQR =
+  !!(snap.exists() && (snap.data()?.qrText)) ||
+  workshops.length ||
+  parties.length ||
+  conferences.length ||
+  sandwiches.length;
   if (scanBtn) scanBtn.style.display = hasAnyQR ? "" : "none";
 
   // --- CAS: pas de billet principal ---
@@ -1578,10 +1869,14 @@ async function loadSavedTicket() {
       <div style="font-weight:900; color:var(--tidoc); margin-bottom:10px;">🎫 Tes billets</div>
       <div id="workshopsListBox"></div>
       <div id="partyTicketsListBox" style="margin-top:12px;"></div>
+      <div id="conferenceTicketsListBox" style="margin-top:12px;"></div>
+      <div id="sandwichTicketsListBox" style="margin-top:12px;"></div>
     `;
 
     renderWorkshopsList(workshops);
     renderPartyTicketsList(parties);
+    renderConferenceTicketsList(conferences);
+    renderSandwichTicketsList(sandwiches);
     return;
   }
 
@@ -1696,6 +1991,8 @@ else clearTicketPreview();
     let workshopTitle = "";
     let partyTitle = "";
     let rawText = "";
+    let conferenceTitle = "";
+    let sandwichTitle = "";
 
     // =====================
     // 1) EXTRACTION (PDF / IMAGE)
@@ -1712,6 +2009,8 @@ else clearTicketPreview();
       workshopTitle = meta?.workshopTitle || "";
       partyTitle = meta?.partyTitle || "";
       rawText = meta?.rawText || "";
+      conferenceTitle = meta?.conferenceTitle || "";
+      sandwichTitle = meta?.sandwichTitle || "";
     }
     else if (file.type.startsWith("image/")) {
       const canvas = await loadImageToCanvas(file);
@@ -1758,6 +2057,22 @@ else clearTicketPreview();
     if (!isKnownMain && looksParty) {
       packKey = "party";
     }
+
+    const looksConference =
+  /conference|conférence/i.test(String(conferenceTitle || "")) ||
+  /conference|conférence/i.test(String(rawText || ""));
+
+const looksSandwich =
+  /sandwich|repas|meal|menu/i.test(String(sandwichTitle || "")) ||
+  /sandwich|repas|meal|menu/i.test(String(rawText || ""));
+
+    if (!isKnownMain && looksConference) {
+  packKey = "conference_ticket";
+}
+
+if (!isKnownMain && looksSandwich) {
+  packKey = "sandwich";
+}
 
     // =====================
 // 3) VERIFICATION OFFICIELLE (si activée)
@@ -1808,6 +2123,43 @@ const p = String(packKey || "").toLowerCase();
       return;
     }
 
+
+if (p === "conference_ticket") {
+  const r = await saveConferenceTicket({
+    qrText,
+    holderName,
+    ticketNumber,
+    conferenceTitle
+  });
+
+  await syncNameFromTicket(holderName);
+  await loadSavedTicket();
+
+  setStatus(r?.already
+    ? "ℹ️ Billet conférence déjà importé"
+    : "✅ Billet conférence importé");
+
+  return;
+}
+
+    if (p === "sandwich") {
+  const r = await saveSandwichTicket({
+    qrText,
+    holderName,
+    ticketNumber,
+    sandwichTitle
+  });
+
+  await syncNameFromTicket(holderName);
+  await loadSavedTicket();
+
+  setStatus(r?.already
+    ? "ℹ️ Billet sandwich déjà importé"
+    : "✅ Billet sandwich importé");
+
+  return;
+}
+    
     // 🧪 Workshop
     if (p === "workshop") {
   const r = await saveWorkshopTicket({
