@@ -1531,7 +1531,13 @@ function ensureScanOverlay() {
   return ov;
 }
 
-function openScanMode({ mainTicket = null, workshops = [], parties = [] } = {}) {
+function openScanMode({
+  mainTicket = null,
+  workshops = [],
+  parties = [],
+  conferences = [],
+  sandwiches = []
+} = {}) {
   const ov = ensureScanOverlay();
   const body = ov.querySelector("#scanBody");
   if (!body) return;
@@ -2703,7 +2709,12 @@ function initBilletsPage() {
   bindAdminUI();
 
   document.getElementById("scanModeIconBtn")?.addEventListener("click", () => {
-  openScanMode({ mainTicket: LAST_MAIN_TICKET, workshops: LAST_WORKSHOPS, parties: LAST_PARTIES });
+  openScanMode({
+  mainTicket: LAST_MAIN_TICKET,
+  workshops: LAST_WORKSHOPS,
+  parties: LAST_PARTIES,
+  conferences: LAST_CONFERENCES,
+  sandwiches: LAST_SANDWICHES
 });
 }
 
