@@ -2716,6 +2716,7 @@ function initBilletsPage() {
   conferences: LAST_CONFERENCES,
   sandwiches: LAST_SANDWICHES
 });
+});
 }
 
 window.addEventListener("DOMContentLoaded", initBilletsPage);
